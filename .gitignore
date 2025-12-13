@@ -52,3 +52,8 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+varManager-MMDLoader_v1.0.1.0/
+
+.vs/
+
+.vscode/

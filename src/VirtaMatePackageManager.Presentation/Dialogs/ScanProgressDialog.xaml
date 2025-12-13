@@ -1,0 +1,107 @@
+<Window x:Class="VirtaMatePackageManager.Presentation.Dialogs.ScanProgressDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:VirtaMatePackageManager.Presentation.Dialogs"
+        xmlns:converters="clr-namespace:VirtaMatePackageManager.Presentation.Converters"
+        mc:Ignorable="d"
+        Title="Repository Scanning Progress" Height="350" Width="500"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize">
+    <Window.Resources>
+        <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+    </Window.Resources>
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Repository Name -->
+        <TextBlock Grid.Row="0" 
+                   Text="{Binding RepositoryName}" 
+                   FontSize="16" 
+                   FontWeight="Bold" 
+                   Margin="0,0,0,10"/>
+
+        <!-- Status Message -->
+        <TextBlock Grid.Row="1" 
+                   Text="{Binding StatusMessage}" 
+                   TextWrapping="Wrap" 
+                   Margin="0,0,0,10"/>
+
+        <!-- Progress Bar -->
+        <ProgressBar Grid.Row="2" 
+                     Value="{Binding ProgressValue}" 
+                     Minimum="0" 
+                     Maximum="100" 
+                     Height="25" 
+                     Margin="0,0,0,10"/>
+
+        <!-- Current File -->
+        <TextBlock Grid.Row="3" 
+                   Text="{Binding CurrentFile}" 
+                   TextWrapping="Wrap" 
+                   FontStyle="Italic" 
+                   Foreground="Gray" 
+                   Margin="0,0,0,10"
+                   Visibility="{Binding CurrentFile, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}"/>
+
+        <!-- Statistics -->
+        <GroupBox Grid.Row="4" Header="Statistics" Margin="0,0,0,10">
+            <Grid Margin="5">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Files Scanned:" FontWeight="SemiBold" Margin="0,0,10,5"/>
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding FilesScanned}" Margin="0,0,0,5"/>
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Files Added:" FontWeight="SemiBold" Margin="0,0,10,5"/>
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding FilesAdded}" Margin="0,0,0,5"/>
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Files Updated:" FontWeight="SemiBold" Margin="0,0,10,5"/>
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding FilesUpdated}" Margin="0,0,0,5"/>
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Files Deleted:" FontWeight="SemiBold" Margin="0,0,10,5"/>
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding FilesDeleted}" Margin="0,0,0,5"/>
+
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Errors:" FontWeight="SemiBold" Margin="0,5,10,0" Foreground="Red"/>
+                <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding ErrorsCount}" Margin="0,5,0,0" Foreground="Red"/>
+            </Grid>
+        </GroupBox>
+
+        <!-- Buttons -->
+        <StackPanel Grid.Row="5" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Right" 
+                    Margin="0,10,0,0">
+            <Button Content="Cancel" 
+                    Command="{Binding CancelCommand}"
+                    Padding="20,8"
+                    Margin="0,0,10,0"
+                    MinWidth="100"
+                    Visibility="{Binding IsScanning, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+            <Button Content="Close" 
+                    IsCancel="True"
+                    Padding="20,8"
+                    MinWidth="100"
+                    Click="CloseButton_Click"
+                    Visibility="{Binding IsCompleted, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+        </StackPanel>
+    </Grid>
+</Window>
+
