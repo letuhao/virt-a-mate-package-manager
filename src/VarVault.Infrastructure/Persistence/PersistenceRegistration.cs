@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using VarVault.Domain.Indexing;
+using VarVault.Infrastructure.Indexing;
 using VarVault.Sdk.Persistence;
 
 namespace VarVault.Infrastructure.Persistence;
@@ -16,6 +18,7 @@ public static class PersistenceRegistration
             options.UseSqlite($"Data Source={databasePath}"));
 
         services.AddScoped<IUnitOfWork>(sp => new EfUnitOfWork(sp.GetRequiredService<VarVaultDbContext>()));
+        services.AddScoped<ICatalogStore, EfCatalogStore>();
         services.AddSingleton<CatalogDatabaseInitializer>();
 
         services.AddHealthChecks()

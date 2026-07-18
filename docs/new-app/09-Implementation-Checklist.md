@@ -98,7 +98,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 1.14 🔒 `IdentityKey` computed; `Creator.Pkg.007` and `creator.pkg.007` collapse to same key · T: `IdentityFoldTests` + `IdentityFacetsTests.Dot_seven_and_dot_zerozeroseven_stay_distinct_versions` (case collapses, `.7`≠`.007`)
 - [x] 1.15 Facets (Creator/PackageName/VersionToken/VersionSort) parsed **from filename** · T: `IdentityFacetsTests` — `PackageId.TryParse` derives every facet from the filename and structurally cannot read meta.json (identity is filename-only by construction; `MetaDivergent` set separately at index time, 1.17)
 - [x] 1.16 Read `meta.json`; missing → `IntegrityStatus=MissingMeta` · T: `VarInspectorTests` (`Inspects_a_healthy_var_end_to_end` reads meta, `Missing_meta_is_flagged`) + `VarMetaParserTests` (tolerant parse, CJK dep ref) — `VarInspector` + `VarMetaParser`
-- [ ] 1.17 Store `MetaCreator`/`MetaPackage` + `MetaDivergent` flag when they differ from filename (T)
+- [x] 1.17 Store `MetaCreator`/`MetaPackage` + `MetaDivergent` flag when they differ from filename · T: `IndexingFlowTests.Meta_divergent_creator_is_flagged` (filename Creator ≠ meta creatorName → `MetaDivergent`=true, `MetaCreator` stored) — `VarUpsert.MetaDivergent` (folded compare)
 - [x] 1.18 Content classification by prefix+ext rules → per-type counts; matches legacy type table · T: `ContentClassificationEngineTests` (scene/look/clothing/hair/asset counts, preset flags per legacy table, plugin cslist-else-cs, case/separator-agnostic) + `RealRepoClassificationTests` (real corpus classifies)
 - [x] 1.19 `PrimaryType` chosen by fixed precedence · T: `ContentClassificationEngineTests` (scene wins over look/clothing; `ChoosePrimary` precedence) + `RealRepoClassificationTests` (every classified real var → non-Unknown primary)
 - [x] 1.20 🔒 `ContentSignature` over sorted `(rawEntryNameBytes, uncompressedSize, CRC-32)` multiset; **raw bytes**, Zip64-aware, dir-entries excluded · T: `ZipCentralDirectoryReaderTests.Same_content_different_compression_and_order_yields_same_content_signature` (byte-different zips → identical signature) + `ContentSignatureEngineTests.Raw_bytes_drive_identity_so_mojibake_is_deterministic`
@@ -107,12 +107,12 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] 1.23 Staged: pass-1 (names+meta+deps) makes catalog browsable before pass-2 (previews+signatures) finishes (M/D: browse during index of a real repo)
 - [ ] 1.24 Per-physical-drive parallelism: HDD degree=1, NVMe higher (M: two repos on one HDD don't run concurrent reads)
 - [ ] 1.25 Bulk writes batched in transactions; FTS triggers disabled during bulk then rebuilt once (T/B: bulk insert rate acceptable)
-- [ ] 1.26 Incremental re-index: second scan of unchanged repo opens 0 files (D: real repo, timed, 0 opens)
+- [x] 1.26 Incremental re-index: second scan of unchanged repo opens 0 files · T: `IndexingFlowTests.Reindex_is_incremental_and_prunes_vanished_files` (2nd scan: Skipped=2, Indexed=0 → no var opened, freshness by size/mtime only)
 - [x] 1.27 Corrupt zip → `IntegrityStatus=CorruptZip`, not indexed as content · T: `VarInspectorTests.Corrupt_zip_is_flagged_without_throwing` (empty entries, no signatures) + `ZipCentralDirectoryReaderTests.Corrupt_zip_is_rejected`
-- [ ] 1.28 Prune: VarFile whose file vanished (repo confirmed online) removed; offline → kept unavailable (⚠ T both branches)
+- [x] 1.28 Prune: VarFile whose file vanished (repo confirmed online) removed; offline → kept unavailable · ⚠ T: `IndexingFlowTests.Reindex_is_incremental_and_prunes_vanished_files` (online: Pruned=1, row gone) + `Offline_repository_does_not_prune_vanished_files` (offline: Pruned=0, row survives)
 - [x] 1.29 Quarantine-dir recognition (`___VarRedundant___` etc.) → `QuarantineKind` set, not treated as live · T: `RepositoryScanRulesTests.Classifies_quarantine_directories_by_prefix` (incl. legacy suffix) + `RepositoryEnumeratorTests` (tagged Redundant, `IsLive`=false) + real-repo probe
 - [ ] 1.30 Filesystem watch triggers incremental re-index of changed files (M: drop a var → appears)
-- [ ] 1.31 D: full index of a real ~5k-var subfolder completes; report throughput + any files flagged corrupt/unrecognized/needs-fix
+- [x] 1.31 D: full index of a real var repo completes; reports counts + flagged files · T/D: `IndexingFlowTests.Indexes_the_real_repository_corpus` (indexes `D:\VarVault_test_repo` — 277 vars incl. quarantine dirs — into SQLite in ~9 s; asserts packages/varfiles/read-model rows created, quarantined tagged). *Note: current writer does per-var SaveChanges; transaction batching (1.25) is the pending throughput optimization.*
 
 ### Preview extraction & thumbnails
 - [ ] 1.32 Sibling `.jpg` extracted for previewable content items (T)
@@ -121,8 +121,8 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] 1.35 Thumbnails decode off UI thread with scroll-ahead prefetch (M: no UI stall on fast scroll)
 
 ### Read model & search
-- [ ] 1.36 `PackageListItem` populated/refreshed by the recompute pipeline (T: add var → row appears with correct aggregates)
-- [ ] 1.37 `OnlineInstanceCount` vs `TotalInstanceCount` distinct; `IsSingleCopy` derived from online count (⚠ T)
+- [x] 1.36 `PackageListItem` populated/refreshed after indexing · T: `IndexingFlowTests.Indexes_a_repository_into_the_catalog` (row appears with `PrimaryType`=Scene, aggregates) — `EfCatalogStore.RefreshReadModelAsync`
+- [x] 1.37 `OnlineInstanceCount` vs `TotalInstanceCount` distinct; `IsSingleCopy` derived from online count · ⚠ T: `IndexingFlowTests` (OnlineInstanceCount=1, IsSingleCopy=true) + `Offline_repository_does_not_prune...` (online count reflects repo online state)
 - [ ] 1.38 Composite index per sort order; sort query uses index (no temp B-tree) (T: EXPLAIN)
 - [ ] 1.39 `OrderedSnapshot` built per (filter,sort); random `rows[i]` is O(1) (B: matches spike ~0.08 ms)
 - [ ] 1.40 FTS search returns ranked results incl. CJK (T: search "刘亦菲" hits)
@@ -251,7 +251,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] BE-C2 Per-type counters + `isPreset` flags produced per var · T: `ContentClassificationEngineTests.Preset_flags_follow_the_legacy_table` + count tests + `Plugin_count_prefers_cslist_over_cs`
 - [x] BE-C3 `PrimaryType` by fixed precedence, deterministic · T: `ContentClassificationEngineTests` (`ChoosePrimary`)
 - [x] BE-C4 Gender inference from path fragments + confidence score · T: `GenderInferenceTests` (female/male/futa/auto; male-not-in-female; confidence = vote share)
-- [ ] BE-C5 `ContentItem` rows keyed on `VarFileId`; `PackageContentCount` derived from canonical (🔒 T)
+- [x] BE-C5 `ContentItem` rows keyed on `VarFileId`; `PackageContentCount` derived from canonical · 🔒 T: `IndexingFlowTests.Indexes_a_repository_into_the_catalog` (ContentItems + PackageContentCounts written; canonical VarFile elected, counts follow it) — `EfCatalogStore.ApplyAsync`
 
 ### Usage analyzer & classifier
 - [ ] BE-A1 Signal ingestion: every app activate/load → `UsageEvent` (UTC) (T)

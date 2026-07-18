@@ -51,6 +51,12 @@ public sealed record PackageId
         VersionToken = versionToken;
     }
 
+    /// <summary>Fold-compare the filename creator against meta.json's creatorName.</summary>
+    public bool MatchesCreator(string other) => IdentityFold.Equal(Creator, other);
+
+    /// <summary>Fold-compare the filename package against meta.json's packageName.</summary>
+    public bool MatchesPackage(string other) => IdentityFold.Equal(Package, other);
+
     /// <summary>Parse a var name or file name. Rejects non-3-part names and non-numeric versions.</summary>
     public static Result<PackageId> TryParse(string nameOrFile)
     {

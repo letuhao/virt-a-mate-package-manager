@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using VarVault.Sdk.Indexing;
 using VarVault.Sdk.Modularity;
 
 namespace VarVault.Modules.Indexing;
@@ -10,8 +11,9 @@ public sealed class IndexingModule : IModule
 
     public void Register(IServiceCollection services, IModuleContext context)
     {
-        // Slice 1: register IIndexingService, the staged pipeline, signature + encoding engines.
-        _ = services;
+        // The orchestrator binds only to Domain/SDK seams; Infrastructure provides the
+        // IRepositoryEnumerator/IVarInspector/ICatalogStore implementations via DI.
+        services.AddSingleton<IIndexingService, IndexingService>();
         _ = context;
     }
 }
