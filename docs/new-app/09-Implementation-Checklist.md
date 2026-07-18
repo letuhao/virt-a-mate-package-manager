@@ -52,8 +52,8 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 0.6 SQLite via EF Core 10; connection opens `WAL` + `synchronous` set per policy · T: `CatalogSchemaTests.Connection_uses_wal_journal_mode` + `PersistenceTests.Baseline_pragmas_enable_WAL_and_foreign_keys`
 - [x] 0.7 First EF migration creates the schema; migrate-up on empty DB succeeds · T: `CatalogSchemaTests.Migration_creates_all_expected_tables` (25 tables incl. FTS); `dotnet ef database update` applies `20260718215021_InitialCatalogSchema` clean
 - [x] 0.8 `PRAGMA foreign_keys=ON` enforced at connection open · T: `CatalogSchemaTests.Foreign_key_violation_is_rejected` (VarFile→nonexistent Repository throws `DbUpdateException`)
-- [ ] 0.9 Startup `PRAGMA integrity_check` runs; corrupt DB is detected and surfaced (M: corrupt a copy → app reports)
-- [ ] 0.10 ⚠ DB refuses to open if located on a repo/removable volume (T: path on flagged volume → guarded error)
+- [x] 0.9 Startup `PRAGMA integrity_check` runs; corrupt DB is detected and surfaced · T: `CatalogSafetyTests.Integrity_check_detects_a_corrupt_database` (corrupted SQLite header → failure Result) + `Integrity_check_passes_on_healthy_database` + `Initializer_prepares_a_fresh_database` (`CatalogDatabaseInitializer`: guard→migrate→pragmas→integrity)
+- [x] 0.10 ⚠ DB refuses to open if located on a repo/removable volume · T: `CatalogSafetyTests.Rejects_db_on_non_fixed_volume` (Removable/Network/CDRom) + `Rejects_db_nested_within_a_repository` + `Rejects_repository_nested_within_the_db_directory` (`CatalogLocationGuard`)
 - [x] 0.11 App-computed Unicode fold-key function: NFC + full case-fold; ASCII and CJK both covered · T: `IdentityFoldTests` (ASCII Café==café, Cyrillic МЕ==ме, CJK preserved, NFC composed==decomposed, idempotent) — see `IdentityFold`
 
 ### Schema — entities & constraints (each = table created + constraints enforced)
