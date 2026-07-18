@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using VarVault.Common;
+using VarVault.Domain.Indexing;
 using VarVault.Infrastructure.Diagnostics;
+using VarVault.Infrastructure.Indexing;
 using VarVault.Infrastructure.Threading;
 using VarVault.Sdk.Threading;
 
@@ -20,6 +22,7 @@ public static class InfrastructureRegistration
         services.AddSingleton<IJobQueue>(_ => new BackgroundJobQueue());
         services.AddSingleton<IWriteQueue>(_ => new WriteQueue());
         services.AddSingleton<IUiDispatcher, InlineUiDispatcher>();
+        services.AddSingleton<IRepositoryEnumerator, RepositoryEnumerator>();
 
         services.AddHealthChecks()
             .AddCheck<WriteQueueHealthCheck>("write-queue", tags: ["live"]);

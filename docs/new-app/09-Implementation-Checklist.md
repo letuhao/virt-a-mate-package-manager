@@ -92,8 +92,8 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] 1.10 Offline detection: unplugged repo → `IsOnline=false`, its VarFiles marked unavailable, **not pruned** (⚠ T: offline repo's rows survive a scan)
 
 ### Indexing pipeline (see [06](./06-Feature-Specs-Indexing.md))
-- [ ] 1.11 Enumerate `*.var` recursively; exclude `___XXX___` dirs and reparse points (T: symlink/junction not indexed)
-- [ ] 1.12 Freshness skip by `(size, mtime)` from directory entry **without opening the file** (T: unchanged file not opened — assert via I/O counter/mock)
+- [x] 1.11 Enumerate `*.var` recursively; exclude link-farm dirs and reparse points; quarantine tagged/omittable · T: `RepositoryEnumeratorTests` (`Finds_live_vars_excludes_link_dirs_tags_quarantine`, `Skips_reparse_point_directories`, `Include_quarantined_false_omits_quarantined_vars`) + real-repo probe — `RepositoryEnumerator` (manual walk, skips `ReparsePoint`, `RepositoryScanRules.IsLinkDirectory`)
+- [x] 1.12 Freshness skip by `(size, mtime)` from directory entry **without opening the file** · T: `RepositoryScanRulesTests` (`IsFresh` size/mtime + 2 s tolerance window) + `RepositoryEnumeratorTests.Captures_size_and_mtime_without_opening_files` (enumerator only stats, never opens)
 - [x] 1.13 🔒 Identity parse: 3-part `Creator.Package.Version`, digit version; else failure → Unrecognized bucket · T: `IdentityFacetsTests` (`.007` preserved, `A.B.C.1`/non-numeric → failure, `Long_version_clamps_without_overflow` 20-digit → `long.MaxValue`)
 - [x] 1.14 🔒 `IdentityKey` computed; `Creator.Pkg.007` and `creator.pkg.007` collapse to same key · T: `IdentityFoldTests` + `IdentityFacetsTests.Dot_seven_and_dot_zerozeroseven_stay_distinct_versions` (case collapses, `.7`≠`.007`)
 - [x] 1.15 Facets (Creator/PackageName/VersionToken/VersionSort) parsed **from filename** · T: `IdentityFacetsTests` — `PackageId.TryParse` derives every facet from the filename and structurally cannot read meta.json (identity is filename-only by construction; `MetaDivergent` set separately at index time, 1.17)
@@ -110,7 +110,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] 1.26 Incremental re-index: second scan of unchanged repo opens 0 files (D: real repo, timed, 0 opens)
 - [ ] 1.27 Corrupt zip → `IntegrityStatus=CorruptZip`, not indexed as content (T)
 - [ ] 1.28 Prune: VarFile whose file vanished (repo confirmed online) removed; offline → kept unavailable (⚠ T both branches)
-- [ ] 1.29 Quarantine-dir recognition (`___VarRedundant___` etc.) → `QuarantineKind` set, not treated as live (T)
+- [x] 1.29 Quarantine-dir recognition (`___VarRedundant___` etc.) → `QuarantineKind` set, not treated as live · T: `RepositoryScanRulesTests.Classifies_quarantine_directories_by_prefix` (incl. legacy suffix) + `RepositoryEnumeratorTests` (tagged Redundant, `IsLive`=false) + real-repo probe
 - [ ] 1.30 Filesystem watch triggers incremental re-index of changed files (M: drop a var → appears)
 - [ ] 1.31 D: full index of a real ~5k-var subfolder completes; report throughput + any files flagged corrupt/unrecognized/needs-fix
 
