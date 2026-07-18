@@ -200,8 +200,8 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] 4.9 Duplicate review: keep-one, ranked by integrity/health; verified-before-delete (M)
 
 ### Encoding health & fix (see [06](./06-Feature-Specs-Indexing.md))
-- [ ] 4.10 Per-entry codepage detection (GBK/GB18030/Shift-JIS/Big5/EUC-KR) with round-trip validation; `DetectedCodepage`+`BrokenEntryCount` stored (T: fixture broken vars classify correctly, 0 false-positive on healthy)
-- [ ] 4.11 CodePagesEncodingProvider registered; raw entry-name bytes captured (T)
+- [x] 4.10 Per-entry codepage detection (GBK/GB18030/Shift-JIS/Big5/EUC-KR) with round-trip validation; `DetectedCodepage`+`BrokenEntryCount` computed · T: `EncodingHealthEngineTests` (GBK detected; UTF-8 flag & valid-UTF-8-without-flag & ASCII all Ok = 0 false-positive; undetectable→NeedsFix broken-count; mixed→PartiallyBroken) + `RealRepoClassificationTests.Encoding_detection_runs_over_the_real_corpus...` — `EncodingHealthEngine.Detect` (storage on `VarFile` at index time, IDX-8)
+- [x] 4.11 CodePagesEncodingProvider registered; raw entry-name bytes captured · T: `EncodingHealthEngineTests` (engine registers `CodePagesEncodingProvider`; `ZipCentralDirectoryReader` captures raw name bytes + UTF-8 flag bit 11)
 - [ ] 4.12 🔒⚠ Fix writes a NEW UTF-8 var (never overwrite in place); temp→validate→atomic rename (T)
 - [ ] 4.13 🔒 Fixed var validated against VaM constraints (ZIP+Deflate, UTF-8 flag, no Zip64/data-descriptors, meta present) before preferring it (T)
 - [ ] 4.14 ⚠ Original retained (not trashed) until fix confirmed; `FixedFromVarFileId` lineage set (T)

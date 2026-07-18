@@ -50,4 +50,27 @@ public sealed class RealRepoClassificationTests
         // The corpus is real VaM content — the pipeline must classify a meaningful share of it.
         Assert.True(classifiedCount > 0, "expected at least some real vars to classify into known content types");
     }
+
+    [Fact]
+    public void Encoding_detection_runs_over_the_real_corpus_without_false_crashes()
+    {
+        if (!Directory.Exists(Repo))
+            return;
+
+        var vars = Directory.GetFiles(Repo, "*.var");
+        Assert.NotEmpty(vars);
+
+        foreach (var path in vars)
+        {
+            var read = ZipCentralDirectoryReader.Read(path);
+            if (read.IsFailure)
+                continue;
+
+            var health = Domain.Content.EncodingHealthEngine.Detect(read.Value);
+            // Detection must be deterministic and total (never throw) across the whole corpus.
+            var again = Domain.Content.EncodingHealthEngine.Detect(read.Value);
+            Assert.Equal(health.Health, again.Health);
+            Assert.Equal(health.DetectedCodepage, again.DetectedCodepage);
+        }
+    }
 }

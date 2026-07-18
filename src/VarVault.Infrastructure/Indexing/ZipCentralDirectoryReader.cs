@@ -142,6 +142,7 @@ public static class ZipCentralDirectoryReader
             if (BinaryPrimitives.ReadUInt32LittleEndian(span) != CentralHeaderSignature)
                 break; // reached the end / padding
 
+            ushort flags = BinaryPrimitives.ReadUInt16LittleEndian(span[8..]);
             uint crc = BinaryPrimitives.ReadUInt32LittleEndian(span[16..]);
             long uncompressed = BinaryPrimitives.ReadUInt32LittleEndian(span[24..]);
             int nameLen = BinaryPrimitives.ReadUInt16LittleEndian(span[28..]);
@@ -158,7 +159,8 @@ public static class ZipCentralDirectoryReader
                 uncompressed = ReadZip64Uncompressed(span.Slice(46 + nameLen, extraLen), uncompressed);
 
             var isDirectory = nameLen > 0 && rawName[^1] == (byte)'/';
-            entries.Add(new ZipEntryFacts(rawName, uncompressed, crc, isDirectory));
+            var nameIsUtf8 = (flags & 0x0800) != 0; // general-purpose bit 11 = UTF-8 filename
+            entries.Add(new ZipEntryFacts(rawName, uncompressed, crc, isDirectory, nameIsUtf8));
 
             pos += recordLen;
         }

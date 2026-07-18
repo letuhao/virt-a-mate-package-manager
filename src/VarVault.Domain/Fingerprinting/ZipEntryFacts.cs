@@ -12,7 +12,8 @@ public sealed record ZipEntryFacts(
     byte[] RawNameBytes,
     long UncompressedSize,
     uint Crc32,
-    bool IsDirectory)
+    bool IsDirectory,
+    bool NameIsUtf8 = false)
 {
     private static readonly byte[] MetaJsonUtf8 = "meta.json"u8.ToArray();
 
