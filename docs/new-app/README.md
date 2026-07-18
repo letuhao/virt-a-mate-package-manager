@@ -22,6 +22,11 @@ Design for a **new** VaM `.var` manager (working name **VarVault**) — a tiered
 | 08 | [UI Design Review](./08-UI-Design-Review.md) | Critique of the mockup; high-priority fixes (all folded in) |
 | 09 | [Implementation Checklist](./09-Implementation-Checklist.md) | Item-level, evidence-gated QC tracker (Phase 0 + Slices 1–5 + BE engines) |
 | 10 | [Decisions Log](./10-Decisions-Log.md) | Every question, sealed |
+| 11 | [Architecture & Modularity](./11-Architecture-and-Modularity.md) | Modular monolith + SDK + plugin host; project layout & dependency rules |
+| 12 | [Engineering Standards](./12-Engineering-Standards.md) | Coding standards: errors, async/threading, events, logging, DI, persistence, testing |
+| 13 | [UI/UX Standards](./13-UI-UX-Standards.md) | MVVM, Avalonia, design tokens, states, accessibility |
+
+Project-root **[CLAUDE.md](../../CLAUDE.md)** is the quick-start for coding sessions. The built foundation lives in `/src` + `/tests`.
 
 ## Interactive drafts
 - **Full prototype** (all screens, clickable): [`mockups/prototype.html`](./mockups/prototype.html)

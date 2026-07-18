@@ -1,18 +1,24 @@
 using Microsoft.Extensions.DependencyInjection;
 using VarVault.Common;
+using VarVault.Infrastructure.Threading;
+using VarVault.Sdk.Threading;
 
 namespace VarVault.Infrastructure;
 
 /// <summary>
-/// Registers cross-cutting infrastructure (clock now; DbContext, filesystem/symlink,
-/// zip, job queue arrive in Slice 1). The Host calls this once; modules consume the
-/// results through SDK interfaces and never bind to infrastructure directly.
+/// Registers cross-cutting infrastructure: clock, background job queue, single-writer
+/// write queue, and a headless UI dispatcher. The catalog DB is added separately by
+/// <see cref="Persistence.PersistenceRegistration.AddVarVaultPersistence"/> (Slice 1).
+/// Modules consume all of this through SDK interfaces and never bind to it directly.
 /// </summary>
 public static class InfrastructureRegistration
 {
     public static IServiceCollection AddVarVaultInfrastructure(this IServiceCollection services)
     {
         services.AddSingleton<IClock>(SystemClock.Instance);
+        services.AddSingleton<IJobQueue>(_ => new BackgroundJobQueue());
+        services.AddSingleton<IWriteQueue>(_ => new WriteQueue());
+        services.AddSingleton<IUiDispatcher, InlineUiDispatcher>();
         return services;
     }
 }

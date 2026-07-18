@@ -4,13 +4,24 @@ namespace VarVault.Sdk.Events;
 public interface IDomainEvent;
 
 /// <summary>
-/// In-process publish/subscribe bus. Modules react to each other's events without
-/// coupling — the only sanctioned cross-module communication besides SDK service calls.
+/// A DI-registered handler for a domain event. Modules react to each other's events by
+/// registering handlers — the sanctioned cross-module communication besides SDK service calls.
+/// </summary>
+public interface IEventHandler<in TEvent> where TEvent : IDomainEvent
+{
+    Task HandleAsync(TEvent @event, CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// In-process publish/subscribe bus. Dispatches an event to every DI-registered
+/// <see cref="IEventHandler{TEvent}"/> plus any lightweight inline subscribers.
 /// </summary>
 public interface IEventBus
 {
-    void Publish<TEvent>(TEvent @event) where TEvent : IDomainEvent;
+    /// <summary>Publish to all handlers; completes when they have all run.</summary>
+    Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default)
+        where TEvent : IDomainEvent;
 
-    /// <summary>Subscribe a handler; dispose the returned token to unsubscribe.</summary>
+    /// <summary>Subscribe a lightweight inline handler (e.g. a view-model); dispose to unsubscribe.</summary>
     IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : IDomainEvent;
 }

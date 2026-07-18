@@ -1,5 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Serilog;
 using VarVault.Host.Internal;
+using VarVault.Host.Logging;
 using VarVault.Infrastructure;
 using VarVault.Sdk.Events;
 using VarVault.Sdk.Modularity;
@@ -14,10 +17,10 @@ public sealed record HostOptions(string AppName, string DataDirectory)
 }
 
 /// <summary>
-/// The composition root. Builds one DI container from the shared infrastructure plus
-/// every module, validating on build. GUI, CLI, and tests all run through this.
+/// The composition root. Builds one DI container from logging + shared infrastructure +
+/// the event bus + every module, validating on build. GUI, CLI, and tests all run through it.
 /// </summary>
-public sealed class VarVaultHost : IDisposable
+public sealed class VarVaultHost : IAsyncDisposable
 {
     private readonly ServiceProvider _provider;
 
@@ -39,8 +42,11 @@ public sealed class VarVaultHost : IDisposable
         var services = new ServiceCollection();
         var context = new ModuleContext(options.AppName, options.DataDirectory);
 
+        var serilog = LoggingSetup.Create(options.AppName, options.DataDirectory);
+        services.AddLogging(builder => builder.AddSerilog(serilog, dispose: true));
+
         services.AddSingleton<IModuleContext>(context);
-        services.AddSingleton<IEventBus, EventBus>();
+        services.AddSingleton<IEventBus>(sp => new EventBus(sp));
         services.AddVarVaultInfrastructure();
 
         var names = new List<string>(modules.Length);
@@ -57,8 +63,12 @@ public sealed class VarVaultHost : IDisposable
             ValidateScopes = true,
         });
 
+        provider.GetRequiredService<ILogger<VarVaultHost>>()
+            .LogInformation("VarVault host composed with {ModuleCount} modules: {Modules}",
+                names.Count, string.Join(", ", names));
+
         return new VarVaultHost(provider, names.AsReadOnly());
     }
 
-    public void Dispose() => _provider.Dispose();
+    public ValueTask DisposeAsync() => _provider.DisposeAsync();
 }

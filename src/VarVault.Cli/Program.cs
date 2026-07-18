@@ -1,6 +1,6 @@
 using VarVault.Host;
 
-using var host = Bootstrap.BuildDefault();
+await using var host = Bootstrap.BuildDefault();
 
 Console.WriteLine($"VarVault {typeof(VarVaultHost).Assembly.GetName().Version}");
 Console.WriteLine($"Host started. {host.LoadedModules.Count} module(s) loaded:");

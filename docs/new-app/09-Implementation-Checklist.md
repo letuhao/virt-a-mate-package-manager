@@ -19,9 +19,21 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 0.1 Modular solution (Common / Sdk / Domain / Infrastructure / Modules.* / Host / Cli); dependency direction enforced · T: `VarVault.Architecture.Tests` (4 tests pass — Common/Sdk/Domain isolation, modules don't reference each other/infra/host)
 - [x] 0.2 .NET 10 on all projects (Directory.Build.props); builds clean · M: `dotnet build` → 0 errors, net10.0
 - [x] 0.3 DI container wired via Host composition root (module `Register` into one `IServiceProvider`, `ValidateOnBuild`) · T: `HostCompositionTests` + `dotnet run VarVault.Cli` → "2 module(s) loaded: Repositories, Indexing"
-- [ ] 0.4 Serilog configured with file sink + rolling; a startup log line is written (M: log file exists after run) *(packages referenced; wiring pending)*
-- [x] 0.5 xUnit tests run; central package management (Directory.Packages.props) · T: `dotnet test` → 16 passed, 0 failed
+- [x] 0.4 Serilog: console + daily rolling file under data dir; structured startup line · M: `dotnet run VarVault.Cli` → `logs/VarVault-YYYYMMDD.log` contains "host composed with 2 modules"; `ILogger<T>` via `AddSerilog`
+- [x] 0.5 xUnit tests run; central package management (Directory.Packages.props) · T: `dotnet test` → 23 passed, 0 failed
 - *Foundation extras done:* SDK contract boundary (`IModule`/`IModuleContext`/`IPlugin`/`IEventBus`), `Result<T>`/`Guard`/`IClock` kernel, `PackageId` value object (·007 preserved, invalid rejected — tested), `global.json`, `.editorconfig`.
+
+### Cross-cutting SDK (built — see [11](./11-Architecture-and-Modularity.md)/[12](./12-Engineering-Standards.md))
+- [x] SDK-1 **Logging** — `ILogger<T>` via Serilog (`LoggingSetup`, console+file) · M: startup log line written
+- [x] SDK-2 **Message bus** — `IEventBus.PublishAsync` → DI `IEventHandler<T>` + inline `Subscribe` · T: `HostCompositionTests` (handler invoked; inline sub receives/unsubscribes)
+- [x] SDK-3 **Background jobs** — `IJobQueue` (Channel, bounded concurrency, `JobHandle` progress+cancel) · T: `ThreadingTests.JobQueue_runs_job_and_reports_progress`
+- [x] SDK-4 **Single-writer queue** — `IWriteQueue` (priority, one consumer) · T: `ThreadingTests.WriteQueue_runs_writes_one_at_a_time` (maxConcurrent==1) + returns result
+- [x] SDK-5 **Async mutual exclusion** — `AsyncLock` · T: `AsyncLockTests.Serializes_concurrent_sections`
+- [x] SDK-6 **UI dispatcher** — `IUiDispatcher` contract + headless `InlineUiDispatcher` · T: resolves from host
+- [x] SDK-7 **Progress** — `IProgressSink`/`ProgressReport` (+ `JobHandle` implements it)
+- [x] SDK-8 **Persistence layer** — `VarVaultDbContext` (EF Core SQLite), `SqlitePragmas` (WAL/NORMAL/FK), `IUnitOfWork`/`EfUnitOfWork`, `AddVarVaultPersistence` · T: `PersistenceTests.Baseline_pragmas_enable_WAL_and_foreign_keys`
+- [x] SDK-9 **Architecture enforcement** — `VarVault.Architecture.Tests` (NetArchTest) · T: 4 tests pass
+- [x] SDK-10 **Standards** — [CLAUDE.md](../../CLAUDE.md), [12-Engineering-Standards](./12-Engineering-Standards.md), [13-UI-UX-Standards](./13-UI-UX-Standards.md)
 
 ### Database & migrations
 - [ ] 0.6 SQLite via EF Core 10; connection opens `WAL` + `synchronous` set per policy (M: `PRAGMA journal_mode` returns wal)
