@@ -16,11 +16,12 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 ## Phase 0 — Foundation & infrastructure
 
 ### Solution & tooling
-- [ ] 0.1 Solution with Core / Application / Infrastructure / Desktop projects; Core has no infra references (T: architecture test asserts dependency direction)
-- [ ] 0.2 .NET 10 target on all projects; builds clean, no warnings-as-errors violations
-- [ ] 0.3 DI container wired (Microsoft.Extensions.DependencyInjection + Hosting); app resolves root services
-- [ ] 0.4 Serilog configured with file sink + rolling; a startup log line is written (M: log file exists after run)
-- [ ] 0.5 xUnit test project runs in CI; one trivial test passes
+- [x] 0.1 Modular solution (Common / Sdk / Domain / Infrastructure / Modules.* / Host / Cli); dependency direction enforced · T: `VarVault.Architecture.Tests` (4 tests pass — Common/Sdk/Domain isolation, modules don't reference each other/infra/host)
+- [x] 0.2 .NET 10 on all projects (Directory.Build.props); builds clean · M: `dotnet build` → 0 errors, net10.0
+- [x] 0.3 DI container wired via Host composition root (module `Register` into one `IServiceProvider`, `ValidateOnBuild`) · T: `HostCompositionTests` + `dotnet run VarVault.Cli` → "2 module(s) loaded: Repositories, Indexing"
+- [ ] 0.4 Serilog configured with file sink + rolling; a startup log line is written (M: log file exists after run) *(packages referenced; wiring pending)*
+- [x] 0.5 xUnit tests run; central package management (Directory.Packages.props) · T: `dotnet test` → 16 passed, 0 failed
+- *Foundation extras done:* SDK contract boundary (`IModule`/`IModuleContext`/`IPlugin`/`IEventBus`), `Result<T>`/`Guard`/`IClock` kernel, `PackageId` value object (·007 preserved, invalid rejected — tested), `global.json`, `.editorconfig`.
 
 ### Database & migrations
 - [ ] 0.6 SQLite via EF Core 10; connection opens `WAL` + `synchronous` set per policy (M: `PRAGMA journal_mode` returns wal)

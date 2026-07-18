@@ -1,0 +1,28 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+indent_style = space
+trim_trailing_whitespace = true
+
+[*.{cs,csx}]
+indent_size = 4
+dotnet_sort_system_directives_first = true
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_style_qualification_for_field = false:suggestion
+csharp_style_var_for_built_in_types = false:suggestion
+dotnet_diagnostic.CA1852.severity = suggestion
+dotnet_diagnostic.CA1000.severity = none
+dotnet_diagnostic.CA1716.severity = none
+
+[*.{csproj,props,targets,json,xml}]
+indent_size = 2
+
+[tests/**/*.cs]
+# Test method names use underscores by convention.
+dotnet_diagnostic.CA1707.severity = none
+
+[*.md]
+trim_trailing_whitespace = false

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="NetArchTest.Rules" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\VarVault.Common\VarVault.Common.csproj" />
+    <ProjectReference Include="..\..\src\VarVault.Sdk\VarVault.Sdk.csproj" />
+    <ProjectReference Include="..\..\src\VarVault.Domain\VarVault.Domain.csproj" />
+    <ProjectReference Include="..\..\src\VarVault.Infrastructure\VarVault.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\VarVault.Modules.Repositories\VarVault.Modules.Repositories.csproj" />
+    <ProjectReference Include="..\..\src\VarVault.Modules.Indexing\VarVault.Modules.Indexing.csproj" />
+    <ProjectReference Include="..\..\src\VarVault.Host\VarVault.Host.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

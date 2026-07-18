@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VarVault.Cli/VarVault.Cli.csproj" />
+    <Project Path="src/VarVault.Common/VarVault.Common.csproj" />
+    <Project Path="src/VarVault.Domain/VarVault.Domain.csproj" />
+    <Project Path="src/VarVault.Host/VarVault.Host.csproj" />
+    <Project Path="src/VarVault.Infrastructure/VarVault.Infrastructure.csproj" />
+    <Project Path="src/VarVault.Modules.Indexing/VarVault.Modules.Indexing.csproj" />
+    <Project Path="src/VarVault.Modules.Repositories/VarVault.Modules.Repositories.csproj" />
+    <Project Path="src/VarVault.Sdk/VarVault.Sdk.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VarVault.Architecture.Tests/VarVault.Architecture.Tests.csproj" />
+    <Project Path="tests/VarVault.Common.Tests/VarVault.Common.Tests.csproj" />
+    <Project Path="tests/VarVault.Host.Tests/VarVault.Host.Tests.csproj" />
+  </Folder>
+</Solution>
