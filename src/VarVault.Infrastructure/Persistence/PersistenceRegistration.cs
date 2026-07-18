@@ -16,6 +16,10 @@ public static class PersistenceRegistration
             options.UseSqlite($"Data Source={databasePath}"));
 
         services.AddScoped<IUnitOfWork>(sp => new EfUnitOfWork(sp.GetRequiredService<VarVaultDbContext>()));
+
+        services.AddHealthChecks()
+            .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);
+
         return services;
     }
 }

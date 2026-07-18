@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.Metrics;
 using System.Threading.Channels;
 using VarVault.Common;
+using VarVault.Common.Diagnostics;
 using VarVault.Sdk.Threading;
 
 namespace VarVault.Infrastructure.Threading;
@@ -16,9 +18,11 @@ internal sealed class BackgroundJobQueue : IJobQueue, IAsyncDisposable
         Channel.CreateUnbounded<(JobHandle, Func<JobContext, Task>)>(new UnboundedChannelOptions { SingleReader = false });
     private readonly ConcurrentDictionary<JobHandle, byte> _active = new();
     private readonly Task[] _workers;
+    private readonly ObservableGauge<int> _activeGauge;
 
     public BackgroundJobQueue(int degreeOfParallelism = 0)
     {
+        _activeGauge = Telemetry.Meter.CreateObservableGauge("varvault.jobs.active", () => _active.Count);
         var degree = degreeOfParallelism > 0 ? degreeOfParallelism : Math.Max(1, Environment.ProcessorCount - 1);
         _workers = new Task[degree];
         for (var i = 0; i < degree; i++)
@@ -42,19 +46,25 @@ internal sealed class BackgroundJobQueue : IJobQueue, IAsyncDisposable
         await foreach (var (handle, work) in _channel.Reader.ReadAllAsync().ConfigureAwait(false))
         {
             handle.State = JobState.Running;
+            using var activity = Telemetry.StartActivity($"job:{handle.Name}");
+            Telemetry.JobsStarted.Add(1);
             try
             {
                 await work(new JobContext(handle.Cancellation, handle)).ConfigureAwait(false);
                 handle.State = JobState.Completed;
+                Telemetry.JobsCompleted.Add(1);
             }
             catch (OperationCanceledException)
             {
                 handle.State = JobState.Cancelled;
+                Telemetry.JobsCompleted.Add(1);
             }
             catch (Exception ex)
             {
                 handle.State = JobState.Failed;
                 handle.Error = new Error("job.failed", ex.Message);
+                Telemetry.JobsFailed.Add(1);
+                activity?.SetStatus(System.Diagnostics.ActivityStatusCode.Error, ex.Message);
             }
             finally
             {

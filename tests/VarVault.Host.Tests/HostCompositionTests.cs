@@ -3,9 +3,11 @@ using VarVault.Host;
 using VarVault.Sdk.Events;
 using VarVault.Sdk.Modularity;
 using VarVault.Sdk.Threading;
+using VarVault.TestKit;
 
 namespace VarVault.Host.Tests;
 
+[Trait("Category", TestCategories.Integration)]
 public class HostCompositionTests
 {
     [Fact]

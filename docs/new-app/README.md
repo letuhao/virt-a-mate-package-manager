@@ -25,6 +25,7 @@ Design for a **new** VaM `.var` manager (working name **VarVault**) — a tiered
 | 11 | [Architecture & Modularity](./11-Architecture-and-Modularity.md) | Modular monolith + SDK + plugin host; project layout & dependency rules |
 | 12 | [Engineering Standards](./12-Engineering-Standards.md) | Coding standards: errors, async/threading, events, logging, DI, persistence, testing |
 | 13 | [UI/UX Standards](./13-UI-UX-Standards.md) | MVVM, Avalonia, design tokens, states, accessibility |
+| 14 | [Testing & Observability Standards](./14-Testing-and-Observability-Standards.md) | Test pyramid, TestKit harness, categories, metrics/health/tracing |
 
 Project-root **[CLAUDE.md](../../CLAUDE.md)** is the quick-start for coding sessions. The built foundation lives in `/src` + `/tests`.
 

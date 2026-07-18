@@ -12,7 +12,9 @@
   <Folder Name="/tests/">
     <Project Path="tests/VarVault.Architecture.Tests/VarVault.Architecture.Tests.csproj" />
     <Project Path="tests/VarVault.Common.Tests/VarVault.Common.Tests.csproj" />
+    <Project Path="tests/VarVault.E2E.Tests/VarVault.E2E.Tests.csproj" />
     <Project Path="tests/VarVault.Host.Tests/VarVault.Host.Tests.csproj" />
     <Project Path="tests/VarVault.Infrastructure.Tests/VarVault.Infrastructure.Tests.csproj" />
+    <Project Path="tests/VarVault.TestKit/VarVault.TestKit.csproj" />
   </Folder>
 </Solution>

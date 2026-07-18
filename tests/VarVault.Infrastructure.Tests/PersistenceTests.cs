@@ -1,8 +1,10 @@
 using Microsoft.Data.Sqlite;
 using VarVault.Infrastructure.Persistence;
+using VarVault.TestKit;
 
 namespace VarVault.Infrastructure.Tests;
 
+[Trait("Category", TestCategories.Integration)]
 public class PersistenceTests
 {
     [Fact]

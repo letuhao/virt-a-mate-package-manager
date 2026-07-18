@@ -47,10 +47,13 @@ dotnet run --project src/VarVault.Cli
 - **Identity/CJK:** the library is heavily CJK — match by the **fold key** (NFC + case-fold), never raw strings. `PackageId` keeps the verbatim version token (`.007` ≠ `.7`).
 - **Style:** file-scoped namespaces, `nullable enable`, primary constructors where natural. Naming: `IThing`, `ThingService`, `ThingModule`, events past-tense.
 
-## Testing
-- **xUnit** (no FluentAssertions — v8 licensing; use `Assert`). Test method names use `Underscore_case`.
-- Test behavior through **SDK interfaces**, not internals. Add/keep an architecture test when adding a project.
-- Every checklist item ([09](docs/new-app/09-Implementation-Checklist.md)) is checked `[x]` **only** with concrete evidence (test name / benchmark / run output).
+## Testing & observability (see [14-Testing-and-Observability-Standards](docs/new-app/14-Testing-and-Observability-Standards.md))
+- **xUnit** (no FluentAssertions — v8 licensing; use `Assert`). Test method names `Underscore_case`.
+- Use **`VarVault.TestKit`**: `TestHost.Create(...)` (composed host + `FakeClock` + captured logs + optional SQLite), `SqliteTestDatabase`, `TempDirectory`, `CapturingLoggerProvider`, `PackageIds`. The `configure` seam on `VarVaultHost.Build` overrides services in tests.
+- **Categorize** every test class: `[Trait("Category", TestCategories.Unit|Integration|E2E)]`. Run `dotnet test --filter "Category=Unit"` etc.
+- Test behavior through **SDK interfaces**, not internals. Prefer fakes over mocks. Real SQLite (temp files) for integration, not EF in-memory. No sleep-then-assert — poll with bounds; use `FakeClock` for time.
+- **Monitoring:** `VarVault.Common.Diagnostics.Telemetry` (one `Meter`/`ActivitySource` "VarVault") — metrics (writes/jobs counters, durations, queue-depth gauges) + traces. Assert metrics with `MetricCollector<T>`; health via `HealthCheckService` (`write-queue`, `database`). Instrument new subsystems.
+- Every checklist item ([09](docs/new-app/09-Implementation-Checklist.md)) is `[x]` **only** with concrete evidence (test name / benchmark / run output).
 
 ## Docs
 - Design: [docs/new-app/](docs/new-app/README.md) (00–11). **Decisions are sealed in [10-Decisions-Log](docs/new-app/10-Decisions-Log.md)** — check there before re-opening a question.

@@ -35,6 +35,13 @@ public sealed class VarVaultHost : IAsyncDisposable
 
     /// <summary>Compose the host from the given built-in modules.</summary>
     public static VarVaultHost Build(HostOptions options, params IModule[] modules)
+        => Build(options, configure: null, modules);
+
+    /// <summary>
+    /// Compose the host, applying <paramref name="configure"/> after modules register — the
+    /// seam tests use to override services (fake clock, in-memory adapters, extra probes).
+    /// </summary>
+    public static VarVaultHost Build(HostOptions options, Action<IServiceCollection>? configure, params IModule[] modules)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(modules);
@@ -56,6 +63,8 @@ public sealed class VarVaultHost : IAsyncDisposable
             services.AddSingleton(module);
             names.Add(module.Name);
         }
+
+        configure?.Invoke(services);
 
         var provider = services.BuildServiceProvider(new ServiceProviderOptions
         {

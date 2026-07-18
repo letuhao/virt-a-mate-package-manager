@@ -3,9 +3,11 @@ using Microsoft.Extensions.DependencyInjection;
 using VarVault.Common;
 using VarVault.Host;
 using VarVault.Sdk.Threading;
+using VarVault.TestKit;
 
 namespace VarVault.Host.Tests;
 
+[Trait("Category", TestCategories.Integration)]
 public class ThreadingTests
 {
     [Fact]

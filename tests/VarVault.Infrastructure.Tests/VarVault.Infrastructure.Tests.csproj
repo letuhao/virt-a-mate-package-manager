@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\VarVault.Infrastructure\VarVault.Infrastructure.csproj" />
+    <ProjectReference Include="..\VarVault.TestKit\VarVault.TestKit.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

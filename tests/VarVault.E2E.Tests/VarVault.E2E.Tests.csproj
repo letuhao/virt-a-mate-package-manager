@@ -8,10 +8,10 @@
     <PackageReference Include="xunit" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\VarVault.Host\VarVault.Host.csproj" />
-    <ProjectReference Include="..\..\src\VarVault.Sdk\VarVault.Sdk.csproj" />
     <ProjectReference Include="..\VarVault.TestKit\VarVault.TestKit.csproj" />
   </ItemGroup>
   <ItemGroup>

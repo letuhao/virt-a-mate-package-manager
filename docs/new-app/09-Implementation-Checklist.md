@@ -35,6 +35,19 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] SDK-9 **Architecture enforcement** — `VarVault.Architecture.Tests` (NetArchTest) · T: 4 tests pass
 - [x] SDK-10 **Standards** — [CLAUDE.md](../../CLAUDE.md), [12-Engineering-Standards](./12-Engineering-Standards.md), [13-UI-UX-Standards](./13-UI-UX-Standards.md)
 
+### Testing & observability (built — see [14](./14-Testing-and-Observability-Standards.md))
+- [x] TO-1 **TestKit harness** — `TestHost` (composed host + FakeClock + captured logs + optional SQLite), `SqliteTestDatabase`, `TempDirectory`, `CapturingLoggerProvider`, `PackageIds`, `TestCategories` · used by Host/Infra/E2E tests
+- [x] TO-2 **Host test seam** — `VarVaultHost.Build(options, configure, modules)` service-override hook · T: TestKit overrides `IClock`
+- [x] TO-3 **Test categories** — `[Trait("Category", …)]`; filterable · M: `dotnet test --filter "Category=E2E"` runs only E2E
+- [x] TO-4 **Integration tests** — real SQLite via fixture · T: `DatabaseIntegrationTests`, `PersistenceTests` (WAL/FK)
+- [x] TO-5 **E2E harness** — full flow (event→handler→job→metric→write→health→logs) · T: `FoundationFlowTests` passes
+- [x] TO-6 **Metrics** — `Telemetry` Meter/instruments (writes/jobs counters+durations, depth/active gauges); write & job queues instrumented · T: E2E asserts `jobs.completed` via `MetricCollector<long>`
+- [x] TO-7 **Tracing** — `ActivitySource` "VarVault"; write/job activities
+- [x] TO-8 **Health checks** — `write-queue` (liveness) + `database` (readiness) via `HealthCheckService` · T: E2E asserts `Healthy`
+- [x] TO-9 **Log-as-probe** — `CapturingLoggerProvider` asserts structured entries · T: E2E asserts startup line
+- [ ] TO-10 **UI-E2E** — Avalonia.Headless.XUnit harness (added with the app)
+- *Total suite: 25 tests across 5 test projects, all green.*
+
 ### Database & migrations
 - [ ] 0.6 SQLite via EF Core 10; connection opens `WAL` + `synchronous` set per policy (M: `PRAGMA journal_mode` returns wal)
 - [ ] 0.7 First EF migration creates the schema; migrate-up on empty DB succeeds (T)
