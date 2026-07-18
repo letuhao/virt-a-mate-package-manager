@@ -1,4 +1,5 @@
 using VarVault.Common;
+using VarVault.Domain.Identity;
 
 namespace VarVault.Domain.ValueObjects;
 
@@ -17,6 +18,9 @@ public sealed record PackageId
     public string VersionToken { get; }
 
     public string VarName => $"{Creator}.{Package}.{VersionToken}";
+
+    /// <summary>The fold key (NFC + case-fold) used for all identity matching. See <see cref="IdentityFold"/>.</summary>
+    public string IdentityKey => IdentityFold.Compute(VarName);
 
     private PackageId(string creator, string package, string versionToken)
     {

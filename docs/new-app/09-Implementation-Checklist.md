@@ -49,27 +49,27 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - *Total suite: 25 tests across 5 test projects, all green.*
 
 ### Database & migrations
-- [ ] 0.6 SQLite via EF Core 10; connection opens `WAL` + `synchronous` set per policy (M: `PRAGMA journal_mode` returns wal)
-- [ ] 0.7 First EF migration creates the schema; migrate-up on empty DB succeeds (T)
-- [ ] 0.8 `PRAGMA foreign_keys=ON` enforced at connection open (T: FK violation throws)
+- [x] 0.6 SQLite via EF Core 10; connection opens `WAL` + `synchronous` set per policy · T: `CatalogSchemaTests.Connection_uses_wal_journal_mode` + `PersistenceTests.Baseline_pragmas_enable_WAL_and_foreign_keys`
+- [x] 0.7 First EF migration creates the schema; migrate-up on empty DB succeeds · T: `CatalogSchemaTests.Migration_creates_all_expected_tables` (25 tables incl. FTS); `dotnet ef database update` applies `20260718215021_InitialCatalogSchema` clean
+- [x] 0.8 `PRAGMA foreign_keys=ON` enforced at connection open · T: `CatalogSchemaTests.Foreign_key_violation_is_rejected` (VarFile→nonexistent Repository throws `DbUpdateException`)
 - [ ] 0.9 Startup `PRAGMA integrity_check` runs; corrupt DB is detected and surfaced (M: corrupt a copy → app reports)
 - [ ] 0.10 ⚠ DB refuses to open if located on a repo/removable volume (T: path on flagged volume → guarded error)
-- [ ] 0.11 App-computed Unicode fold-key function: NFC + full case-fold; ASCII and CJK both covered (T: `Fold("Café")==Fold("café")` folded equal per rule; `Fold("МЕ")==Fold("ме")`)
+- [x] 0.11 App-computed Unicode fold-key function: NFC + full case-fold; ASCII and CJK both covered · T: `IdentityFoldTests` (ASCII Café==café, Cyrillic МЕ==ме, CJK preserved, NFC composed==decomposed, idempotent) — see `IdentityFold`
 
 ### Schema — entities & constraints (each = table created + constraints enforced)
-- [ ] 0.12 `Repository` table + `VolumeSerial`, tier, priority, capacity fields (T: insert/read round-trip)
-- [ ] 0.13 `Package` — unique `IdentityKey`, unique `(Creator,PackageName,VersionSort)`? (note: VersionSort not unique alone) unique `VarName`; `CanonicalVarFileId` nullable ON DELETE SET NULL (🔒 T: deleting canonical VarFile nulls the pointer, does NOT delete Package)
-- [ ] 0.14 `VarFile` — unique `(RepositoryId,RelativePath)`; FK PackageId nullable (T)
-- [ ] 0.15 `ContentItem` keyed on `VarFileId` (🔒 not PackageId) (T: schema check)
-- [ ] 0.16 `Dependency` — unique `(VarFileId,DependsOnRefKey)`; self-edges droppable (T)
-- [ ] 0.17 `UserSave` + `SaveDependency` tables exist (T)
-- [ ] 0.18 `UsageEvent` (UTC timestamps) + `UsageStat` tables (T: stored value is UTC epoch)
-- [ ] 0.19 `MigrationJob` — unique partial index `(VarFileId) WHERE State NOT IN (Done,Failed,Cancelled)` (⚠ T: second live job on same file rejected)
-- [ ] 0.20 `Profile`, `ActivationLink`, `LoadingPreset`, `PresetMember`, `VarAlias` tables (T)
-- [ ] 0.21 `Tag`/`PackageTag`/`Collection`/`CollectionMember`/`ContentItemPref` tables (T)
-- [ ] 0.22 `PackageListItem` materialized table + `TrashItem` + `Setting` (T)
-- [ ] 0.23 FTS5 `PackageSearch` virtual table with the chosen **CJK-capable tokenizer** decided (🔒 M: MATCH on space-less CJK returns rows)
-- [ ] 0.24 All indexes from data-arch §6 created; `ANALYZE` runs post-bulk (M: `EXPLAIN QUERY PLAN` uses each index)
+- [x] 0.12 `Repository` table + `VolumeSerial`, tier, priority, capacity fields · T: `CatalogSchemaTests.Repository_round_trips_all_fields`
+- [x] 0.13 `Package` — unique `IdentityKey`, `(Creator,PackageName,VersionSort)` composite (not unique alone), unique `VarName`; `CanonicalVarFileId` nullable ON DELETE SET NULL · 🔒 T: `Duplicate_identity_key_is_rejected` + `Deleting_canonical_varfile_nulls_pointer_not_package` (Package survives, pointer nulled)
+- [x] 0.14 `VarFile` — unique `(RepositoryId,RelativePath)`; FK PackageId nullable · T: `Duplicate_repo_relativepath_is_rejected` (migration `PackageId nullable:true`, SetNull)
+- [x] 0.15 `ContentItem` keyed on `VarFileId` (🔒 not PackageId) · T: `ContentItem_cascades_with_its_varfile`
+- [x] 0.16 `Dependency` — unique `(VarFileId,DependsOnRefKey)` · T: `Duplicate_dependency_edge_is_rejected`
+- [x] 0.17 `UserSave` + `SaveDependency` tables exist · T: `Migration_creates_all_expected_tables` + `Remaining_entity_groups_round_trip`
+- [x] 0.18 `UsageEvent` (UTC epoch) + `UsageStat` tables · T: `UsageEvent_timestamp_is_stored_as_integer_epoch` (`typeof`==integer, value round-trips)
+- [x] 0.19 `MigrationJob` — unique partial index `(VarFileId) WHERE State NOT IN (Done,Failed,Cancelled)` · ⚠ T: `Only_one_live_migration_job_per_file` + `Terminal_migration_job_does_not_block_a_new_live_job`
+- [x] 0.20 `Profile`, `ActivationLink`, `LoadingPreset`, `PresetMember`, `VarAlias` tables · T: `Migration_creates_all_expected_tables` + `Remaining_entity_groups_round_trip`
+- [x] 0.21 `Tag`/`PackageTag`/`Collection`/`CollectionMember`/`ContentItemPref` tables · T: `Migration_creates_all_expected_tables` + `Remaining_entity_groups_round_trip`
+- [x] 0.22 `PackageListItem` materialized table + `TrashItem` + `Setting` · T: `Migration_creates_all_expected_tables` + `Remaining_entity_groups_round_trip`
+- [x] 0.23 FTS5 `PackageSearch` virtual table with the chosen **CJK-capable tokenizer** (trigram, D1) · 🔒 T: `Fts5_trigram_matches_spaceless_cjk` (MATCH on space-less CJK returns the row)
+- [x] 0.24 Indexes from data-arch §6 created; `EXPLAIN QUERY PLAN` uses them · T: `SchemaIndexTests` (identity unique, (repo,path) unique, ContentSignature, gallery composite with no temp B-tree). *`ANALYZE` runs post-bulk during indexing (1.25).*
 
 ### Recompute pipeline (single writer)
 - [ ] 0.25 Single-writer queue: all writes serialize through one connection; interactive writes prioritized over bulk (T: concurrent favorite-toggle completes while bulk batch runs)

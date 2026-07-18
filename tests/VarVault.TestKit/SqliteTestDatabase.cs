@@ -22,7 +22,7 @@ public sealed class SqliteTestDatabase : IDisposable
             .Options;
 
         var db = new VarVaultDbContext(options);
-        db.Database.EnsureCreated();
+        db.Database.Migrate(); // applies migrations incl. the FTS5 virtual table
         SqlitePragmas.ApplyBaseline(db.Database.GetDbConnection());
         return db;
     }

@@ -54,9 +54,9 @@ public sealed class TestHost : IAsyncDisposable
 
         if (withPersistence)
         {
-            // Stand in for Slice-1's migration so the DB is real and connectable.
+            // Apply the real EF migrations (includes the FTS5 virtual table) so the DB matches production.
             using var scope = host.Services.CreateScope();
-            scope.ServiceProvider.GetRequiredService<VarVaultDbContext>().Database.EnsureCreated();
+            scope.ServiceProvider.GetRequiredService<VarVaultDbContext>().Database.Migrate();
         }
 
         return new TestHost(host, clock, dir, logs);

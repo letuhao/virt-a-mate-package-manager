@@ -22,6 +22,7 @@
     <!-- Persistence -->
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Data.Sqlite" Version="10.0.0" />
     <!-- Tests -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
