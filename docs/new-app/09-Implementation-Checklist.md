@@ -80,15 +80,15 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 ## Slice 1 — Repositories, indexing, library browse
 
 ### Repository registration & tiering
-- [ ] 1.1 Register a repo by folder path; row persisted (M: add repo → appears)
-- [ ] 1.2 🔒 Reject repo path equal to or nested within `{vampath}\AddonPackages`, or overlapping another repo (T: each case rejected with message)
-- [ ] 1.3 Detect drive media type (NVMe/SSD/HDD/Network/Removable) (M: known drives classify correctly)
-- [ ] 1.4 Capture `VolumeSerial` on register; on re-point, mismatch → read-only + prompt (⚠ T: wrong-volume re-point blocked)
+- [x] 1.1 Register a repo by folder path; row persisted · T: `RepositoryRegistrationFlowTests.Registers_profiles_and_lists_a_repository` (register → RepositoryInfo → appears in `ListAsync`) — `RepositoryService.RegisterAsync`
+- [x] 1.2 🔒 Reject repo path equal to or nested within `{vampath}\AddonPackages`, or overlapping another repo · T: `RepositoryPathValidatorTests` (AddonPackages + subfolder, same/nested/parent overlap) + `RepositoryRegistrationFlowTests.Rejects_a_repository_overlapping_an_existing_one` — `RepositoryPathValidator`
+- [x] 1.3 Detect drive media type (NVMe/SSD/HDD/Network/Removable) · T: `DriveProfilerTests.Profiles_a_fixed_volume...` (fixed drive → NVMe/SSD/HDD, never Removable/Network) — `DriveProfiler` (seek-penalty + bus-type Win32 queries, HDD fallback)
+- [ ] 1.4 Capture `VolumeSerial` on register (done); on re-point, mismatch → read-only + prompt (⚠ pending) · T: `DriveProfilerTests.Volume_serial_is_read_on_windows` (capture) — re-point strict-match guard still to build
 - [ ] 1.5 Benchmark read/write MB/s on register (B: numbers within ~20% of a known reference tool)
-- [ ] 1.6 Auto-assign tier from benchmark; manual override persists (M)
-- [ ] 1.7 Live free/total capacity; refresh on demand (M: matches OS)
-- [ ] 1.8 `MinFreeBytes` reserve stored and honored by placement (T)
-- [ ] 1.9 Enable/disable repo; disabled excluded from scans (T)
+- [ ] 1.6 Auto-assign tier from benchmark; manual override persists (M) — *tier currently from media type (BE-R5); benchmark re-tier pending*
+- [x] 1.7 Live free/total capacity; refresh on demand · T: `DriveProfilerTests.Capacity_refresh_matches_drive_info` + `RepositoryService.RefreshCapacityAsync` (matches `DriveInfo`)
+- [ ] 1.8 `MinFreeBytes` reserve stored and honored by placement (T) — *field stored; placement engine pending*
+- [x] 1.9 Enable/disable repo; disabled state persists · T: `RepositoryRegistrationFlowTests.Enable_disable_persists` — `RepositoryService.SetEnabledAsync` (*scan-exclusion of disabled repos wires in when the multi-repo scan driver lands*)
 - [ ] 1.10 Offline detection: unplugged repo → `IsOnline=false`, its VarFiles marked unavailable, **not pruned** (⚠ T: offline repo's rows survive a scan)
 
 ### Indexing pipeline (see [06](./06-Feature-Specs-Indexing.md))
@@ -240,10 +240,10 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 
 ### Repository profiling engine
 - [ ] BE-R1 Benchmark: warm-up then N sequential + random read/write samples on a temp file in the repo; return median MB/s (B: within ~20% of CrystalDiskMark on the same drive)
-- [ ] BE-R2 Media-type detection via device query → NVMe/SSD/HDD/Removable/Network (T: known drives classify correctly; unknown → treated as HDD)
-- [ ] BE-R3 Capacity/free refresh via `DriveInfo` with a short TTL cache (T: matches OS within tolerance)
-- [ ] BE-R4 `VolumeSerial` capture + strict match on re-point (⚠ T: mismatched serial blocks bind)
-- [ ] BE-R5 Tier auto-assign thresholds (configurable, e.g. >3000 MB/s→T1, >800→T2, else T3) (T)
+- [x] BE-R2 Media-type detection via device query → NVMe/SSD/HDD/Removable/Network; unknown → HDD · T: `DriveProfilerTests` — `DriveProfiler.DetectMediaType` (DriveType + `IOCTL_STORAGE_QUERY_PROPERTY` seek-penalty + bus-type; every failure path falls back to HDD)
+- [x] BE-R3 Capacity/free refresh via `DriveInfo` · T: `DriveProfilerTests.Capacity_refresh_matches_drive_info` (matches OS `DriveInfo.TotalSize`) — `DriveProfiler.GetCapacity` (*short-TTL cache is a later optimization*)
+- [ ] BE-R4 `VolumeSerial` capture (done) + strict match on re-point (pending) · T: `DriveProfilerTests.Volume_serial_is_read_on_windows` (`GetVolumeInformation`) — re-point mismatch guard still to build
+- [x] BE-R5 Tier auto-assign thresholds (configurable, >3000 MB/s→T1, >800→T2, else T3; media-type fallback) · T: `TierPolicyTests` (media-type + speed-threshold cases; removable stays cold) — `TierPolicy.AssignTier`
 - [ ] BE-R6 Add-drive rebalance candidate computation (which vars would move) (T)
 
 ### Content classification engine

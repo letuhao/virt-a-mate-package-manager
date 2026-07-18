@@ -58,9 +58,13 @@ public static class CatalogLocationGuard
     {
         var a = NormalizeDir(candidate);
         var b = NormalizeDir(ancestor);
-        return a.Equals(b, StringComparison.OrdinalIgnoreCase)
-            || a.StartsWith(b + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-            || b.StartsWith(a + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        if (a.Equals(b, StringComparison.OrdinalIgnoreCase))
+            return true;
+        // Append a separator only when absent, so a root ("E:\") doesn't become "E:\\".
+        var aSep = a.EndsWith(Path.DirectorySeparatorChar) ? a : a + Path.DirectorySeparatorChar;
+        var bSep = b.EndsWith(Path.DirectorySeparatorChar) ? b : b + Path.DirectorySeparatorChar;
+        return aSep.StartsWith(bSep, StringComparison.OrdinalIgnoreCase)
+            || bSep.StartsWith(aSep, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string NormalizeDir(string path) =>

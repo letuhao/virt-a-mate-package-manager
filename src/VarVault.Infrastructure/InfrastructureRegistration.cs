@@ -25,6 +25,7 @@ public static class InfrastructureRegistration
         services.AddSingleton<IRepositoryEnumerator, RepositoryEnumerator>();
         services.AddSingleton<IVarInspector, VarInspector>();
         services.AddSingleton<Domain.Dedup.IFileHasher, Sha256FileHasher>();
+        services.AddSingleton<Domain.Repositories.IDriveProfiler, Repositories.DriveProfiler>();
 
         services.AddHealthChecks()
             .AddCheck<WriteQueueHealthCheck>("write-queue", tags: ["live"]);
