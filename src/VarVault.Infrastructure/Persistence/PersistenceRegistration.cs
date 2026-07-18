@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using VarVault.Domain.Dependencies;
 using VarVault.Domain.Indexing;
 using VarVault.Infrastructure.Indexing;
 using VarVault.Sdk.Persistence;
@@ -19,6 +20,7 @@ public static class PersistenceRegistration
 
         services.AddScoped<IUnitOfWork>(sp => new EfUnitOfWork(sp.GetRequiredService<VarVaultDbContext>()));
         services.AddScoped<ICatalogStore, EfCatalogStore>();
+        services.AddScoped<IDependencyResolver, EfDependencyResolver>();
         services.AddSingleton<CatalogDatabaseInitializer>();
 
         services.AddHealthChecks()

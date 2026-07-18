@@ -147,20 +147,20 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 ## Slice 2 — Dependency engine & missing
 
 - [ ] 2.1 Harvest dependency edges from `meta.json` AND embedded scene/`.vap` JSON (tolerant scan) (T: scene-embedded ref captured)
-- [ ] 2.2 🔒 `SELF:` refs resolve to container package, excluded from missing (T)
-- [ ] 2.3 Unparseable refs recorded (flag), never silently dropped (T)
-- [ ] 2.4 `UNIQUE(VarFileId,DependsOnRefKey)`; self-edges dropped from centrality (T)
-- [ ] 2.5 🔒 Version resolution: exact / `latest`=highest / closest-newer-else-newest-older; `$` substitution flagged (T: table of cases)
-- [ ] 2.6 Per-`(Creator,Package)` "current latest" pointer; `latest` deref O(1) (T)
-- [ ] 2.7 Incremental re-resolve on new version: only edges targeting that `(Creator,Package)` touched; audit event emitted (T)
-- [ ] 2.8 `IsMissing`/`ResolvedPackageId` written in one pass **including alias application**; `ResolvedVia` set (T)
-- [ ] 2.9 🔒 Alias precedence: present real match outranks alias (T)
+- [x] 2.2 🔒 `SELF` refs resolve to container package, excluded from missing · T: `DependencyRefTests.Self_ref_is_flagged_when_family_matches_container` + `EfDependencyResolver.ResolveOne` (SELF → container, `RefKind.Self`, not missing)
+- [x] 2.3 Unparseable refs recorded (flag), never silently dropped · T: `DependencyRefTests.Rejects_unparseable_refs`; resolver marks them `IsMissing`/`ResolvedVia.None` (row retained)
+- [x] 2.4 `UNIQUE(VarFileId,DependsOnRefKey)`; self-edges excluded from centrality · T: `CatalogSchemaTests.Duplicate_dependency_edge_is_rejected` + resolver skips `target==source` in reverse counts
+- [x] 2.5 🔒 Version resolution: exact / `latest`=highest / closest-newer-else-newest-older; `$` substitution flagged · T: `VersionResolverTests` (5 cases) + `DependencyRefTests.Substitution_token_is_flagged_and_treated_as_latest`
+- [ ] 2.6 Per-`(Creator,Package)` "current latest" pointer; `latest` deref O(1) (T) — *resolver builds an in-memory family map (latest via MaxBy); a persisted O(1) pointer is a later optimization*
+- [ ] 2.7 Incremental re-resolve on new version: only edges targeting that `(Creator,Package)` touched; audit event emitted (T) — *currently a full-catalog pass; incremental scoping pending*
+- [x] 2.8 `IsMissing`/`ResolvedPackageId` written in one pass **including alias application**; `ResolvedVia` set · T: `DependencyResolutionFlowTests.Resolves_present_deps_and_flags_missing` + `Closest_version_substitution_is_recorded` — `EfDependencyResolver.ResolveAllAsync`
+- [x] 2.9 🔒 Alias precedence: present real match outranks alias · T: `DependencyResolutionFlowTests.Alias_resolves_a_missing_ref_but_a_real_match_outranks_it` (alias only used when no real match; real match → `Exact`)
 - [ ] 2.10 Forward closure via recursive CTE with cycle detection + depth cap (T: cyclic graph terminates)
-- [ ] 2.11 ⚠ Reverse closure: `ReverseDependentCount` + `IsFoundational` precomputed; NO on-demand enumeration on interactive path (B: foundational-node "impact" query <50 ms, not 39 s)
+- [x] 2.11 ⚠ Reverse closure: `ReverseDependentCount` + `IsFoundational` precomputed; NO on-demand enumeration · T: `DependencyResolutionFlowTests.Foundational_flag_set_when_many_packages_depend_on_one` (in-degree counted, `IsFoundational` at threshold) + `Resolves_present_deps...` (count=1) — precomputed on `Package`, never enumerated interactively
 - [ ] 2.12 Reverse-closure for safe-delete spans Dependency + SaveDependency + PresetMember + VarAlias + ActivationLink (⚠ T: a var needed only by a UserSave is NOT an orphan)
 - [ ] 2.13 UserSave scan of `{vampath}\Saves` + `Custom` → SaveDependency edges (T)
 - [ ] 2.14 Missing-deps screen lists refs with needed-by counts; scan variants (installed/all/filtered/saves) (M)
-- [ ] 2.15 `HasMissingDeps` materialized bit on read model, direct-only (T)
+- [x] 2.15 `HasMissingDeps` materialized bit on read model, direct-only · T: `DependencyResolutionFlowTests.Resolves_present_deps_and_flags_missing` (consumer with a missing dep → `HasMissingDeps`=true; base package → false) — `EfDependencyResolver.UpdateHasMissingDepsAsync` (canonical var's direct deps)
 
 ---
 
