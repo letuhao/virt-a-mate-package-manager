@@ -101,9 +101,9 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] 1.17 Store `MetaCreator`/`MetaPackage` + `MetaDivergent` flag when they differ from filename (T)
 - [ ] 1.18 Content classification by prefix+ext rules → per-type counts; matches legacy type table on a fixture corpus (T: fixture var → expected counts)
 - [ ] 1.19 `PrimaryType` chosen by fixed precedence (T)
-- [ ] 1.20 🔒 `ContentSignature` over sorted `(rawEntryNameBytes, uncompressedSize, CRC-32)` multiset; **raw bytes**, Zip64-aware, dir-entries excluded (T: two zips of identical content diff compression/order → same signature; mojibake var → deterministic signature)
-- [ ] 1.21 `PayloadSignature` (excludes meta.json) computed (T)
-- [ ] 1.22 `ContentSignatureNoPath` (size+CRC, paths excluded) computed (T)
+- [x] 1.20 🔒 `ContentSignature` over sorted `(rawEntryNameBytes, uncompressedSize, CRC-32)` multiset; **raw bytes**, Zip64-aware, dir-entries excluded · T: `ZipCentralDirectoryReaderTests.Same_content_different_compression_and_order_yields_same_content_signature` (byte-different zips → identical signature) + `ContentSignatureEngineTests.Raw_bytes_drive_identity_so_mojibake_is_deterministic`
+- [x] 1.21 `PayloadSignature` (excludes meta.json) computed · T: `ContentSignatureEngineTests.Payload_signature_excludes_meta_json` + `ZipCentralDirectoryReaderTests.Different_meta_only_shares_payload_signature_not_content`
+- [x] 1.22 `ContentSignatureNoPath` (size+CRC, paths excluded) computed · T: `ContentSignatureEngineTests.NoPath_signature_ignores_names_but_not_sizes`
 - [ ] 1.23 Staged: pass-1 (names+meta+deps) makes catalog browsable before pass-2 (previews+signatures) finishes (M/D: browse during index of a real repo)
 - [ ] 1.24 Per-physical-drive parallelism: HDD degree=1, NVMe higher (M: two repos on one HDD don't run concurrent reads)
 - [ ] 1.25 Bulk writes batched in transactions; FTS triggers disabled during bulk then rebuilt once (T/B: bulk insert rate acceptable)
@@ -271,8 +271,8 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] BE-P5 🔒 Propose-only by default; auto-execute is explicit opt-in (T: default config = propose)
 
 ### Fingerprint & dedup engine
-- [ ] BE-F1 🔒 Central-directory reader: Zip64-aware, raw entry-name bytes, dir-entries excluded (T)
-- [ ] BE-F2 Three signatures (Content / Payload / NoPath) computed in one pass (T)
+- [x] BE-F1 🔒 Central-directory reader: Zip64-aware, raw entry-name bytes, dir-entries excluded · T: `ZipCentralDirectoryReaderTests` (`Same_content_different_compression_and_order...`, `Raw_cjk_entry_names_round_trip_without_decoding`, `Corrupt_zip_is_rejected`, `Empty_file_is_rejected`, real-repo probe) — `ZipCentralDirectoryReader` parses EOCD/Zip64 EOCD, yields raw name bytes; engine drops dir entries
+- [x] BE-F2 Three signatures (Content / Payload / NoPath) computed in one pass · T: `ContentSignatureEngineTests` (order-independent, dir-excluded, payload-excludes-meta, no-path-ignores-names, mojibake-deterministic) — `ContentSignatureEngine.Compute`
 - [ ] BE-F3 Lazy full `ContentHash` computed only for verify-before-delete / portability (T: not computed during normal index)
 - [ ] BE-F4 Dedup grouping within one `IdentityKey`; cross-identity matches report-only (🔒 T)
 
