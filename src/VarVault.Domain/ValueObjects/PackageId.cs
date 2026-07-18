@@ -22,6 +22,28 @@ public sealed record PackageId
     /// <summary>The fold key (NFC + case-fold) used for all identity matching. See <see cref="IdentityFold"/>.</summary>
     public string IdentityKey => IdentityFold.Compute(VarName);
 
+    /// <summary>
+    /// Numeric projection of the version token for sorting. Clamped so an absurdly long version
+    /// (11+ digits) can never overflow — the verbatim <see cref="VersionToken"/> stays authoritative.
+    /// </summary>
+    public long VersionSort => ParseVersionSort(VersionToken);
+
+    /// <summary>Parse a digit version token to a sortable long, clamping instead of overflowing.</summary>
+    public static long ParseVersionSort(string versionToken)
+    {
+        long value = 0;
+        foreach (var ch in versionToken)
+        {
+            if (!char.IsAsciiDigit(ch))
+                break;
+            // Clamp: once we'd exceed long.MaxValue, stop accumulating and saturate.
+            if (value > (long.MaxValue - (ch - '0')) / 10)
+                return long.MaxValue;
+            value = (value * 10) + (ch - '0');
+        }
+        return value;
+    }
+
     private PackageId(string creator, string package, string versionToken)
     {
         Creator = creator;

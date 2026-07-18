@@ -94,13 +94,13 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 ### Indexing pipeline (see [06](./06-Feature-Specs-Indexing.md))
 - [ ] 1.11 Enumerate `*.var` recursively; exclude `___XXX___` dirs and reparse points (T: symlink/junction not indexed)
 - [ ] 1.12 Freshness skip by `(size, mtime)` from directory entry **without opening the file** (T: unchanged file not opened — assert via I/O counter/mock)
-- [ ] 1.13 🔒 Identity parse: 3-part `Creator.Package.Version`, digit version; else `PackageId=null` → Unrecognized bucket (T: `.007` preserved; `A.B.C.1` → null; 11-digit version no overflow)
-- [ ] 1.14 🔒 `IdentityKey` computed; `Creator.Pkg.007` and `creator.pkg.007` collapse to same key (T)
-- [ ] 1.15 Facets (Creator/PackageName/VersionToken/VersionSort) parsed **from filename**, never meta.json (T: meta with different names doesn't change identity)
+- [x] 1.13 🔒 Identity parse: 3-part `Creator.Package.Version`, digit version; else failure → Unrecognized bucket · T: `IdentityFacetsTests` (`.007` preserved, `A.B.C.1`/non-numeric → failure, `Long_version_clamps_without_overflow` 20-digit → `long.MaxValue`)
+- [x] 1.14 🔒 `IdentityKey` computed; `Creator.Pkg.007` and `creator.pkg.007` collapse to same key · T: `IdentityFoldTests` + `IdentityFacetsTests.Dot_seven_and_dot_zerozeroseven_stay_distinct_versions` (case collapses, `.7`≠`.007`)
+- [x] 1.15 Facets (Creator/PackageName/VersionToken/VersionSort) parsed **from filename** · T: `IdentityFacetsTests` — `PackageId.TryParse` derives every facet from the filename and structurally cannot read meta.json (identity is filename-only by construction; `MetaDivergent` set separately at index time, 1.17)
 - [ ] 1.16 Read `meta.json`; missing → `IntegrityStatus=MissingMeta` (T)
 - [ ] 1.17 Store `MetaCreator`/`MetaPackage` + `MetaDivergent` flag when they differ from filename (T)
-- [ ] 1.18 Content classification by prefix+ext rules → per-type counts; matches legacy type table on a fixture corpus (T: fixture var → expected counts)
-- [ ] 1.19 `PrimaryType` chosen by fixed precedence (T)
+- [x] 1.18 Content classification by prefix+ext rules → per-type counts; matches legacy type table · T: `ContentClassificationEngineTests` (scene/look/clothing/hair/asset counts, preset flags per legacy table, plugin cslist-else-cs, case/separator-agnostic) + `RealRepoClassificationTests` (real corpus classifies)
+- [x] 1.19 `PrimaryType` chosen by fixed precedence · T: `ContentClassificationEngineTests` (scene wins over look/clothing; `ChoosePrimary` precedence) + `RealRepoClassificationTests` (every classified real var → non-Unknown primary)
 - [x] 1.20 🔒 `ContentSignature` over sorted `(rawEntryNameBytes, uncompressedSize, CRC-32)` multiset; **raw bytes**, Zip64-aware, dir-entries excluded · T: `ZipCentralDirectoryReaderTests.Same_content_different_compression_and_order_yields_same_content_signature` (byte-different zips → identical signature) + `ContentSignatureEngineTests.Raw_bytes_drive_identity_so_mojibake_is_deterministic`
 - [x] 1.21 `PayloadSignature` (excludes meta.json) computed · T: `ContentSignatureEngineTests.Payload_signature_excludes_meta_json` + `ZipCentralDirectoryReaderTests.Different_meta_only_shares_payload_signature_not_content`
 - [x] 1.22 `ContentSignatureNoPath` (size+CRC, paths excluded) computed · T: `ContentSignatureEngineTests.NoPath_signature_ignores_names_but_not_sizes`
@@ -247,10 +247,10 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] BE-R6 Add-drive rebalance candidate computation (which vars would move) (T)
 
 ### Content classification engine
-- [ ] BE-C1 Precompiled rule set (path-prefix + ext → type); NO per-entry regex recompile (T: assert compiled set reused across entries)
-- [ ] BE-C2 Per-type counters + `isPreset` flags produced per var (T: fixture var → expected counts)
-- [ ] BE-C3 `PrimaryType` by fixed precedence, deterministic (T)
-- [ ] BE-C4 Gender inference from path fragments + confidence score (T: female/male/AUTO/futa fixtures)
+- [x] BE-C1 Precompiled rule set (path-prefix + ext → type); NO per-entry regex recompile · T: `ContentClassificationEngineTests` — `ContentClassificationEngine.Rules` is a single static array of string prefix/suffix checks (zero regex); reused for every entry
+- [x] BE-C2 Per-type counters + `isPreset` flags produced per var · T: `ContentClassificationEngineTests.Preset_flags_follow_the_legacy_table` + count tests + `Plugin_count_prefers_cslist_over_cs`
+- [x] BE-C3 `PrimaryType` by fixed precedence, deterministic · T: `ContentClassificationEngineTests` (`ChoosePrimary`)
+- [x] BE-C4 Gender inference from path fragments + confidence score · T: `GenderInferenceTests` (female/male/futa/auto; male-not-in-female; confidence = vote share)
 - [ ] BE-C5 `ContentItem` rows keyed on `VarFileId`; `PackageContentCount` derived from canonical (🔒 T)
 
 ### Usage analyzer & classifier
