@@ -202,9 +202,9 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 ### Encoding health & fix (see [06](./06-Feature-Specs-Indexing.md))
 - [x] 4.10 Per-entry codepage detection (GBK/GB18030/Shift-JIS/Big5/EUC-KR) with round-trip validation; `DetectedCodepage`+`BrokenEntryCount` computed · T: `EncodingHealthEngineTests` (GBK detected; UTF-8 flag & valid-UTF-8-without-flag & ASCII all Ok = 0 false-positive; undetectable→NeedsFix broken-count; mixed→PartiallyBroken) + `RealRepoClassificationTests.Encoding_detection_runs_over_the_real_corpus...` — `EncodingHealthEngine.Detect` (storage on `VarFile` at index time, IDX-8)
 - [x] 4.11 CodePagesEncodingProvider registered; raw entry-name bytes captured · T: `EncodingHealthEngineTests` (engine registers `CodePagesEncodingProvider`; `ZipCentralDirectoryReader` captures raw name bytes + UTF-8 flag bit 11)
-- [ ] 4.12 🔒⚠ Fix writes a NEW UTF-8 var (never overwrite in place); temp→validate→atomic rename (T)
-- [ ] 4.13 🔒 Fixed var validated against VaM constraints (ZIP+Deflate, UTF-8 flag, no Zip64/data-descriptors, meta present) before preferring it (T)
-- [ ] 4.14 ⚠ Original retained (not trashed) until fix confirmed; `FixedFromVarFileId` lineage set (T)
+- [x] 4.12 🔒⚠ Fix writes a NEW UTF-8 var (never overwrite in place); temp→validate→atomic rename · T: `EncodingFixerTests.Fixes_a_gbk_broken_var_into_valid_utf8` (`.partial`→validate→`File.Move`) + `Refuses_to_overwrite_an_existing_output` + `No_partial_file_remains_after_success` — `EncodingFixer`
+- [x] 4.13 🔒 Fixed var validated against VaM constraints (Deflate, UTF-8 flag, meta present) before preferring it · T: `EncodingFixerTests` (fixed var → `EncodingHealth.Ok` + `VamVarValidator.Validate` success; 衣装 decodes correctly, non-ASCII names flagged UTF-8) — `VamVarValidator`
+- [ ] 4.14 ⚠ Original retained (not trashed) until fix confirmed (done); `FixedFromVarFileId` lineage set (pending) · T: `EncodingFixerTests.Fixes_a_gbk_broken_var_into_valid_utf8` (original untouched, still `NeedsFix`) — DB lineage wiring pending
 - [ ] 4.15 ⚠ Auto/batch mode flags low-confidence for review, never deletes originals unattended (T)
 - [ ] 4.16 Health report grouped by codepage; batch "fix all" (M)
 - [ ] 4.17 Optional slimming is separate, off by default (T)

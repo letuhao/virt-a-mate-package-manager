@@ -38,6 +38,17 @@ public static class EncodingHealthEngine
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
     }
 
+    /// <summary>Map a detected codepage display name back to its numeric code page (for the fixer).</summary>
+    public static int? CodePageFor(string name)
+    {
+        foreach (var (codePage, candidateName) in Candidates)
+        {
+            if (string.Equals(candidateName, name, StringComparison.OrdinalIgnoreCase))
+                return codePage;
+        }
+        return null;
+    }
+
     public static EncodingHealthResult Detect(IReadOnlyList<ZipEntryFacts> entries)
     {
         Guard.NotNull(entries);
