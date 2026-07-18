@@ -1,0 +1,506 @@
+<style>
+  :root {
+    color-scheme: dark;
+    --bg-0:#0d0f13; --bg-1:#15181f; --bg-2:#1c2029; --bg-3:#232833; --bg-hover:#262c38;
+    --border:#2b313d; --border-hi:#3a414f;
+    --text-hi:#e7ebf2; --text:#aab3c2; --text-lo:#6b7484;
+    --accent:#7c86f0; --accent-hi:#9aa2f6; --accent-bg:rgba(124,134,240,.16); --accent-line:rgba(124,134,240,.5);
+    --good:#3ddc97; --good-bg:rgba(61,220,151,.14);
+    --warn:#f4b740; --warn-bg:rgba(244,183,64,.14);
+    --crit:#fb6f84; --crit-bg:rgba(251,111,132,.14);
+    --hot:#f2924e; --warm:#d9b16a; --cold:#6aa2c8;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 10px 30px rgba(0,0,0,.35);
+    --fs-xs:11px; --fs-sm:12px; --fs-base:13px; --fs-md:14px; --fs-lg:16px;
+    --r:7px; --r-sm:5px;
+    --mono:ui-monospace,"Cascadia Code","Cascadia Mono",Consolas,"SF Mono",monospace;
+    --ui:-apple-system,"Segoe UI",ui-sans-serif,system-ui,Roboto,sans-serif;
+    --rail-w:246px; --detail-w:340px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { color-scheme: light;
+      --bg-0:#eef0f4; --bg-1:#f7f8fb; --bg-2:#ffffff; --bg-3:#f0f2f6; --bg-hover:#eaecf2;
+      --border:#dde1e9; --border-hi:#c7ccd8; --text-hi:#161a22; --text:#4a5265; --text-lo:#8a93a4;
+      --accent:#5a63d8; --accent-hi:#464fc4; --accent-bg:rgba(90,99,216,.12); --accent-line:rgba(90,99,216,.45);
+      --good:#0f9d63; --good-bg:rgba(15,157,99,.12); --warn:#b9791a; --warn-bg:rgba(185,121,26,.14);
+      --crit:#d63d55; --crit-bg:rgba(214,61,85,.12); --hot:#d1732e; --warm:#a5833f; --cold:#4d7ea6;
+      --shadow:0 1px 2px rgba(20,30,60,.08), 0 8px 24px rgba(20,30,60,.08); }
+  }
+  :root[data-theme="light"] { color-scheme: light;
+    --bg-0:#eef0f4; --bg-1:#f7f8fb; --bg-2:#ffffff; --bg-3:#f0f2f6; --bg-hover:#eaecf2;
+    --border:#dde1e9; --border-hi:#c7ccd8; --text-hi:#161a22; --text:#4a5265; --text-lo:#8a93a4;
+    --accent:#5a63d8; --accent-hi:#464fc4; --accent-bg:rgba(90,99,216,.12); --accent-line:rgba(90,99,216,.45);
+    --good:#0f9d63; --good-bg:rgba(15,157,99,.12); --warn:#b9791a; --warn-bg:rgba(185,121,26,.14);
+    --crit:#d63d55; --crit-bg:rgba(214,61,85,.12); --hot:#d1732e; --warm:#a5833f; --cold:#4d7ea6;
+    --shadow:0 1px 2px rgba(20,30,60,.08), 0 8px 24px rgba(20,30,60,.08); }
+  :root[data-theme="dark"] { color-scheme: dark;
+    --bg-0:#0d0f13; --bg-1:#15181f; --bg-2:#1c2029; --bg-3:#232833; --bg-hover:#262c38;
+    --border:#2b313d; --border-hi:#3a414f; --text-hi:#e7ebf2; --text:#aab3c2; --text-lo:#6b7484;
+    --accent:#7c86f0; --accent-hi:#9aa2f6; --accent-bg:rgba(124,134,240,.16); --accent-line:rgba(124,134,240,.5);
+    --good:#3ddc97; --good-bg:rgba(61,220,151,.14); --warn:#f4b740; --warn-bg:rgba(244,183,64,.14);
+    --crit:#fb6f84; --crit-bg:rgba(251,111,132,.14); --hot:#f2924e; --warm:#d9b16a; --cold:#6aa2c8;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 10px 30px rgba(0,0,0,.35); }
+
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg-0); color:var(--text); font-family:var(--ui); font-size:var(--fs-base); -webkit-font-smoothing:antialiased; }
+  .mono { font-family:var(--mono); font-variant-numeric:tabular-nums; }
+  button { font-family:inherit; color:inherit; cursor:pointer; }
+  input[type=checkbox]{ accent-color:var(--accent); width:14px; height:14px; }
+  ::-webkit-scrollbar { width:11px; height:11px; }
+  ::-webkit-scrollbar-thumb { background:var(--border-hi); border-radius:6px; border:3px solid transparent; background-clip:content-box; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:1px; border-radius:3px; }
+
+  .app { display:grid; grid-template-rows:44px 1fr auto 26px; height:100vh; }
+  .topbar { display:flex; align-items:center; gap:12px; padding:0 12px; background:var(--bg-1); border-bottom:1px solid var(--border); }
+  .brand { display:flex; align-items:center; gap:9px; font-weight:600; color:var(--text-hi); font-size:var(--fs-md); letter-spacing:-.01em; }
+  .brand .glyph { width:22px; height:22px; border-radius:6px; background:linear-gradient(135deg,var(--accent),var(--cold)); display:grid; place-items:center; color:#fff; font-weight:700; font-size:12px; box-shadow:var(--shadow); }
+  .brand small { color:var(--text-lo); font-weight:500; font-size:var(--fs-xs); }
+  .filters { display:flex; align-items:center; gap:6px; }
+  .filters .lbl { color:var(--text-lo); font-size:var(--fs-sm); }
+  .fld { height:28px; background:var(--bg-2); border:1px solid var(--border); border-radius:var(--r-sm); color:var(--text-hi); padding:0 8px; font-size:var(--fs-sm); font-family:var(--ui); }
+  .fld:focus { border-color:var(--accent-line); outline:none; }
+  .search { flex:1; max-width:420px; position:relative; }
+  .search input { width:100%; height:28px; background:var(--bg-2); border:1px solid var(--border); border-radius:var(--r); color:var(--text-hi); padding:0 30px; font-size:var(--fs-base); }
+  .search input:focus { border-color:var(--accent-line); background:var(--bg-0); outline:none; }
+  .search .ico { position:absolute; left:9px; top:6px; color:var(--text-lo); }
+  .top-actions { display:flex; align-items:center; gap:6px; margin-left:auto; }
+  .seg { display:flex; background:var(--bg-2); border:1px solid var(--border); border-radius:var(--r); overflow:hidden; }
+  .seg button { border:0; background:transparent; color:var(--text-lo); padding:5px 9px; font-size:var(--fs-sm); }
+  .seg button.on { background:var(--accent-bg); color:var(--accent-hi); }
+  .btn { border:1px solid var(--border); background:var(--bg-2); color:var(--text); border-radius:var(--r-sm); padding:5px 10px; font-size:var(--fs-sm); display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+  .btn:hover { background:var(--bg-hover); border-color:var(--border-hi); color:var(--text-hi); }
+  .btn:disabled { opacity:.4; cursor:default; }
+  .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:500; }
+  .btn.primary:hover { background:var(--accent-hi); }
+  .btn.danger:hover { background:var(--crit-bg); border-color:var(--crit); color:var(--crit); }
+  .btn.sm { padding:3px 8px; font-size:var(--fs-xs); }
+  .theme-tgl { border:1px solid var(--border); background:var(--bg-2); border-radius:var(--r-sm); width:28px; height:28px; display:grid; place-items:center; color:var(--text-lo); }
+  .theme-tgl:hover { color:var(--text-hi); background:var(--bg-hover); }
+
+  .body { display:grid; grid-template-columns:var(--rail-w) 1fr var(--detail-w); min-height:0; }
+
+  /* rail */
+  .rail { background:var(--bg-1); border-right:1px solid var(--border); overflow-y:auto; padding:8px 0; }
+  .rail-sec { padding:4px 12px 2px; }
+  .rail-h { display:flex; align-items:center; gap:4px; font-size:var(--fs-xs); letter-spacing:.07em; text-transform:uppercase; color:var(--text-lo); font-weight:600; margin:9px 0 5px; }
+  .rail-h .sp { flex:1; }
+  .rail-h button { border:0; background:none; color:var(--text-lo); font-size:13px; line-height:1; padding:1px 4px; border-radius:4px; }
+  .rail-h button:hover { color:var(--text-hi); background:var(--bg-3); }
+  .nav { list-style:none; margin:0; padding:0; }
+  .nav li { display:flex; align-items:center; gap:8px; padding:5px 12px; border-radius:var(--r-sm); margin:1px 6px; color:var(--text); font-size:var(--fs-base); cursor:pointer; }
+  .nav li:hover { background:var(--bg-hover); color:var(--text-hi); }
+  .nav li.on { background:var(--accent-bg); color:var(--accent-hi); font-weight:500; }
+  .nav li .count { margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--text-lo); }
+  .nav li.on .count { color:var(--accent-hi); }
+  .dot { width:8px; height:8px; border-radius:50%; flex:none; }
+  .repo { padding:6px 12px; margin:1px 6px; border-radius:var(--r-sm); cursor:pointer; }
+  .repo:hover { background:var(--bg-hover); }
+  .repo-top { display:flex; align-items:center; gap:7px; font-size:var(--fs-base); color:var(--text-hi); }
+  .repo-top .tier { font-family:var(--mono); font-size:10px; font-weight:600; padding:1px 5px; border-radius:4px; }
+  .repo-top .meta { margin-left:auto; font-family:var(--mono); font-size:10px; color:var(--text-lo); }
+  .bar { height:4px; border-radius:3px; background:var(--bg-3); margin-top:5px; overflow:hidden; }
+  .bar > i { display:block; height:100%; border-radius:3px; }
+  .repo-sub { font-size:10px; color:var(--text-lo); margin-top:3px; font-family:var(--mono); }
+  .offline { opacity:.55; }
+  .profrow { display:flex; gap:5px; padding:2px 12px 4px; }
+  .profrow select { flex:1; }
+  .tool { display:flex; align-items:center; gap:8px; padding:6px 12px; margin:1px 6px; border-radius:var(--r-sm); color:var(--text); font-size:var(--fs-base); cursor:pointer; }
+  .tool:hover { background:var(--bg-hover); color:var(--text-hi); }
+  .tool .badge { margin-left:auto; font-family:var(--mono); font-size:10px; padding:1px 6px; border-radius:10px; background:var(--crit-bg); color:var(--crit); }
+  .tool .badge.warn { background:var(--warn-bg); color:var(--warn); }
+  .tool svg { color:var(--text-lo); }
+  .sub-actions { margin:0 6px 4px 26px; display:flex; flex-direction:column; gap:1px; }
+  .sub-actions a { font-size:var(--fs-sm); color:var(--text-lo); padding:3px 8px; border-radius:4px; text-decoration:none; }
+  .sub-actions a:hover { color:var(--accent-hi); background:var(--bg-hover); }
+
+  /* center */
+  .center { display:flex; flex-direction:column; min-width:0; background:var(--bg-0); }
+  .facetbar { display:flex; align-items:center; gap:7px; padding:8px 14px; border-bottom:1px solid var(--border); background:var(--bg-1); flex-wrap:wrap; }
+  .chip { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--border); background:var(--bg-2); color:var(--text); border-radius:100px; padding:3px 10px; font-size:var(--fs-sm); }
+  .chip:hover { border-color:var(--border-hi); color:var(--text-hi); }
+  .chip.on { background:var(--accent-bg); border-color:var(--accent-line); color:var(--accent-hi); }
+  .chip .x { color:var(--text-lo); font-size:13px; }
+  .facetbar .spacer { flex:1; }
+  .result-n { color:var(--text-lo); font-size:var(--fs-sm); }
+  .result-n b { color:var(--text-hi); font-family:var(--mono); font-weight:600; }
+  .sortsel { display:flex; align-items:center; gap:6px; font-size:var(--fs-sm); color:var(--text-lo); }
+  .sortsel select { background:var(--bg-2); border:1px solid var(--border); color:var(--text-hi); border-radius:var(--r-sm); padding:3px 6px; font-size:var(--fs-sm); font-family:var(--ui); }
+  .scroll { overflow:auto; flex:1; padding:13px; }
+
+  .gallery { display:grid; grid-template-columns:repeat(auto-fill,minmax(182px,1fr)); gap:12px; }
+  .card { background:var(--bg-1); border:1px solid var(--border); border-radius:var(--r); overflow:hidden; cursor:pointer; transition:border-color .12s; position:relative; }
+  @media (prefers-reduced-motion:reduce){ .card{ transition:none; } }
+  .card:hover { border-color:var(--border-hi); }
+  .card.sel { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent); }
+  .card .chk { position:absolute; top:7px; left:7px; z-index:2; opacity:0; }
+  .card:hover .chk, .card .chk:checked { opacity:1; }
+  .thumb { aspect-ratio:16/10; position:relative; display:grid; place-items:center; }
+  .thumb .letter { font-size:32px; font-weight:700; color:rgba(255,255,255,.85); }
+  .thumb .badges { position:absolute; top:7px; right:7px; display:flex; gap:4px; }
+  .pill { font-size:10px; font-weight:600; padding:2px 6px; border-radius:5px; backdrop-filter:blur(4px); display:inline-flex; align-items:center; gap:3px; font-family:var(--mono); }
+  .pill.tier { background:rgba(0,0,0,.5); color:#fff; } .pill.warn { background:var(--warn); color:#1a1206; }
+  .pill.crit { background:var(--crit); color:#2a0810; } .pill.fav { background:rgba(0,0,0,.5); color:var(--warn); }
+  .pill.inst { position:absolute; bottom:7px; left:7px; background:var(--good-bg); color:var(--good); }
+  .card-body { padding:8px 10px 9px; }
+  .card-name { color:var(--text-hi); font-size:var(--fs-sm); font-weight:500; line-height:1.35; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .card-meta { display:flex; align-items:center; gap:6px; margin-top:5px; color:var(--text-lo); font-size:11px; }
+  .card-meta .type { font-weight:500; } .card-meta .sz { margin-left:auto; font-family:var(--mono); }
+  .temp { width:7px; height:7px; border-radius:50%; flex:none; }
+
+  .tbl { width:100%; border-collapse:collapse; font-size:var(--fs-sm); white-space:nowrap; }
+  .tbl thead th { position:sticky; top:0; background:var(--bg-1); text-align:left; color:var(--text-lo); font-weight:600; font-size:10px; text-transform:uppercase; letter-spacing:.04em; padding:7px 8px; border-bottom:1px solid var(--border); z-index:1; }
+  .tbl thead th.ct { text-align:center; color:var(--text-lo); }
+  .tbl tbody td { padding:5px 8px; border-bottom:1px solid var(--border); color:var(--text); }
+  .tbl tbody tr { cursor:pointer; } .tbl tbody tr:hover { background:var(--bg-1); }
+  .tbl tbody tr.sel { background:var(--accent-bg); }
+  .tbl .nm { color:var(--text-hi); font-weight:500; }
+  .tbl .num { font-family:var(--mono); text-align:right; } .tbl .ct { font-family:var(--mono); text-align:center; }
+  .tbl .ct.z { color:var(--text-lo); opacity:.4; }
+  .tbl .type-tag { font-size:11px; padding:1px 6px; border-radius:5px; font-weight:500; }
+  .tbl .fixv { color:var(--text-lo); font-family:var(--mono); font-size:11px; }
+  .tbl .lnk { color:var(--accent-hi); }
+  .hidden { display:none !important; }
+
+  /* operations bar */
+  .opsbar { display:flex; align-items:center; gap:6px; padding:7px 12px; background:var(--bg-1); border-top:1px solid var(--border); }
+  .opsbar .selinfo { font-size:var(--fs-sm); color:var(--text); margin-right:4px; }
+  .opsbar .selinfo b { color:var(--accent-hi); font-family:var(--mono); }
+  .opsbar .div { width:1px; height:20px; background:var(--border); margin:0 2px; }
+  .opsbar .right { margin-left:auto; display:flex; gap:6px; }
+
+  /* detail */
+  .detail { background:var(--bg-1); border-left:1px solid var(--border); overflow-y:auto; }
+  .d-hero { aspect-ratio:16/10; position:relative; display:grid; place-items:center; }
+  .d-hero .letter { font-size:50px; font-weight:700; color:rgba(255,255,255,.9); }
+  .d-pad { padding:12px 14px; }
+  .d-name { color:var(--text-hi); font-size:var(--fs-lg); font-weight:600; line-height:1.3; word-break:break-word; }
+  .d-sub { color:var(--text-lo); font-size:var(--fs-sm); margin-top:2px; font-family:var(--mono); }
+  .d-badges { display:flex; flex-wrap:wrap; gap:5px; margin-top:10px; }
+  .tag { font-size:11px; padding:3px 8px; border-radius:6px; display:inline-flex; align-items:center; gap:5px; font-weight:500; border:1px solid var(--border); background:var(--bg-2); color:var(--text); }
+  .tag.good { background:var(--good-bg); color:var(--good); border-color:transparent; }
+  .tag.warn { background:var(--warn-bg); color:var(--warn); border-color:transparent; }
+  .tag.crit { background:var(--crit-bg); color:var(--crit); border-color:transparent; }
+  .d-actions { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:12px; }
+  .d-actions .btn { justify-content:center; } .d-actions .full { grid-column:1/-1; }
+  .d-sec { margin-top:15px; }
+  .d-sec h4 { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-lo); font-weight:600; margin:0 0 7px; display:flex; align-items:center; gap:7px; }
+  .d-sec h4 .n { margin-left:auto; font-family:var(--mono); }
+  .previewbar { display:flex; align-items:center; gap:5px; margin-bottom:7px; }
+  .previewbar select { background:var(--bg-2); border:1px solid var(--border); color:var(--text-hi); border-radius:4px; padding:2px 5px; font-size:11px; font-family:var(--ui); }
+  .previewbar label { display:flex; align-items:center; gap:4px; font-size:11px; color:var(--text-lo); }
+  .previewbar .hf { margin-left:auto; display:flex; gap:3px; }
+  .hfbtn { font-size:10px; padding:2px 7px; border-radius:4px; border:1px solid var(--border); background:var(--bg-2); color:var(--text-lo); }
+  .hfbtn:hover { color:var(--text-hi); }
+  .pvstrip { display:grid; grid-template-columns:repeat(3,1fr); gap:5px; }
+  .pv { aspect-ratio:1; border-radius:5px; position:relative; display:grid; place-items:center; font-size:9px; color:rgba(255,255,255,.7); overflow:hidden; }
+  .pv .cap { position:absolute; bottom:0; left:0; right:0; background:linear-gradient(transparent,rgba(0,0,0,.7)); color:#fff; font-size:8px; padding:6px 3px 2px; text-align:center; line-height:1.1; }
+  .pv .load { position:absolute; top:3px; right:3px; font-size:8px; background:var(--good); color:#04160d; padding:0 3px; border-radius:3px; font-weight:700; }
+  .kv { display:grid; grid-template-columns:auto 1fr; gap:5px 14px; font-size:var(--fs-sm); }
+  .kv dt { color:var(--text-lo); } .kv dd { margin:0; color:var(--text-hi); text-align:right; font-family:var(--mono); }
+  .copy { display:flex; align-items:center; gap:9px; padding:6px 9px; border:1px solid var(--border); border-radius:var(--r-sm); margin-bottom:6px; background:var(--bg-2); font-size:var(--fs-sm); }
+  .copy .tier { font-family:var(--mono); font-size:10px; font-weight:600; padding:1px 5px; border-radius:4px; }
+  .copy .path { color:var(--text-lo); font-family:var(--mono); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .copy .cbadge { margin-left:auto; font-size:10px; color:var(--text-lo); font-family:var(--mono); }
+  .dep { display:flex; align-items:center; gap:8px; padding:4px 8px; border-radius:var(--r-sm); font-size:var(--fs-sm); }
+  .dep:hover { background:var(--bg-2); }
+  .dep .nm { color:var(--text); font-family:var(--mono); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+  .st { font-size:10px; font-weight:600; padding:1px 6px; border-radius:4px; font-family:var(--mono); }
+  .st.ok { color:var(--good); background:var(--good-bg); } .st.sub { color:var(--warn); background:var(--warn-bg); } .st.miss { color:var(--crit); background:var(--crit-bg); }
+
+  /* log */
+  .logwrap { background:var(--bg-1); border-top:1px solid var(--border); }
+  .log-h { display:flex; align-items:center; gap:8px; padding:4px 12px; font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.06em; color:var(--text-lo); font-weight:600; cursor:pointer; }
+  .log-h .idx { margin-left:auto; display:flex; align-items:center; gap:7px; color:var(--accent-hi); text-transform:none; letter-spacing:0; font-weight:500; font-family:var(--mono); font-size:11px; }
+  .log-h .spin { width:11px; height:11px; border:2px solid var(--accent-bg); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } } @media (prefers-reduced-motion:reduce){ .spin{ animation:none; } }
+  .log { height:104px; overflow-y:auto; padding:2px 12px 8px; font-family:var(--mono); font-size:11px; line-height:1.55; }
+  .log .ln { color:var(--text-lo); } .log .ln .t { color:var(--text-lo); opacity:.7; } .log .ln .g { color:var(--good); } .log .ln .a { color:var(--accent-hi); } .log .ln .w { color:var(--warn); }
+
+  .status { display:flex; align-items:center; gap:16px; padding:0 12px; background:var(--bg-1); border-top:1px solid var(--border); font-size:11px; color:var(--text-lo); font-family:var(--mono); }
+  .status .s { display:flex; align-items:center; gap:6px; } .status .s b { color:var(--text); font-weight:600; }
+  .status .spacer { flex:1; }
+  .tiermini { display:flex; align-items:center; gap:5px; }
+  .tiermini .seg2 { width:40px; height:5px; border-radius:3px; background:var(--bg-3); overflow:hidden; }
+  .tiermini .seg2 > i { display:block; height:100%; }
+</style>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="glyph">V</span><span>VarVault <small>· 69,660 pkgs · 4.3 TB</small></span></div>
+    <div class="filters">
+      <span class="lbl">Creator</span>
+      <select class="fld"><option>All</option><option>刘亦菲</option><option>AshAuryn</option><option>DaniPunani</option></select>
+      <input class="fld" placeholder="packageName…" style="width:120px">
+      <label class="lbl" style="display:flex;align-items:center;gap:4px"><input type="checkbox"> Installed</label>
+      <button class="btn sm">Reset</button>
+    </div>
+    <div class="search">
+      <svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg>
+      <input placeholder="Search content, tags…  (dungeon, timeline, 刘亦菲)" />
+    </div>
+    <div class="top-actions">
+      <div class="seg" id="viewSeg">
+        <button data-view="gallery" onclick="setView('gallery')">▦ Gallery</button>
+        <button class="on" data-view="table" onclick="setView('table')">☰ Table</button>
+      </div>
+      <button class="btn primary">+ Add repo</button>
+      <button class="theme-tgl" title="Toggle theme" onclick="toggleTheme()">◐</button>
+    </div>
+  </header>
+
+  <div class="body">
+    <!-- RAIL -->
+    <aside class="rail">
+      <div class="rail-sec">
+        <div class="rail-h">Library</div>
+        <ul class="nav">
+          <li class="on"><span class="dot" style="background:var(--accent)"></span> All packages <span class="count">69,660</span></li>
+          <li><span class="dot" style="background:var(--warn)"></span> Favorites <span class="count">312</span></li>
+          <li><span class="dot" style="background:var(--good)"></span> Active in game <span class="count">1,847</span></li>
+          <li><span class="dot" style="background:var(--cold)"></span> Single copy <span class="count">9,540</span></li>
+        </ul>
+      </div>
+
+      <div class="rail-sec">
+        <div class="rail-h">Repositories &amp; tiers <span class="sp"></span><button title="Add repo">+</button></div>
+        <div class="repo"><div class="repo-top"><span class="tier" style="background:var(--hot);color:#241202">T1</span> Samsung 990 Pro <span class="meta">1.4/2.0 TB</span></div><div class="bar"><i style="width:70%;background:var(--hot)"></i></div><div class="repo-sub">NVMe · 7100 MB/s · hot · 18,902</div></div>
+        <div class="repo"><div class="repo-top"><span class="tier" style="background:var(--warm);color:#231a06">T2</span> WD SN850X <span class="meta">1.9/2.0 TB</span></div><div class="bar"><i style="width:95%;background:var(--warn)"></i></div><div class="repo-sub">NVMe · near full · 24,110</div></div>
+        <div class="repo"><div class="repo-top"><span class="tier" style="background:var(--cold);color:#04151f">T3</span> Seagate 8TB <span class="meta">3.1/8.0 TB</span></div><div class="bar"><i style="width:39%;background:var(--cold)"></i></div><div class="repo-sub">HDD · cold archive · 26,455</div></div>
+        <div class="repo offline"><div class="repo-top"><span class="tier" style="background:var(--text-lo);color:#000">—</span> Archive USB <span class="meta">offline</span></div><div class="bar"><i style="width:82%;background:var(--text-lo)"></i></div><div class="repo-sub">Removable · 1,737 unavailable</div></div>
+      </div>
+
+      <div class="rail-sec">
+        <div class="rail-h">AddonPackages profile</div>
+        <div class="profrow">
+          <select class="fld"><option>ng9 (active)</option><option>UFB_BB</option><option>default</option></select>
+          <button class="btn sm">Add</button><button class="btn sm">Rename</button><button class="btn sm danger">Del</button>
+        </div>
+        <div class="rail-h">Loading presets <span class="sp"></span><button title="New preset">+</button></div>
+        <ul class="nav">
+          <li><span class="dot" style="background:var(--good)"></span> Cinematic set <span class="count">241</span></li>
+          <li><span class="dot" style="background:var(--text-lo)"></span> Quick play <span class="count">86</span></li>
+          <li><span class="dot" style="background:var(--text-lo)"></span> AshAuryn faves <span class="count">54</span></li>
+        </ul>
+      </div>
+
+      <div class="rail-sec">
+        <div class="rail-h">Dependency analysis</div>
+        <div class="sub-actions">
+          <a href="#">Scan missing — installed <b style="color:var(--crit)">1,203</b></a>
+          <a href="#">Scan missing — all packages</a>
+          <a href="#">Scan missing — filtered view</a>
+          <a href="#">Scan my Saves (scenes/looks)</a>
+          <a href="#">Analyze VaM error log</a>
+        </div>
+        <div class="rail-h">Maintenance</div>
+        <div class="tool"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg> Rebuild symlinks</div>
+        <div class="tool"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg> Fix previews</div>
+        <div class="tool"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg> Find stale / old versions <span class="badge warn">2.1k</span></div>
+        <div class="tool"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v6m0 0 3-3m-3 3L9 5M4 12h16v8H4z"/></svg> Batch fix encoding <span class="badge warn">684</span></div>
+        <div class="tool"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 1 1-6.2-8.5"/><path d="M21 4v5h-5"/></svg> Reclaim space wizard</div>
+      </div>
+    </aside>
+
+    <!-- CENTER -->
+    <section class="center">
+      <div class="facetbar">
+        <button class="chip on">All types <span class="x">×</span></button>
+        <button class="chip">Tier T1·T2 <span class="x">×</span></button>
+        <button class="chip">Installed</button>
+        <button class="chip">＋ Filter</button>
+        <div class="spacer"></div>
+        <span class="result-n"><b>69,660</b> pkgs · <b>~2.1</b>M files</span>
+        <div class="sortsel"><span>Sort</span>
+          <select><option>Recently used</option><option>Newest added</option><option>Size ↓</option><option>Name A–Z</option><option>Hot → Cold</option><option>Most depended-on</option></select>
+        </div>
+      </div>
+
+      <div class="scroll">
+        <div class="gallery hidden" id="gallery"></div>
+        <table class="tbl" id="table">
+          <thead><tr>
+            <th style="width:24px"><input type="checkbox" onclick="selectAll(this.checked)"></th>
+            <th>Package</th><th>Creator</th>
+            <th class="ct" title="scenes">Sc</th><th class="ct" title="looks">Lk</th><th class="ct" title="clothing">Cl</th>
+            <th class="ct" title="hair">Hr</th><th class="ct" title="plugins">Pl</th><th class="ct" title="assets">As</th>
+            <th class="ct" title="morphs">Mo</th><th class="ct" title="pose">Po</th><th class="ct" title="skin">Sk</th>
+            <th class="num">Size</th><th>Tier</th><th class="num">Cop</th><th class="num">Dep</th>
+            <th>State</th><th class="num">Added</th><th class="num">Used</th><th>Fix Var</th><th></th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- OPERATIONS BAR -->
+      <div class="opsbar">
+        <span class="selinfo"><b id="selN">0</b> selected</span>
+        <button class="btn primary" id="opInstall" disabled>Install</button>
+        <button class="btn" id="opUninstall" disabled>Uninstall</button>
+        <button class="btn danger" id="opDelete" disabled>Delete</button>
+        <span class="div"></span>
+        <button class="btn" disabled id="opMove">Move to subfolder…</button>
+        <button class="btn" disabled id="opPreset">Add to preset…</button>
+        <button class="btn" disabled id="opFix">Fix encoding</button>
+        <div class="right">
+          <button class="btn sm">Export installed → txt</button>
+          <button class="btn sm">Install from txt</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- DETAIL -->
+    <aside class="detail" id="detail"></aside>
+  </div>
+
+  <!-- LOG -->
+  <div class="logwrap">
+    <div class="log-h">Activity log
+      <span class="idx"><span class="spin"></span> Indexing T3 · 18,204 / 26,455 · stage 2 previews</span>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+
+  <footer class="status">
+    <span class="s"><b>69,660</b> pkgs</span>
+    <span class="s"><b>2,113,880</b> files</span>
+    <span class="s">selected <b id="stSel">—</b></span>
+    <div class="spacer"></div>
+    <span class="s">Storage <span class="tiermini"><span class="seg2"><i style="width:70%;background:var(--hot)"></i></span><span class="seg2"><i style="width:95%;background:var(--warn)"></i></span><span class="seg2"><i style="width:39%;background:var(--cold)"></i></span></span></span>
+  </footer>
+</div>
+
+<script>
+  const TYPES = { scene:'#7c86f0', look:'#f472b6', clothing:'#2dd4bf', hair:'#f4b740', morph:'#a78bfa', pose:'#38bdf8', skin:'#fb923c', plugin:'#34d399', asset:'#8b97a8' };
+  const TEMP = { hot:'var(--hot)', warm:'var(--warm)', cold:'var(--cold)' };
+  // ct = [scenes,looks,clothing,hair,plugins,assets,morphs,pose,skin]
+  const DATA = [
+    {n:'五一莉刻.精神分裂1号.1', cr:'五一莉刻', t:'look', sz:'514.0', tier:'T1', temp:'hot', ct:[1,11,14,0,0,0,11,0,0], inst:true, copies:2, deps:3, dsub:0, dmiss:0, fav:true, single:false, fix:false, added:'7/18', used:'2h', desc:'Appearance look (CJK). Installed.'},
+    {n:'爱发电Shao名超级捆..1', cr:'爱发电', t:'clothing', sz:'1.33', tier:'T1', temp:'hot', ct:[1,0,1,0,0,0,0,0,0], inst:true, copies:1, deps:2, dsub:0, dmiss:1, fav:false, single:true, fix:false, added:'7/17', used:'1d', desc:'Bondage clothing set (CJK). One copy — irreplaceable.'},
+    {n:'Vazh.DogA1.1', cr:'Vazh', t:'asset', sz:'115.0', tier:'T2', temp:'warm', ct:[0,0,0,0,0,2,0,0,0], inst:false, copies:1, deps:0, dsub:0, dmiss:0, fav:false, single:true, fix:false, added:'7/17', used:'never', desc:'Asset bundle.'},
+    {n:'Sxr4.Sxr4_Adventures_32.6', cr:'Sxr4', t:'scene', sz:'1.58', tier:'T1', temp:'hot', ct:[1,0,0,0,0,0,0,0,0], inst:true, copies:1, deps:19, dsub:2, dmiss:0, fav:false, single:true, fix:false, added:'6/9', used:'5h', desc:'Adventure scene.'},
+    {n:'Riccio.Yuuko.1', cr:'Riccio', t:'look', sz:'3.99', tier:'T2', temp:'warm', ct:[0,1,0,0,7,0,7,0,4], inst:false, copies:2, deps:11, dsub:1, dmiss:0, fav:true, single:false, fix:false, added:'6/17', used:'1w', desc:'Character look with plugins & morphs.'},
+    {n:'Riccio.Serina.1', cr:'Riccio', t:'look', sz:'5.79', tier:'T2', temp:'warm', ct:[0,1,0,0,7,0,3,0,0], inst:false, copies:1, deps:9, dsub:0, dmiss:2, fav:false, single:true, fix:false, added:'6/13', used:'2w', desc:'Character look. 2 deps missing.'},
+    {n:'HelloTokyo.HTs2_42.1', cr:'HelloTokyo', t:'scene', sz:'7.13', tier:'T1', temp:'hot', ct:[1,0,0,0,14,1,0,0,0], inst:true, copies:1, deps:14, dsub:1, dmiss:0, fav:false, single:true, fix:false, added:'6/19', used:'12h', desc:'Interactive scene with 14 plugins.'},
+    {n:'DaniPunani.CUAPack_Mercy_pal.1', cr:'DaniPunani', t:'asset', sz:'0.14', tier:'T3', temp:'cold', ct:[0,0,0,0,0,2,0,0,0], inst:false, copies:1, deps:0, dsub:0, dmiss:0, fav:false, single:true, fix:false, added:'6/26', used:'never', desc:'CUA asset pack.'},
+    {n:'作者14.和服.3', cr:'作者14', t:'clothing', sz:'340', tier:'T3', temp:'cold', ct:[0,0,5,0,0,0,0,0,0], inst:false, copies:1, deps:6, dsub:0, dmiss:0, fav:false, single:true, fix:true, added:'5/29', used:'4mo', desc:'Kimono (CJK). Entry names in Shift-JIS — VaM cannot load until fixed.'},
+    {n:'Kemenate.Morphs.14', cr:'Kemenate', t:'morph', sz:'2100', tier:'T3', temp:'cold', ct:[0,0,0,0,0,0,289,0,0], inst:false, copies:2, deps:0, dsub:0, dmiss:0, fav:true, single:false, fix:false, added:'5/25', used:'6mo', desc:'Large morph library. Cold — candidate to keep off SSD. Duplicate copy exists.'},
+    {n:'백설공주.Pose_Set.1', cr:'백설공주', t:'pose', sz:'44', tier:'T2', temp:'warm', ct:[0,0,0,0,0,0,0,12,0], inst:false, copies:1, deps:3, dsub:0, dmiss:2, fav:false, single:true, fix:true, added:'7/10', used:'2mo', desc:'Pose set (Korean). Needs encoding fix; 2 deps missing.'},
+    {n:'AcidBubbles.Timeline.317', cr:'AcidBubbles', t:'plugin', sz:'8.0', tier:'T1', temp:'hot', ct:[0,0,0,0,1,0,0,0,0], inst:true, copies:2, deps:0, dsub:0, dmiss:0, fav:true, single:false, fix:false, added:'7/1', used:'2h', desc:'Animation plugin. Foundational — 12,880 packages depend on it.', found:true},
+  ];
+
+  const sel = new Set();
+  function tint(t){ const c=TYPES[t]; return `linear-gradient(150deg, ${c}38, ${c}14 60%, var(--bg-2))`; }
+  function statePill(v){ let s=''; if(v.dmiss)s+=`<span class="pill crit">! ${v.dmiss}</span>`; if(v.fix)s+=`<span class="pill warn">⚑</span>`; return s; }
+  function stateCell(v){ return v.dmiss?`<span class="st miss">${v.dmiss} missing</span>`:v.fix?`<span class="st sub">needs fix</span>`:`<span class="st ok">ok</span>`; }
+  let selected = 0;
+
+  function renderGallery(){
+    document.getElementById('gallery').innerHTML = DATA.map((v,i)=>`
+      <div class="card ${i===selected?'sel':''}" onclick="select(${i})">
+        <input type="checkbox" class="chk" ${sel.has(i)?'checked':''} onclick="event.stopPropagation();toggleSel(${i})">
+        <div class="thumb" style="background:${tint(v.t)}">
+          <span class="letter">${[...v.n][0]}</span>
+          <div class="badges"><span class="pill tier">${v.tier}</span>${statePill(v)}${v.fav?'<span class="pill fav">★</span>':''}</div>
+          ${v.inst?'<span class="pill inst">installed</span>':''}
+        </div>
+        <div class="card-body">
+          <div class="card-name">${v.n}</div>
+          <div class="card-meta"><span class="temp" style="background:${TEMP[v.temp]}"></span>
+            <span class="type" style="color:${TYPES[v.t]}">${v.t}</span>${v.single?' <span title="single copy">◆</span>':''}
+            <span class="sz">${v.sz} MB</span></div>
+        </div>
+      </div>`).join('');
+  }
+  function ctCell(n){ return `<td class="ct ${n?'':'z'}">${n||'·'}</td>`; }
+  function renderTable(){
+    document.getElementById('tbody').innerHTML = DATA.map((v,i)=>`
+      <tr class="${i===selected?'sel':''}" onclick="select(${i})">
+        <td><input type="checkbox" ${sel.has(i)?'checked':''} onclick="event.stopPropagation();toggleSel(${i})"></td>
+        <td class="nm">${v.inst?'<span style="color:var(--good)">●</span> ':''}${v.n}</td><td>${v.cr}</td>
+        ${v.ct.map(ctCell).join('')}
+        <td class="num">${v.sz}</td>
+        <td><span class="temp" style="display:inline-block;background:${TEMP[v.temp]}"></span> ${v.tier}</td>
+        <td class="num">${v.copies}</td><td class="num">${v.deps}</td>
+        <td>${stateCell(v)}</td><td class="num">${v.added}</td><td class="num">${v.used}</td>
+        <td class="fixv">${v.fix?'<span class="lnk">rebuild →</span>':v.n}</td>
+        <td><button class="btn sm" onclick="event.stopPropagation();select(${i})">Detail</button></td>
+      </tr>`).join('');
+  }
+  function renderDetail(){
+    const v=DATA[selected], depsOk=v.deps-v.dsub-v.dmiss;
+    const pv=(cap,load)=>`<div class="pv" style="background:${tint(v.t)}">${load?'<span class="load">LOAD</span>':''}<span class="cap">${cap}</span></div>`;
+    document.getElementById('detail').innerHTML = `
+      <div class="d-hero" style="background:${tint(v.t)}"><span class="letter">${[...v.n][0]}</span></div>
+      <div class="d-pad">
+        <div class="d-name">${v.n}</div>
+        <div class="d-sub">${v.cr} · ${v.t} · ${v.copies} copies · ${v.sz} MB</div>
+        <div class="d-badges">
+          <span class="tag" style="color:${TEMP[v.temp]}">● ${v.temp}</span><span class="tag">${v.tier}</span>
+          ${v.inst?'<span class="tag good">installed</span>':''}
+          ${v.fav?'<span class="tag warn">★ favorite</span>':''}
+          ${v.single?'<span class="tag crit">◆ single copy</span>':''}
+          ${v.fix?'<span class="tag warn">⚑ needs encoding fix</span>':''}
+          ${v.found?'<span class="tag">foundational</span>':''}
+        </div>
+        <p style="color:var(--text);font-size:var(--fs-sm);line-height:1.5;margin:10px 0 0">${v.desc}</p>
+        <div class="d-actions">
+          <button class="btn primary full">${v.inst?'✓ Installed — Uninstall':'＋ Install (+deps)'}</button>
+          <button class="btn">★ Favorite</button><button class="btn">◎ Locate file</button>
+          <button class="btn full">＋ Add to loading preset…</button>
+          ${v.fix?'<button class="btn full" style="color:var(--warn)">⚑ Fix encoding → UTF-8</button>':''}
+          ${v.copies>1?'<button class="btn full">⧉ Review duplicates ('+v.copies+')</button>':''}
+        </div>
+
+        <div class="d-sec">
+          <h4>Content previews <span class="n">${v.ct.reduce((a,b)=>a+b,0)}</span></h4>
+          <div class="previewbar">
+            <select><option>All types</option><option>scenes</option><option>looks</option><option>clothing</option><option>morphs</option></select>
+            <label><input type="checkbox"> Loadable only</label>
+            <span class="hf"><button class="hfbtn">Hide</button><button class="hfbtn" style="color:var(--warn)">★ Fav</button></span>
+          </div>
+          <div class="pvstrip">${pv('scene / preset',true)}${pv('look_main',true)}${pv('clothing002',false)}${pv('morph_289',false)}${pv('pose_A',true)}${pv('+'+Math.max(0,v.ct.reduce((a,b)=>a+b,0)-5)+' more',false)}</div>
+        </div>
+
+        <div class="d-sec">
+          <h4>Copies across tiers <span class="n">${v.copies}</span></h4>
+          <div class="copy"><span class="tier" style="background:${TEMP[v.temp]};color:#04151f">${v.tier}</span><span class="path">…\\___VarTidied___\\${v.cr}\\${v.n}.var</span><span class="cbadge">${v.sz}MB</span></div>
+          ${v.copies>1?`<div class="copy"><span class="tier" style="background:var(--cold);color:#04151f">T3</span><span class="path">…\\Seagate8TB\\${v.cr}\\…</span><span class="cbadge">dup</span></div>`:''}
+          ${v.single?`<div style="font-size:11px;color:var(--crit);margin-top:2px">No backup — this is the only copy.</div>`:''}
+        </div>
+
+        <div class="d-sec">
+          <h4>Dependencies <span class="n">${v.deps}</span></h4>
+          ${v.deps===0?'<div style="color:var(--text-lo);font-size:var(--fs-sm)">No dependencies.</div>':`
+          <div class="dep"><span class="nm">MeshedVR.AssetsPack.3</span><span class="st ok">ok</span></div>
+          ${v.dsub?`<div class="dep"><span class="nm">Cloth.2 → resolved .5</span><span class="st sub">substituted</span></div>`:''}
+          ${v.dmiss?`<div class="dep"><span class="nm">GoneCreator.Deleted.1</span><span class="st miss">missing</span></div>`:''}
+          <div style="font-size:11px;color:var(--text-lo);margin-top:6px">${depsOk} ok · ${v.dsub} sub · ${v.dmiss} missing${v.dmiss?' — <a href="#" style="color:var(--accent-hi)">resolve via alias</a>':''}</div>`}
+        </div>
+      </div>`;
+    document.getElementById('stSel').textContent = v.n.length>20?v.n.slice(0,20)+'…':v.n;
+  }
+  function select(i){ selected=i; renderGallery(); renderTable(); renderDetail(); }
+  function toggleSel(i){ sel.has(i)?sel.delete(i):sel.add(i); syncSel(); }
+  function selectAll(on){ DATA.forEach((_,i)=>on?sel.add(i):sel.delete(i)); syncSel(); renderTable(); renderGallery(); }
+  function syncSel(){
+    document.getElementById('selN').textContent=sel.size;
+    ['opInstall','opUninstall','opDelete','opMove','opPreset','opFix'].forEach(id=>document.getElementById(id).disabled=sel.size===0);
+    renderTable(); renderGallery();
+  }
+  function setView(view){
+    document.querySelectorAll('#viewSeg button').forEach(b=>b.classList.toggle('on', b.dataset.view===view));
+    document.getElementById('gallery').classList.toggle('hidden', view!=='gallery');
+    document.getElementById('table').classList.toggle('hidden', view!=='table');
+  }
+  function toggleTheme(){ const r=document.documentElement, c=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'); r.setAttribute('data-theme', c==='dark'?'light':'dark'); }
+
+  // activity log
+  const LOG=[
+    ['23:59:23.347','g','MeshedVR.AssetsPack.3','installed'],['23:59:23.352','g','AshAuryn.Expressions.5','installed'],
+    ['23:59:23.360','a','刘亦菲.RealLook.3','symlink created → T1'],['23:59:23.366','w','作者14.和服.3','flagged: Shift-JIS entry names — needs fix'],
+    ['23:59:23.371','g','AcidBubbles.Timeline.317','installed'],['23:59:23.377','a','Kemenate.Morphs.14','duplicate detected on T3 (same content signature)'],
+    ['23:59:23.383','g','via5.Synergy.1','installed'],['23:59:23.390','a','preset "Cinematic set"','resolved 241 pkgs · 3 via alias'],
+  ];
+  document.getElementById('log').innerHTML = LOG.map(([t,c,n,m])=>`<div class="ln"><span class="t">2026-07-18 ${t}</span> <span class="${c}">[${c==='g'?'OK':c==='w'?'WARN':'INFO'}]</span> ${n} — ${m}</div>`).join('');
+  setView('table'); syncSel(); renderGallery(); renderTable(); renderDetail();
+</script>

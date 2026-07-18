@@ -1,0 +1,735 @@
+<style>
+  :root{color-scheme:dark;
+    --bg-0:#0d0f13;--bg-1:#15181f;--bg-2:#1c2029;--bg-3:#232833;--bg-hover:#262c38;
+    --border:#2b313d;--border-hi:#3a414f;--text-hi:#e7ebf2;--text:#aab3c2;--text-lo:#6b7484;
+    --accent:#7c86f0;--accent-hi:#9aa2f6;--accent-bg:rgba(124,134,240,.16);--accent-line:rgba(124,134,240,.5);
+    --good:#3ddc97;--good-bg:rgba(61,220,151,.14);--warn:#f4b740;--warn-bg:rgba(244,183,64,.14);
+    --crit:#fb6f84;--crit-bg:rgba(251,111,132,.14);--hot:#f2924e;--warm:#d9b16a;--cold:#6aa2c8;
+    --shadow:0 1px 2px rgba(0,0,0,.5),0 10px 30px rgba(0,0,0,.35);
+    --fs-xs:11px;--fs-sm:12px;--fs-base:13px;--fs-md:14px;--fs-lg:16px;--fs-xl:21px;--r:7px;--r-sm:5px;
+    --mono:ui-monospace,"Cascadia Code",Consolas,"SF Mono",monospace;--ui:-apple-system,"Segoe UI",ui-sans-serif,system-ui,sans-serif;}
+  @media(prefers-color-scheme:light){:root{color-scheme:light;
+    --bg-0:#eef0f4;--bg-1:#f7f8fb;--bg-2:#fff;--bg-3:#f0f2f6;--bg-hover:#eaecf2;--border:#dde1e9;--border-hi:#c7ccd8;
+    --text-hi:#161a22;--text:#4a5265;--text-lo:#8a93a4;--accent:#5a63d8;--accent-hi:#464fc4;--accent-bg:rgba(90,99,216,.12);--accent-line:rgba(90,99,216,.45);
+    --good:#0f9d63;--good-bg:rgba(15,157,99,.12);--warn:#b9791a;--warn-bg:rgba(185,121,26,.14);--crit:#d63d55;--crit-bg:rgba(214,61,85,.12);
+    --hot:#d1732e;--warm:#a5833f;--cold:#4d7ea6;--shadow:0 1px 2px rgba(20,30,60,.08),0 8px 24px rgba(20,30,60,.08);}}
+  :root[data-theme=light]{color-scheme:light;--bg-0:#eef0f4;--bg-1:#f7f8fb;--bg-2:#fff;--bg-3:#f0f2f6;--bg-hover:#eaecf2;--border:#dde1e9;--border-hi:#c7ccd8;
+    --text-hi:#161a22;--text:#4a5265;--text-lo:#8a93a4;--accent:#5a63d8;--accent-hi:#464fc4;--accent-bg:rgba(90,99,216,.12);--accent-line:rgba(90,99,216,.45);
+    --good:#0f9d63;--good-bg:rgba(15,157,99,.12);--warn:#b9791a;--warn-bg:rgba(185,121,26,.14);--crit:#d63d55;--crit-bg:rgba(214,61,85,.12);--hot:#d1732e;--warm:#a5833f;--cold:#4d7ea6;}
+  :root[data-theme=dark]{color-scheme:dark;--bg-0:#0d0f13;--bg-1:#15181f;--bg-2:#1c2029;--bg-3:#232833;--bg-hover:#262c38;--border:#2b313d;--border-hi:#3a414f;
+    --text-hi:#e7ebf2;--text:#aab3c2;--text-lo:#6b7484;--accent:#7c86f0;--accent-hi:#9aa2f6;--accent-bg:rgba(124,134,240,.16);--accent-line:rgba(124,134,240,.5);
+    --good:#3ddc97;--good-bg:rgba(61,220,151,.14);--warn:#f4b740;--warn-bg:rgba(244,183,64,.14);--crit:#fb6f84;--crit-bg:rgba(251,111,132,.14);--hot:#f2924e;--warm:#d9b16a;--cold:#6aa2c8;}
+
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg-0);color:var(--text);font-family:var(--ui);font-size:var(--fs-base);-webkit-font-smoothing:antialiased;}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+  button{font-family:inherit;color:inherit;cursor:pointer;}
+  input,select{font-family:var(--ui);}
+  input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;}
+  ::-webkit-scrollbar{width:11px;height:11px;}::-webkit-scrollbar-thumb{background:var(--border-hi);border-radius:6px;border:3px solid transparent;background-clip:content-box;}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:1px;border-radius:3px;}
+  h2{font-size:var(--fs-xl);color:var(--text-hi);margin:0;font-weight:600;letter-spacing:-.02em;}
+  h3{font-size:var(--fs-md);color:var(--text-hi);margin:0 0 2px;font-weight:600;}
+  .muted{color:var(--text-lo);} .sm{font-size:var(--fs-sm);}
+  a{color:var(--accent-hi);text-decoration:none;} a:hover{text-decoration:underline;}
+
+  .btn{border:1px solid var(--border);background:var(--bg-2);color:var(--text);border-radius:var(--r-sm);padding:6px 11px;font-size:var(--fs-sm);display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
+  .btn:hover{background:var(--bg-hover);border-color:var(--border-hi);color:var(--text-hi);}
+  .btn:disabled{opacity:.4;cursor:default;}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:500;} .btn.primary:hover{background:var(--accent-hi);}
+  .btn.danger{color:var(--crit);} .btn.danger:hover{background:var(--crit-bg);border-color:var(--crit);}
+  .btn.sm{padding:3px 8px;font-size:var(--fs-xs);}
+  .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--bg-2);color:var(--text);border-radius:100px;padding:3px 10px;font-size:var(--fs-sm);}
+  .chip.on{background:var(--accent-bg);border-color:var(--accent-line);color:var(--accent-hi);}
+  .tag{font-size:11px;padding:2px 8px;border-radius:6px;display:inline-flex;align-items:center;gap:5px;font-weight:500;border:1px solid var(--border);background:var(--bg-2);color:var(--text);}
+  .tag.good{background:var(--good-bg);color:var(--good);border-color:transparent;} .tag.warn{background:var(--warn-bg);color:var(--warn);border-color:transparent;} .tag.crit{background:var(--crit-bg);color:var(--crit);border-color:transparent;}
+  .card{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);padding:14px;}
+  .bar{height:5px;border-radius:3px;background:var(--bg-3);overflow:hidden;} .bar>i{display:block;height:100%;border-radius:3px;}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:var(--fs-sm);} .kv dt{color:var(--text-lo);} .kv dd{margin:0;color:var(--text-hi);text-align:right;font-family:var(--mono);}
+  .fld{height:30px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-hi);padding:0 9px;font-size:var(--fs-sm);width:100%;}
+  .temp{width:8px;height:8px;border-radius:50%;display:inline-block;}
+  .st{font-size:10px;font-weight:600;padding:1px 6px;border-radius:4px;font-family:var(--mono);}
+  .st.ok{color:var(--good);background:var(--good-bg);} .st.sub{color:var(--warn);background:var(--warn-bg);} .st.miss{color:var(--crit);background:var(--crit-bg);}
+
+  /* shell — labeled, grouped rail */
+  .app{display:grid;grid-template-columns:214px 1fr;height:100vh;}
+  .siderail{background:var(--bg-1);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:10px 8px;overflow-y:auto;}
+  .siderail .logo{display:flex;align-items:center;gap:9px;padding:4px 6px 10px;font-weight:600;color:var(--text-hi);font-size:var(--fs-md);letter-spacing:-.01em;}
+  .siderail .logo .g{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--cold));display:grid;place-items:center;color:#fff;font-weight:700;font-size:13px;box-shadow:var(--shadow);}
+  .siderail .logo small{display:block;color:var(--text-lo);font-weight:500;font-size:10px;font-family:var(--mono);}
+  .rgroup{font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--text-lo);font-weight:700;margin:13px 9px 4px;}
+  .rnav{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;color:var(--text);border-radius:var(--r-sm);padding:6px 9px;font-size:var(--fs-base);text-align:left;}
+  .rnav:hover{background:var(--bg-hover);color:var(--text-hi);}
+  .rnav.on{background:var(--accent-bg);color:var(--accent-hi);font-weight:500;}
+  .rnav svg{flex:none;width:16px;height:16px;color:var(--text-lo);}
+  .rnav:hover svg,.rnav.on svg{color:var(--accent-hi);}
+  .rnav .rb{margin-left:auto;font-family:var(--mono);font-size:10px;padding:0 6px;border-radius:10px;background:var(--crit-bg);color:var(--crit);font-weight:600;}
+  .rnav .rb.warn{background:var(--warn-bg);color:var(--warn);}
+  .siderail .grow{flex:1;}
+  /* jobs tray */
+  .jobsbtn{position:relative;} .jobsbtn .dotb{position:absolute;top:3px;right:3px;width:7px;height:7px;border-radius:50%;background:var(--accent);}
+  .jobs-panel{position:absolute;top:44px;right:14px;width:340px;background:var(--bg-2);border:1px solid var(--border-hi);border-radius:var(--r);box-shadow:var(--shadow);z-index:80;display:none;overflow:hidden;}
+  .jobs-panel.on{display:block;}
+  .jobs-h{padding:10px 13px;border-bottom:1px solid var(--border);font-size:var(--fs-sm);color:var(--text-hi);font-weight:600;display:flex;}
+  .job{padding:10px 13px;border-bottom:1px solid var(--border);}
+  .job .jt{display:flex;align-items:center;gap:8px;font-size:var(--fs-sm);color:var(--text-hi);} .job .jt .x{margin-left:auto;color:var(--text-lo);border:0;background:none;font-size:15px;}
+  .job .jbar{height:4px;border-radius:3px;background:var(--bg-3);margin-top:7px;overflow:hidden;} .job .jbar>i{display:block;height:100%;background:var(--accent);border-radius:3px;}
+  .job .jsub{font-size:11px;color:var(--text-lo);font-family:var(--mono);margin-top:5px;}
+  /* sortable header */
+  th.sortable{cursor:pointer;user-select:none;} th.sortable:hover{color:var(--text-hi);}
+  th.sortable .cr{opacity:.35;font-size:9px;margin-left:3px;} th.sortable.asc .cr,th.sortable.desc .cr{opacity:1;color:var(--accent-hi);}
+  /* virtual scroll position */
+  .scrollpos{font-family:var(--mono);font-size:11px;color:var(--text-lo);}
+  /* toast */
+  .toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--bg-3);border:1px solid var(--border-hi);border-radius:var(--r);box-shadow:var(--shadow);padding:10px 14px;display:flex;align-items:center;gap:14px;font-size:var(--fs-sm);color:var(--text-hi);opacity:0;pointer-events:none;transition:opacity .18s, transform .18s;z-index:120;}
+  .toast.on{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;} @media(prefers-reduced-motion:reduce){.toast{transition:none;}}
+  .toast a{color:var(--accent-hi);font-weight:600;cursor:pointer;}
+  /* dashboard */
+  .dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+  .stat{display:flex;align-items:baseline;gap:8px;} .stat .big{font-size:28px;font-weight:600;color:var(--text-hi);font-family:var(--mono);} .stat .u{color:var(--text-lo);font-size:var(--fs-sm);}
+  .attn{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:var(--r-sm);background:var(--bg-2);margin-bottom:7px;cursor:pointer;} .attn:hover{background:var(--bg-hover);} .attn .ai{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex:none;} .attn .agrow{flex:1;} .attn .an{color:var(--text-hi);font-size:var(--fs-sm);font-weight:500;} .attn .ad{color:var(--text-lo);font-size:11px;} .attn .act{font-family:var(--mono);font-size:var(--fs-md);font-weight:600;}
+
+  .main{display:flex;flex-direction:column;min-width:0;overflow:hidden;}
+  .topbar{height:46px;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid var(--border);background:var(--bg-1);}
+  .topbar .search{flex:1;max-width:440px;position:relative;}
+  .topbar .search input{width:100%;height:30px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r);color:var(--text-hi);padding:0 30px;font-size:var(--fs-base);}
+  .topbar .search .ico{position:absolute;left:9px;top:7px;color:var(--text-lo);}
+  .topbar .grow{flex:1;} .theme-tgl{border:1px solid var(--border);background:var(--bg-2);border-radius:var(--r-sm);width:30px;height:30px;display:grid;place-items:center;color:var(--text-lo);} .theme-tgl:hover{color:var(--text-hi);}
+
+  .screen{flex:1;overflow:auto;display:none;} .screen.on{display:block;}
+  .screen-pad{padding:20px 24px;max-width:1400px;}
+  .screen-head{display:flex;align-items:flex-end;gap:14px;margin-bottom:18px;}
+  .screen-head .grow{flex:1;}
+  .tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:16px;}
+  .tabs button{border:0;background:none;color:var(--text-lo);padding:8px 13px;font-size:var(--fs-base);border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .tabs button.on{color:var(--text-hi);border-bottom-color:var(--accent);}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+  .grid3{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;}
+
+  table.t{width:100%;border-collapse:collapse;font-size:var(--fs-sm);}
+  table.t th{text-align:left;color:var(--text-lo);font-weight:600;font-size:10px;text-transform:uppercase;letter-spacing:.04em;padding:8px 10px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg-1);}
+  table.t td{padding:7px 10px;border-bottom:1px solid var(--border);}
+  table.t tr:hover,table.t tbody tr:hover{background:var(--bg-1);}
+  .nm{color:var(--text-hi);font-weight:500;} .num{font-family:var(--mono);text-align:right;}
+
+  /* paging */
+  .pager{display:flex;align-items:center;gap:4px;font-size:var(--fs-sm);color:var(--text-lo);}
+  .pager button{width:26px;height:26px;border:1px solid var(--border);background:var(--bg-2);border-radius:var(--r-sm);display:grid;place-items:center;}
+  .pager button:hover{background:var(--bg-hover);} .pager .cur{color:var(--text-hi);font-family:var(--mono);}
+
+  /* Library screen (condensed) */
+  .lib{display:grid;grid-template-columns:230px 1fr 320px;height:100%;}
+  .lib .rail{background:var(--bg-1);border-right:1px solid var(--border);overflow:auto;padding:8px 0;}
+  .rail-h{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-lo);font-weight:600;margin:10px 12px 5px;display:flex;align-items:center;}
+  .rail-h .sp{flex:1;} .rail-h button{border:0;background:none;color:var(--text-lo);font-size:13px;padding:0 4px;border-radius:4px;} .rail-h button:hover{color:var(--text-hi);background:var(--bg-3);}
+  .nav{list-style:none;margin:0;padding:0;} .nav li{display:flex;align-items:center;gap:8px;padding:5px 12px;border-radius:var(--r-sm);margin:1px 6px;color:var(--text);cursor:pointer;} .nav li:hover{background:var(--bg-hover);color:var(--text-hi);} .nav li.on{background:var(--accent-bg);color:var(--accent-hi);} .nav li .count{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--text-lo);}
+  .dot{width:8px;height:8px;border-radius:50%;flex:none;}
+  .tool{display:flex;align-items:center;gap:8px;padding:6px 12px;margin:1px 6px;border-radius:var(--r-sm);color:var(--text);cursor:pointer;} .tool:hover{background:var(--bg-hover);color:var(--text-hi);} .tool .badge{margin-left:auto;font-family:var(--mono);font-size:10px;padding:1px 6px;border-radius:10px;background:var(--warn-bg);color:var(--warn);}
+  .sub-actions a{display:block;font-size:var(--fs-sm);color:var(--text-lo);padding:3px 8px 3px 26px;} .sub-actions a:hover{color:var(--accent-hi);background:var(--bg-hover);}
+  .lib .center{display:flex;flex-direction:column;min-width:0;}
+  .facetbar{display:flex;align-items:center;gap:7px;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--bg-1);flex-wrap:wrap;}
+  .facetbar .grow{flex:1;}
+  /* searchable combobox */
+  .combo{position:relative;}
+  .combo-btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--bg-2);color:var(--text-hi);border-radius:var(--r-sm);padding:5px 10px;font-size:var(--fs-sm);height:28px;}
+  .combo-btn:hover{border-color:var(--border-hi);} .combo-btn .caret{color:var(--text-lo);font-size:9px;}
+  .combo-panel{position:absolute;top:calc(100% + 4px);left:0;width:250px;background:var(--bg-2);border:1px solid var(--border-hi);border-radius:var(--r);box-shadow:var(--shadow);z-index:60;display:none;overflow:hidden;}
+  .combo.open .combo-panel{display:block;}
+  .combo-search{width:100%;border:0;border-bottom:1px solid var(--border);background:var(--bg-1);color:var(--text-hi);padding:8px 10px;font-size:var(--fs-sm);}
+  .combo-search:focus{outline:none;}
+  .combo-list{max-height:300px;overflow:auto;padding:4px;}
+  .combo-opt{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:var(--r-sm);cursor:pointer;font-size:var(--fs-sm);color:var(--text);}
+  .combo-opt:hover,.combo-opt.hi{background:var(--accent-bg);color:var(--accent-hi);}
+  .combo-opt .count{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--text-lo);}
+  .combo-empty{padding:12px;color:var(--text-lo);font-size:var(--fs-sm);text-align:center;}
+  .facetbar .flt{height:28px;font-size:var(--fs-sm);width:130px;}
+  .facetbar label.chk{display:inline-flex;align-items:center;gap:5px;cursor:pointer;}
+  .lib .scroll{overflow:auto;flex:1;}
+  .ct{font-family:var(--mono);text-align:center;} .ct.z{opacity:.3;}
+  /* view toggle + package gallery */
+  .seg{display:flex;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--r-sm);overflow:hidden;}
+  .seg button{border:0;background:transparent;color:var(--text-lo);padding:4px 9px;font-size:var(--fs-sm);} .seg button.on{background:var(--accent-bg);color:var(--accent-hi);}
+  .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(176px,1fr));gap:12px;padding:13px;}
+  .gcard{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;cursor:pointer;}
+  .gcard:hover{border-color:var(--border-hi);} .gcard.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}
+  .gthumb{aspect-ratio:16/10;position:relative;display:grid;place-items:center;} .gthumb .letter{font-size:30px;font-weight:700;color:rgba(255,255,255,.85);}
+  .gthumb .badges{position:absolute;top:6px;right:6px;display:flex;gap:4px;}
+  .gthumb .pill{font-size:10px;font-weight:600;padding:2px 6px;border-radius:5px;font-family:var(--mono);backdrop-filter:blur(4px);}
+  .gthumb .pill.tier{background:rgba(0,0,0,.5);color:#fff;} .gthumb .pill.crit{background:var(--crit);color:#2a0810;} .gthumb .pill.warn{background:var(--warn);color:#1a1206;}
+  .gthumb .inst{position:absolute;bottom:6px;left:6px;font-size:10px;background:var(--good-bg);color:var(--good);padding:1px 6px;border-radius:5px;font-family:var(--mono);}
+  .gbody{padding:8px 9px;} .gname{color:var(--text-hi);font-size:var(--fs-sm);font-weight:500;line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+  .gmeta{display:flex;align-items:center;gap:6px;margin-top:5px;color:var(--text-lo);font-size:11px;} .gmeta .sz{margin-left:auto;font-family:var(--mono);}
+  /* detail content-preview strip */
+  .previewbar{display:flex;align-items:center;gap:5px;margin-bottom:7px;} .previewbar select{background:var(--bg-2);border:1px solid var(--border);color:var(--text-hi);border-radius:4px;padding:2px 5px;font-size:11px;font-family:var(--ui);}
+  .previewbar label{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-lo);} .previewbar .hf{margin-left:auto;display:flex;gap:3px;}
+  .hfbtn{font-size:10px;padding:2px 7px;border-radius:4px;border:1px solid var(--border);background:var(--bg-2);color:var(--text-lo);} .hfbtn:hover{color:var(--text-hi);}
+  .pvstrip{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;} .pv{aspect-ratio:1;border-radius:5px;position:relative;display:grid;place-items:center;overflow:hidden;}
+  .pv .cap{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.72));color:#fff;font-size:8px;padding:7px 3px 2px;text-align:center;line-height:1.1;}
+  .pv .load{position:absolute;top:3px;right:3px;font-size:8px;background:var(--good);color:#04160d;padding:0 3px;border-radius:3px;font-weight:700;}
+  .opsbar{display:flex;align-items:center;gap:6px;padding:7px 12px;background:var(--bg-1);border-top:1px solid var(--border);}
+  .opsbar .div{width:1px;height:20px;background:var(--border);margin:0 3px;} .opsbar .right{margin-left:auto;display:flex;gap:6px;}
+  .detailp{background:var(--bg-1);border-left:1px solid var(--border);overflow:auto;}
+  .d-hero{aspect-ratio:16/10;display:grid;place-items:center;} .d-hero .letter{font-size:46px;font-weight:700;color:rgba(255,255,255,.9);}
+  .d-pad{padding:13px 15px;} .d-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px;} .d-actions .btn{justify-content:center;} .d-actions .full{grid-column:1/-1;}
+  .d-sec{margin-top:15px;} .d-sec h4{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--text-lo);font-weight:600;margin:0 0 7px;display:flex;} .d-sec h4 .n{margin-left:auto;font-family:var(--mono);}
+  .dep{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:var(--r-sm);} .dep:hover{background:var(--bg-2);} .dep .nm2{color:var(--text);font-family:var(--mono);font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  /* log dock + status */
+  .logdock{border-top:1px solid var(--border);background:var(--bg-1);height:26px;display:flex;align-items:center;gap:10px;padding:0 14px;font-family:var(--mono);font-size:11px;color:var(--text-lo);}
+  .logdock .spin{width:10px;height:10px;border:2px solid var(--accent-bg);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;} @keyframes spin{to{transform:rotate(360deg);}} @media(prefers-reduced-motion:reduce){.spin{animation:none;}}
+  .logdock .idx{color:var(--accent-hi);display:flex;align-items:center;gap:6px;} .logdock .grow{flex:1;} .logdock b{color:var(--text);}
+
+  /* modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(2px);}
+  .modal-bg.on{display:flex;}
+  .modal{background:var(--bg-1);border:1px solid var(--border-hi);border-radius:12px;box-shadow:var(--shadow);width:640px;max-width:92vw;max-height:88vh;overflow:auto;}
+  .modal.wide{width:840px;}
+  .modal-h{display:flex;align-items:center;padding:15px 18px;border-bottom:1px solid var(--border);} .modal-h h3{font-size:var(--fs-lg);} .modal-h .x{margin-left:auto;border:0;background:none;color:var(--text-lo);font-size:20px;line-height:1;} .modal-h .x:hover{color:var(--text-hi);}
+  .modal-b{padding:18px;} .modal-f{padding:13px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;background:var(--bg-1);position:sticky;bottom:0;}
+  .stepper{display:flex;gap:0;margin-bottom:20px;} .step{flex:1;text-align:center;font-size:var(--fs-sm);color:var(--text-lo);position:relative;padding-bottom:10px;} .step .n{width:24px;height:24px;border-radius:50%;background:var(--bg-3);color:var(--text-lo);display:inline-grid;place-items:center;font-family:var(--mono);margin-bottom:5px;} .step.on{color:var(--text-hi);} .step.on .n{background:var(--accent);color:#fff;} .step.done .n{background:var(--good-bg);color:var(--good);} .step::after{content:"";position:absolute;top:12px;left:60%;right:-40%;height:2px;background:var(--border);} .step:last-child::after{display:none;}
+  .warnbox{background:var(--crit-bg);border:1px solid var(--crit);border-radius:var(--r);padding:11px 13px;color:var(--crit);font-size:var(--fs-sm);display:flex;gap:9px;align-items:flex-start;}
+  .okbox{background:var(--good-bg);border:1px solid transparent;border-radius:var(--r);padding:10px 13px;color:var(--good);font-size:var(--fs-sm);}
+  .infobox{background:var(--accent-bg);border-radius:var(--r);padding:10px 13px;color:var(--accent-hi);font-size:var(--fs-sm);}
+  .flow{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;} .flow .stg{padding:3px 8px;border-radius:5px;background:var(--bg-3);color:var(--text-lo);} .flow .stg.done{background:var(--good-bg);color:var(--good);} .flow .stg.act{background:var(--accent-bg);color:var(--accent-hi);}
+</style>
+
+<div class="app">
+  <!-- LABELED GROUPED NAV -->
+  <nav class="siderail">
+    <div class="logo"><span class="g">V</span><span>VarVault<small>69,660 pkgs</small></span></div>
+
+    <div class="rgroup">Browse</div>
+    <button class="rnav on" data-s="dashboard" onclick="go('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="11" width="8" height="10" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/></svg> Dashboard</button>
+    <button class="rnav" data-s="library" onclick="go('library')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg> Library</button>
+    <button class="rnav" data-s="presets" onclick="go('presets')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg> Loading presets</button>
+
+    <div class="rgroup">Optimize</div>
+    <button class="rnav" data-s="tiering" onclick="go('tiering')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 5h18M6 12h12M9 19h6"/></svg> Tiering &amp; migration</button>
+    <button class="rnav" data-s="dupes" onclick="go('dupes')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/></svg> Duplicates &amp; reclaim</button>
+    <button class="rnav" data-s="analytics" onclick="go('analytics')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V4"/><path d="M4 20h16"/><rect x="7" y="12" width="3" height="5"/><rect x="12" y="8" width="3" height="9"/><rect x="17" y="14" width="3" height="3"/></svg> Analytics</button>
+
+    <div class="rgroup">Problems</div>
+    <button class="rnav" data-s="proposals" onclick="go('proposals')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m8 12 3 3 5-6"/></svg> Proposals <span class="rb">7</span></button>
+    <button class="rnav" data-s="health" onclick="go('health')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M12 8v4M12 16h.01"/></svg> Health &amp; fix <span class="rb warn">725</span></button>
+    <button class="rnav" data-s="missing" onclick="go('missing')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m10.3 4 -8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.7-3l-8-14a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg> Missing deps <span class="rb">1.2k</span></button>
+
+    <div class="rgroup">System</div>
+    <button class="rnav" data-s="repos" onclick="go('repos')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg> Repositories</button>
+    <button class="rnav" data-s="trash" onclick="go('trash')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg> Trash &amp; backup</button>
+    <button class="rnav" data-s="history" onclick="go('history')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12a9 9 0 1 0 3-6.9L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/></svg> Activity history</button>
+    <button class="rnav" data-s="settings" onclick="go('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg> Settings</button>
+    <div class="grow"></div>
+  </nav>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="search"><svg class="ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2"/></svg><input placeholder="Search everything…  (Ctrl K)"></div>
+      <div class="grow"></div>
+      <button class="btn" onclick="openModal('m-rescue')" style="color:var(--warn)">⛑ Rescue: game won't launch</button>
+      <button class="btn jobsbtn" onclick="toggleJobs(event)">⟳ Jobs<span class="dotb"></span></button>
+      <button class="btn primary" onclick="openModal('m-addrepo')">+ Add repository</button>
+      <button class="theme-tgl" onclick="toggleTheme()">◐</button>
+    </div>
+    <div class="jobs-panel" id="jobsPanel" onclick="event.stopPropagation()">
+      <div class="jobs-h">Background jobs <span class="grow" style="flex:1"></span><a class="sm" onclick="toggleJobs(event)">pause all</a></div>
+      <div class="job"><div class="jt">↻ Indexing — Seagate 8TB <button class="x">×</button></div><div class="jbar"><i style="width:69%"></i></div><div class="jsub">18,204 / 26,455 · stage 2 previews · ~6 min left</div></div>
+      <div class="job"><div class="jt">⇄ Migrating T1 → T3 <button class="x">×</button></div><div class="jbar"><i style="width:34%;background:var(--warm)"></i></div><div class="jsub">copy → verify → rename → delete · 106 / 312 GB</div></div>
+      <div class="job"><div class="jt">⚑ Batch fix encoding <button class="x">×</button></div><div class="jbar"><i style="width:12%;background:var(--warn)"></i></div><div class="jsub">52 / 431 vars · GBK → UTF-8 · originals retained</div></div>
+    </div>
+
+    <!-- ============ DASHBOARD ============ -->
+    <section class="screen on" id="dashboard"><div class="screen-pad">
+      <div class="screen-head"><div><h2>Dashboard</h2><div class="muted sm">69,660 packages · 4.3 TB across 4 repos · 1,847 active in game</div></div><div class="grow"></div><button class="btn" onclick="openModal('m-onboard')">Setup wizard</button><button class="btn" onclick="openModal('m-rescue')" style="color:var(--warn)">⛑ Rescue</button></div>
+      <div class="dash-grid">
+        <div class="card"><h3>Storage by tier</h3>
+          <div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">
+            <div><div style="display:flex;justify-content:space-between" class="sm"><span><span class="temp" style="background:var(--hot)"></span> T1 · Samsung 990 Pro</span><span class="mono muted">1.4 / 2.0 TB</span></div><div class="bar" style="margin-top:4px"><i style="width:70%;background:var(--hot)"></i></div></div>
+            <div><div style="display:flex;justify-content:space-between" class="sm"><span><span class="temp" style="background:var(--warm)"></span> T2 · WD SN850X</span><span class="mono" style="color:var(--warn)">1.9 / 2.0 TB</span></div><div class="bar" style="margin-top:4px"><i style="width:95%;background:var(--warn)"></i></div></div>
+            <div><div style="display:flex;justify-content:space-between" class="sm"><span><span class="temp" style="background:var(--cold)"></span> T3 · Seagate 8TB</span><span class="mono muted">3.1 / 8.0 TB</span></div><div class="bar" style="margin-top:4px"><i style="width:39%;background:var(--cold)"></i></div></div>
+          </div>
+          <div class="muted sm" style="margin-top:10px">⚠ T2 near full — <a onclick="openModal('m-migrate')">rebalance 190 GB to T3</a></div>
+        </div>
+
+        <div class="card"><h3>Needs your attention</h3><div style="margin-top:10px">
+          <div class="attn" onclick="go('proposals')"><div class="ai" style="background:var(--accent-bg);color:var(--accent-hi)">◈</div><div class="agrow"><div class="an">7 proposals awaiting review</div><div class="ad">migrations, dedup, stale — propose-first</div></div><div class="act" style="color:var(--accent-hi)">→</div></div>
+          <div class="attn" onclick="go('health')"><div class="ai" style="background:var(--warn-bg);color:var(--warn)">⚑</div><div class="agrow"><div class="an">684 vars can't load (bad encoding)</div><div class="ad">CJK codepages — batch-fixable</div></div><div class="act" style="color:var(--warn)">Fix</div></div>
+          <div class="attn" onclick="go('missing')"><div class="ai" style="background:var(--crit-bg);color:var(--crit)">⚠</div><div class="agrow"><div class="an">1,203 missing dependencies</div><div class="ad">alias to owned vars</div></div><div class="act" style="color:var(--crit)">→</div></div>
+          <div class="attn" onclick="go('repos')"><div class="ai" style="background:var(--bg-3);color:var(--text-lo)">⛃</div><div class="agrow"><div class="an">Archive USB offline</div><div class="ad">1,737 vars unavailable</div></div><div class="act muted">—</div></div>
+        </div></div>
+
+        <div class="card"><h3>Reclaimable space</h3>
+          <div class="stat" style="margin:10px 0"><span class="big" style="color:var(--good)">590</span><span class="u">GB recoverable</span></div>
+          <div class="sm muted" style="line-height:1.9">Duplicate copies <b class="mono" style="color:var(--text-hi);float:right">312 GB</b><br>Cold vars on SSD <b class="mono" style="color:var(--text-hi);float:right">190 GB</b><br>Never-loaded orphans <b class="mono" style="color:var(--text-hi);float:right">88 GB</b></div>
+          <button class="btn sm" style="margin-top:10px" onclick="go('dupes')">Open reclaim wizard →</button>
+        </div>
+
+        <div class="card"><h3>Classification</h3>
+          <div style="display:flex;gap:4px;height:8px;margin:12px 0;border-radius:4px;overflow:hidden"><i style="width:12%;background:var(--hot)"></i><i style="width:28%;background:var(--warm)"></i><i style="width:60%;background:var(--cold)"></i></div>
+          <div class="sm muted"><span class="temp" style="background:var(--hot)"></span> 8,410 hot · <span class="temp" style="background:var(--warm)"></span> 19,240 warm · <span class="temp" style="background:var(--cold)"></span> 42,010 cold</div>
+          <div class="muted sm" style="margin-top:10px">Auto-placement keeps your SSD holding the hot set. <a onclick="go('tiering')">tune →</a></div>
+        </div>
+
+        <div class="card"><h3>Recent activity</h3><div class="sm mono muted" style="margin-top:10px;line-height:2">
+          <div><span style="color:var(--good)">migrate</span> VeeRifter.CyberRoom.4 · T3→T1 ✓</div>
+          <div><span style="color:var(--warn)">fix</span> 作者14.和服.3 · SJIS→UTF-8</div>
+          <div><span style="color:var(--crit)">delete</span> Dupe.Copy.2 · → trash</div></div>
+          <a class="sm" onclick="go('history')" style="margin-top:8px;display:inline-block">full history →</a>
+        </div>
+
+        <div class="card"><h3>Quick actions</h3><div style="display:flex;flex-direction:column;gap:7px;margin-top:12px">
+          <button class="btn" onclick="go('presets')">◨ Switch loading preset</button>
+          <button class="btn" onclick="openModal('m-addrepo')">+ Add repository</button>
+          <button class="btn" onclick="go('library')">▦ Browse library</button>
+        </div></div>
+      </div>
+    </div></section>
+
+    <!-- ============ LIBRARY ============ -->
+    <section class="screen" id="library">
+      <div class="lib">
+        <aside class="rail">
+          <div class="rail-h">Library</div>
+          <ul class="nav">
+            <li class="on"><span class="dot" style="background:var(--accent)"></span> All packages <span class="count">69,660</span></li>
+            <li><span class="dot" style="background:var(--warn)"></span> Favorites <span class="count">312</span></li>
+            <li><span class="dot" style="background:var(--good)"></span> Active in game <span class="count">1,847</span></li>
+            <li><span class="dot" style="background:var(--cold)"></span> Single copy <span class="count">9,540</span></li>
+            <li><span class="dot" style="background:var(--text-lo)"></span> Unrecognized names <span class="count">218</span></li>
+            <li><span class="dot" style="background:var(--text-lo)"></span> Recently added <span class="count">1,204</span></li>
+          </ul>
+          <div class="rail-h">Tags <span class="sp"></span><button title="New tag">+</button></div>
+          <ul class="nav">
+            <li><span class="dot" style="background:#f472b6"></span> project: film <span class="count">88</span></li>
+            <li><span class="dot" style="background:#2dd4bf"></span> keep-forever <span class="count">140</span></li>
+          </ul>
+          <div class="rail-h">Collections</div>
+          <ul class="nav"><li><span class="dot" style="background:var(--text-lo)"></span> Best looks <span class="count">63</span></li></ul>
+          <div class="rail-h">Maintenance</div>
+          <div class="tool" onclick="openModal('m-confirm')">↻ Rebuild symlinks</div>
+          <div class="tool" onclick="go('health')">⚑ Batch fix encoding <span class="badge">684</span></div>
+          <div class="tool" onclick="go('dupes')">⧉ Find duplicates / reclaim</div>
+          <div class="tool" onclick="go('tiering')">↕ Find stale / old versions <span class="badge">2.1k</span></div>
+          <div class="rail-h">Dependency analysis</div>
+          <div class="sub-actions"><a onclick="go('missing')">Scan missing — installed</a><a onclick="go('missing')">Scan missing — all</a><a onclick="go('missing')">Scan my Saves</a><a href="#">Analyze VaM error log</a></div>
+        </aside>
+
+        <div class="center">
+          <div class="facetbar">
+            <div class="combo" id="creatorCombo">
+              <button class="combo-btn" onclick="toggleCombo(event,'creatorCombo')"><span class="muted">Creator:</span> <span id="creatorVal">All</span> <span class="caret">▾</span></button>
+              <div class="combo-panel" onclick="event.stopPropagation()"><input class="combo-search" placeholder="Search 41,208 creators…" oninput="filterCombo(this.value)" onkeydown="comboKey(event)"><div class="combo-list" id="creatorList"></div></div>
+            </div>
+            <input class="fld flt" placeholder="packageName…">
+            <label class="chip chk"><input type="checkbox"> Installed</label>
+            <button class="btn sm" style="height:28px">Reset</button>
+            <span style="width:1px;height:20px;background:var(--border)"></span>
+            <button class="chip on">All types ×</button><button class="chip">Tier T1·T2 ×</button><button class="chip">＋ Filter</button>
+            <div class="seg" style="margin-left:4px"><button class="on" id="vtTable" onclick="setLibView('table')">☰ Table</button><button id="vtGallery" onclick="setLibView('gallery')">▦ Gallery</button></div>
+            <div class="grow"></div>
+            <span class="scrollpos">rows 1–48 of <b style="color:var(--text-hi)">69,660</b></span>
+            <span class="muted sm">·</span>
+            <span class="muted sm">Sort:</span><select class="fld" style="width:auto;height:26px"><option>Recently used</option><option>Size ↓</option><option>Hot → Cold</option><option>Most depended-on</option></select>
+          </div>
+          <div class="scroll">
+            <div class="gallery hidden" id="libGallery"></div>
+            <table class="t" id="libTable" style="white-space:nowrap">
+              <thead><tr><th style="width:22px"><input type="checkbox" onclick="return false"></th>
+                <th class="sortable" onclick="sortCol(this)">Package<span class="cr">▲▼</span></th>
+                <th class="sortable" onclick="sortCol(this)">Creator<span class="cr">▲▼</span></th>
+                <th class="ct" title="scenes">Sc</th><th class="ct" title="looks">Lk</th><th class="ct" title="clothing">Cl</th><th class="ct" title="hair">Hr</th><th class="ct" title="plugins">Pl</th><th class="ct" title="morphs">Mo</th>
+                <th class="num sortable desc" onclick="sortCol(this)">Size<span class="cr">▼</span></th><th>Tier</th><th class="num sortable" onclick="sortCol(this)">Cop<span class="cr">▲▼</span></th>
+                <th class="num sortable" onclick="sortCol(this)">Dep<span class="cr">▲▼</span></th><th class="sortable" onclick="sortCol(this)">State<span class="cr">▲▼</span></th><th>Fix Var</th><th></th></tr></thead>
+              <tbody id="libRows"></tbody>
+            </table>
+          </div>
+          <div class="opsbar">
+            <span class="sm"><b class="mono" style="color:var(--accent-hi)">3</b> selected</span>
+            <a class="sm" onclick="showToast('Selected all 12,431 matching the filter')">select all 12,431 matching</a>
+            <span class="div"></span>
+            <button class="btn primary sm">Install</button><button class="btn sm">Uninstall</button>
+            <button class="btn danger sm" onclick="openModal('m-confirm')">Delete</button>
+            <span class="div"></span>
+            <button class="btn sm">Move to subfolder…</button><button class="btn sm" onclick="openModal('m-preset')">Add to preset…</button><button class="btn sm" onclick="openModal('m-fix')">Fix encoding</button>
+            <div class="right"><button class="btn sm">Export → txt</button><button class="btn sm">Install from txt</button></div>
+          </div>
+        </div>
+
+        <aside class="detailp">
+          <div class="d-hero" style="background:linear-gradient(150deg,#f472b638,#f472b614 60%,var(--bg-2))"><span class="letter">五</span></div>
+          <div class="d-pad">
+            <h3 style="font-size:var(--fs-lg);word-break:break-word">五一莉刻.精神分裂1号.1</h3>
+            <div class="muted sm mono">五一莉刻 · look · 2 copies · 514 MB</div>
+            <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:10px"><span class="tag" style="color:var(--hot)">● hot</span><span class="tag">T1</span><span class="tag good">installed</span><span class="tag warn">★ favorite</span></div>
+            <div class="d-actions"><button class="btn primary full">✓ Installed — Uninstall</button><button class="btn">★ Favorite</button><button class="btn">◎ Locate</button><button class="btn full" onclick="openModal('m-vardetail')">Open full detail →</button></div>
+            <div class="d-sec"><h4>Content previews <span class="n">26</span></h4>
+              <div class="previewbar">
+                <select><option>All types</option><option>scenes</option><option>looks</option><option>clothing</option><option>morphs</option></select>
+                <label><input type="checkbox"> Loadable only</label>
+                <span class="hf"><button class="hfbtn">Hide</button><button class="hfbtn" style="color:var(--warn)">★ Fav</button></span>
+              </div>
+              <div class="pvstrip">
+                <div class="pv" style="background:linear-gradient(150deg,#f472b638,#f472b614 60%,var(--bg-2))"><span class="load">LOAD</span><span class="cap">look_main</span></div>
+                <div class="pv" style="background:linear-gradient(150deg,#7c86f038,#7c86f014 60%,var(--bg-2))"><span class="load">LOAD</span><span class="cap">scene / preset</span></div>
+                <div class="pv" style="background:linear-gradient(150deg,#2dd4bf38,#2dd4bf14 60%,var(--bg-2))"><span class="cap">clothing002</span></div>
+                <div class="pv" style="background:linear-gradient(150deg,#a78bfa38,#a78bfa14 60%,var(--bg-2))"><span class="cap">morph_289</span></div>
+                <div class="pv" style="background:linear-gradient(150deg,#38bdf838,#38bdf814 60%,var(--bg-2))"><span class="load">LOAD</span><span class="cap">pose_A</span></div>
+                <div class="pv" style="background:var(--bg-3);color:var(--text-lo)"><span class="cap" style="background:none;color:var(--text-lo);position:static">+21 more</span></div>
+              </div>
+              <div class="muted sm" style="margin-top:6px">Previews aggregate across all selected packages.</div>
+            </div>
+            <div class="d-sec"><h4>Dependencies <span class="n">3</span></h4>
+              <div class="dep"><span class="nm2">MeshedVR.AssetsPack.3</span><span class="st ok">ok</span></div>
+              <div class="dep"><span class="nm2">Cloth.2 → .5</span><span class="st sub">sub</span></div>
+              <div class="dep"><span class="nm2">Gone.Deleted.1</span><span class="st miss">missing</span></div>
+              <div class="muted sm" style="margin-top:6px"><a onclick="openModal('m-alias')">resolve missing via alias →</a></div>
+            </div>
+            <div class="d-sec"><h4>Copies <span class="n">2</span></h4>
+              <div class="mono sm muted">T1 …\___VarTidied___\五一莉刻\… · 514 MB<br>T3 …\Seagate8TB\… · dup</div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ REPOSITORIES ============ -->
+    <section class="screen" id="repos"><div class="screen-pad">
+      <div class="screen-head"><div><h2>Repositories &amp; tiers</h2><div class="muted sm">4 repos · 3 tiers · 4.3 TB used of 12 TB</div></div><div class="grow"></div><button class="btn" onclick="openModal('m-migrate')">Review rebalance plan</button><button class="btn primary" onclick="openModal('m-addrepo')">+ Add repository</button></div>
+      <div class="grid2">
+        <div class="card"><div style="display:flex;align-items:center;gap:8px"><span class="mono" style="background:var(--hot);color:#241202;padding:1px 6px;border-radius:4px;font-weight:600">T1</span><h3>Samsung 990 Pro</h3><span class="tag good" style="margin-left:auto">online</span></div>
+          <div class="muted sm mono" style="margin:6px 0">NVMe · 7,100 MB/s read · hot path · 18,902 vars</div>
+          <div class="bar"><i style="width:70%;background:var(--hot)"></i></div><div class="muted sm mono" style="margin-top:5px">1.40 / 2.00 TB · reserve 100 GB</div>
+          <div style="display:flex;gap:6px;margin-top:10px"><button class="btn sm">Re-benchmark</button><button class="btn sm">Tier ▾</button><button class="btn sm">Edit</button></div></div>
+        <div class="card"><div style="display:flex;align-items:center;gap:8px"><span class="mono" style="background:var(--warm);color:#231a06;padding:1px 6px;border-radius:4px;font-weight:600">T2</span><h3>WD SN850X</h3><span class="tag warn" style="margin-left:auto">95% full</span></div>
+          <div class="muted sm mono" style="margin:6px 0">NVMe · 6,300 MB/s · 24,110 vars</div>
+          <div class="bar"><i style="width:95%;background:var(--warn)"></i></div><div class="muted sm mono" style="margin-top:5px">1.90 / 2.00 TB · <span style="color:var(--warn)">near full</span></div>
+          <div style="display:flex;gap:6px;margin-top:10px"><button class="btn sm" onclick="openModal('m-migrate')">Rebalance…</button><button class="btn sm">Tier ▾</button><button class="btn sm">Edit</button></div></div>
+        <div class="card"><div style="display:flex;align-items:center;gap:8px"><span class="mono" style="background:var(--cold);color:#04151f;padding:1px 6px;border-radius:4px;font-weight:600">T3</span><h3>Seagate 8TB</h3><span class="tag good" style="margin-left:auto">online</span></div>
+          <div class="muted sm mono" style="margin:6px 0">HDD · 240 MB/s · cold archive · 26,455 vars</div>
+          <div class="bar"><i style="width:39%;background:var(--cold)"></i></div><div class="muted sm mono" style="margin-top:5px">3.10 / 8.00 TB · SMART: ✓ healthy</div>
+          <div style="display:flex;gap:6px;margin-top:10px"><button class="btn sm">Re-benchmark</button><button class="btn sm">Tier ▾</button><button class="btn sm">Edit</button></div></div>
+        <div class="card" style="opacity:.6"><div style="display:flex;align-items:center;gap:8px"><span class="mono" style="background:var(--text-lo);color:#000;padding:1px 6px;border-radius:4px;font-weight:600">—</span><h3>Archive USB</h3><span class="tag" style="margin-left:auto">offline</span></div>
+          <div class="muted sm mono" style="margin:6px 0">Removable · unplugged · 1,737 vars unavailable</div>
+          <div class="bar"><i style="width:82%;background:var(--text-lo)"></i></div><div class="muted sm mono" style="margin-top:5px">reconnect to index</div></div>
+      </div>
+    </div></section>
+
+    <!-- ============ PRESETS ============ -->
+    <section class="screen" id="presets"><div class="screen-pad">
+      <div class="screen-head"><div><h2>Loading presets</h2><div class="muted sm">Named var-sets · switch = instant directory-swap of AddonPackages</div></div><div class="grow"></div><button class="btn">Import from txt…</button><button class="btn primary" onclick="openModal('m-preset')">+ New preset</button></div>
+      <div style="display:grid;grid-template-columns:260px 1fr;gap:16px">
+        <div class="card" style="padding:6px">
+          <ul class="nav">
+            <li class="on"><span class="dot" style="background:var(--good)"></span> Cinematic set <span class="count">241</span></li>
+            <li><span class="dot" style="background:var(--text-lo)"></span> Quick play <span class="count">86</span></li>
+            <li><span class="dot" style="background:var(--text-lo)"></span> AshAuryn faves <span class="count">54</span></li>
+          </ul>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:10px"><h3 style="font-size:var(--fs-lg)">Cinematic set</h3><span class="tag good">active in game</span><div class="grow" style="flex:1"></div><button class="btn sm" onclick="openModal('m-preset')">Edit</button><button class="btn sm">Diff…</button><button class="btn sm">Export txt</button></div>
+          <div class="infobox" style="margin:12px 0">Switching activates <b>241 packages</b> → auto-pulls <b>+38 dependencies</b>, applies <b>3 saved aliases</b>. <b>1</b> still missing. <a onclick="openModal('m-alias')">resolve</a></div>
+          <table class="t"><thead><tr><th>Package</th><th>Resolution</th><th>State</th></tr></thead><tbody>
+            <tr><td class="nm">AshAuryn.Expressions.5</td><td class="mono muted">exact</td><td><span class="st ok">ready</span></td></tr>
+            <tr><td class="nm">刘亦菲.RealLook.3</td><td class="mono muted">exact · pinned</td><td><span class="st ok">ready</span></td></tr>
+            <tr><td class="nm">Cloth.latest</td><td class="mono muted">→ Cloth.5</td><td><span class="st sub">substituted</span></td></tr>
+            <tr><td class="nm">Gone.Deleted.1</td><td class="mono muted">alias → Owned.Sub.2</td><td><span class="st ok">aliased</span></td></tr>
+            <tr><td class="nm">Vanished.Pack.2</td><td class="mono muted">—</td><td><span class="st miss">missing</span></td></tr>
+          </tbody></table>
+          <div style="margin-top:12px;display:flex;gap:8px"><button class="btn primary">Switch to this preset</button><button class="btn">Deactivate all</button></div>
+        </div>
+      </div>
+    </div></section>
+
+    <!-- ============ TIERING ============ -->
+    <section class="screen" id="tiering"><div class="screen-pad">
+      <div class="screen-head"><div><h2>Tiering &amp; migration</h2><div class="muted sm">Hot/warm/cold classification drives placement · <b style="color:var(--warn)">propose, never auto-move</b></div></div><div class="grow"></div><button class="btn">Simulate policy…</button><button class="btn primary" onclick="openModal('m-migrate')">Review migration plan</button></div>
+      <div class="tabs"><button class="on">Overview</button><button>Lifecycle rules</button><button>Placement policy</button><button>Stale / old versions</button></div>
+      <div class="grid3" style="margin-bottom:16px">
+        <div class="card"><div class="muted sm">Hot · SSD-worthy</div><div style="font-size:26px;color:var(--hot);font-weight:600" class="mono">8,410</div><div class="bar" style="margin-top:8px"><i style="width:34%;background:var(--hot)"></i></div></div>
+        <div class="card"><div class="muted sm">Warm</div><div style="font-size:26px;color:var(--warm);font-weight:600" class="mono">19,240</div><div class="bar" style="margin-top:8px"><i style="width:52%;background:var(--warm)"></i></div></div>
+        <div class="card"><div class="muted sm">Cold · archive</div><div style="font-size:26px;color:var(--cold);font-weight:600" class="mono">42,010</div><div class="bar" style="margin-top:8px"><i style="width:78%;background:var(--cold)"></i></div></div>
+      </div>
+      <div class="card"><h3>Misplaced — proposals awaiting your approval</h3>
+        <table class="t" style="margin-top:8px"><thead><tr><th>Package</th><th>Class</th><th>Now on</th><th>Suggested</th><th class="num">Size</th><th>Why</th><th></th></tr></thead><tbody>
+          <tr><td class="nm">VeeRifter.CyberRoom.4</td><td><span class="temp" style="background:var(--hot)"></span> hot</td><td>T3 HDD</td><td>T1 NVMe</td><td class="num">880 MB</td><td class="muted sm">loaded 40×/30d, stuck cold</td><td><button class="btn sm" onclick="openModal('m-migrate')">Plan…</button></td></tr>
+          <tr><td class="nm">Spacedog.Import.12</td><td><span class="temp" style="background:var(--cold)"></span> cold</td><td>T1 NVMe</td><td>T3 HDD</td><td class="num">3.4 GB</td><td class="muted sm">never loaded · wasting SSD</td><td><button class="btn sm" onclick="openModal('m-migrate')">Plan…</button></td></tr>
+        </tbody></table>
+      </div>
+    </div></section>
+
+    <!-- ============ DUPES & RECLAIM ============ -->
+    <section class="screen" id="dupes"><div class="screen-pad">
+      <div class="screen-head"><div><h2>Duplicates &amp; reclaim</h2><div class="muted sm">Logical dedup by content signature · verified before any delete · single-copy protected</div></div></div>
+      <div class="tabs"><button class="on">Reclaim space</button><button>Exact duplicates</button><button>Near-duplicates</button><button>Download intake</button></div>
+      <div class="grid3" style="margin-bottom:16px">
+        <div class="card"><div class="muted sm">Duplicate copies</div><div style="font-size:24px;color:var(--text-hi);font-weight:600" class="mono">312 GB</div><div class="muted sm">4,120 redundant files</div><button class="btn sm" style="margin-top:8px" onclick="openModal('m-dupe')">Review…</button></div>
+        <div class="card"><div class="muted sm">Cold on fast SSD</div><div style="font-size:24px;color:var(--text-hi);font-weight:600" class="mono">190 GB</div><div class="muted sm">move to HDD</div><button class="btn sm" style="margin-top:8px" onclick="openModal('m-migrate')">Plan move…</button></div>
+        <div class="card"><div class="muted sm">Never-loaded orphans</div><div style="font-size:24px;color:var(--text-hi);font-weight:600" class="mono">88 GB</div><div class="muted sm">1,204 · <span style="color:var(--crit)">excl. single-copy</span></div><button class="btn sm" style="margin-top:8px" onclick="openModal('m-confirm')">Review…</button></div>
+      </div>
+      <div class="card"><h3>Exact duplicate groups</h3>
+        <table class="t" style="margin-top:8px"><thead><tr><th>Package (content-identical)</th><th class="num">Copies</th><th>Locations</th><th class="num">Reclaim</th><th></th></tr></thead><tbody>
+          <tr><td class="nm">Hunting-Succubus.EnhancedEyes.6</td><td class="num">4</td><td class="muted sm">T1, T2, T3, T3</td><td class="num">384 MB</td><td><button class="btn sm" onclick="openModal('m-dupe')">Review</button></td></tr>
+          <tr><td class="nm">Kemenate.Morphs.14</td><td class="num">2</td><td class="muted sm">T1, T3</td><td class="num">2.1 GB</td><td><button class="btn sm" onclick="openModal('m-dupe')">Review</button></td></tr>
+        </tbody></table>
+      </div>
+    </div></section>
+
+    <!-- ============ HEALTH & FIX ============ -->
+    <section class="screen" id="health"><div class="screen-pad">
+      <div class="screen-head"><div><h2>Health &amp; fix</h2><div class="muted sm">684 vars can't load in VaM (bad encoding) · 41 corrupt</div></div><div class="grow"></div><button class="btn primary" onclick="openModal('m-fix')">Fix all detected…</button></div>
+      <div class="tabs"><button class="on">Encoding (684)</button><button>Integrity / corrupt (41)</button><button>Missing meta (12)</button></div>
+      <div class="grid3" style="margin-bottom:16px">
+        <div class="card"><div class="muted sm">GBK / GB18030</div><div class="mono" style="font-size:22px;color:var(--warn)">431</div><button class="btn sm" style="margin-top:6px" onclick="openModal('m-fix')">Fix group…</button></div>
+        <div class="card"><div class="muted sm">Shift-JIS</div><div class="mono" style="font-size:22px;color:var(--warn)">188</div><button class="btn sm" style="margin-top:6px" onclick="openModal('m-fix')">Fix group…</button></div>
+        <div class="card"><div class="muted sm">Low confidence — review</div><div class="mono" style="font-size:22px;color:var(--crit)">65</div><button class="btn sm" style="margin-top:6px" onclick="openModal('m-fix')">Review…</button></div>
+      </div>
+      <div class="card"><table class="t"><thead><tr><th>Package</th><th>Detected</th><th class="num">Broken</th><th>Confidence</th><th></th></tr></thead><tbody>
+        <tr><td class="nm">作者14.和服.3</td><td class="mono">Shift-JIS</td><td class="num">42/42</td><td><span class="st ok">high</span></td><td><button class="btn sm" onclick="openModal('m-fix')">Fix</button></td></tr>
+        <tr><td class="nm">백설공주.Pose_Set.1</td><td class="mono">EUC-KR</td><td class="num">8/12</td><td><span class="st sub">partial</span></td><td><button class="btn sm" onclick="openModal('m-fix')">Review</button></td></tr>
+        <tr><td class="nm">爱发电Shao名.1</td><td class="mono">GBK</td><td class="num">3/3</td><td><span class="st ok">high</span></td><td><button class="btn sm" onclick="openModal('m-fix')">Fix</button></td></tr>
+      </tbody></table></div>
+    </div></section>
+
+    <!-- ============ MISSING DEPS ============ -->
+    <section class="screen" id="missing"><div class="screen-pad">
+      <div class="screen-head"><div><h2>Missing dependencies</h2><div class="muted sm">1,203 referenced packages not in your library · alias them to owned vars (saved)</div></div><div class="grow"></div><button class="btn">Export links txt</button></div>
+      <div class="card"><table class="t"><thead><tr><th>Missing reference</th><th class="num">Needed by</th><th>Alias to owned</th><th>Scope</th><th></th></tr></thead><tbody>
+        <tr><td class="nm mono">Gone.Deleted.1</td><td class="num">83 pkgs</td><td class="mono muted">Owned.Sub.2</td><td><span class="tag">global</span></td><td><button class="btn sm" onclick="openModal('m-alias')">Edit alias</button></td></tr>
+        <tr><td class="nm mono">Vanished.Pack.2</td><td class="num">41 pkgs · 6 saves</td><td class="muted sm">— not set —</td><td>—</td><td><button class="btn primary sm" onclick="openModal('m-alias')">Resolve…</button></td></tr>
+        <tr><td class="nm mono">OldMorph.Set.latest</td><td class="num">12 pkgs</td><td class="mono muted">MyMorph.Set.7</td><td><span class="tag">preset: film</span></td><td><button class="btn sm" onclick="openModal('m-alias')">Edit alias</button></td></tr>
+      </tbody></table></div>
+    </div></section>
+
+    <!-- ============ PROPOSALS ============ -->
+    <section class="screen" id="proposals"><div class="screen-pad">
+      <div class="screen-head"><div><h2>Proposals &amp; review</h2><div class="muted sm">Nothing runs unattended. The analyzer proposes; you approve. 7 pending · 402 GB affected</div></div><div class="grow"></div><button class="btn">Reject all</button><button class="btn primary">Approve selected</button></div>
+      <div class="tabs"><button class="on">All (7)</button><button>Migrations (3)</button><button>Duplicates (2)</button><button>Encoding fixes (1)</button><button>Stale (1)</button></div>
+      <div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:12px"><input type="checkbox"><div class="ai" style="width:32px;height:32px;border-radius:8px;background:var(--accent-bg);color:var(--accent-hi);display:grid;place-items:center;flex:none">⇄</div>
+        <div style="flex:1"><div class="an" style="color:var(--text-hi);font-weight:500">Rebalance 190 GB off Tier-2 (95% full)</div><div class="muted sm">Move 640 cold vars T2 → T3 · frees 190 GB · ~28 min · copy→verify→delete</div></div>
+        <span class="tag">1,240 files</span><button class="btn sm" onclick="openModal('m-migrate')">Review…</button><button class="btn sm">Reject</button><button class="btn primary sm">Approve</button></div></div>
+      <div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:12px"><input type="checkbox"><div class="ai" style="width:32px;height:32px;border-radius:8px;background:var(--accent-bg);color:var(--accent-hi);display:grid;place-items:center;flex:none">⧉</div>
+        <div style="flex:1"><div class="an" style="color:var(--text-hi);font-weight:500">Remove 4,120 verified duplicate copies</div><div class="muted sm">312 GB · content-signature matched · full-hash verified · single-copy excluded · → trash</div></div>
+        <span class="tag good">verified</span><button class="btn sm" onclick="openModal('m-dupe')">Review…</button><button class="btn sm">Reject</button><button class="btn primary sm">Approve</button></div></div>
+      <div class="card" style="margin-bottom:12px"><div style="display:flex;align-items:center;gap:12px"><input type="checkbox"><div class="ai" style="width:32px;height:32px;border-radius:8px;background:var(--warn-bg);color:var(--warn);display:grid;place-items:center;flex:none">⚑</div>
+        <div style="flex:1"><div class="an" style="color:var(--text-hi);font-weight:500">Fix 431 GBK-encoded vars → UTF-8</div><div class="muted sm">High confidence · new UTF-8 var written · original retained · validated against VaM</div></div>
+        <span class="tag warn">high conf.</span><button class="btn sm" onclick="openModal('m-fix')">Review…</button><button class="btn sm">Reject</button><button class="btn primary sm">Approve</button></div></div>
+      <div class="card"><div style="display:flex;align-items:center;gap:12px"><input type="checkbox"><div class="ai" style="width:32px;height:32px;border-radius:8px;background:var(--crit-bg);color:var(--crit);display:grid;place-items:center;flex:none">⌦</div>
+        <div style="flex:1"><div class="an" style="color:var(--text-hi);font-weight:500">Retire 2,140 superseded old versions</div><div class="muted sm">Not latest &amp; not depended-on · → trash (recoverable) · reverse-closure checked</div></div>
+        <span class="tag">88 GB</span><button class="btn sm" onclick="openModal('m-confirm')">Review…</button><button class="btn sm">Reject</button><button class="btn primary sm">Approve</button></div></div>
+    </div></section>
+
+    <!-- ============ ANALYTICS ============ -->
+    <section class="screen" id="analytics"><div class="screen-pad">
+      <div class="screen-head"><div><h2>Analytics</h2><div class="muted sm">Where your 4.3 TB went · usage &amp; tier utilization</div></div></div>
+      <div class="grid2">
+        <div class="card"><h3>Space by content type</h3><div style="margin-top:10px;display:flex;flex-direction:column;gap:7px">
+          <div><div style="display:flex;justify-content:space-between" class="sm"><span>Assets</span><span class="mono muted">1.6 TB</span></div><div class="bar"><i style="width:38%;background:#8b97a8"></i></div></div>
+          <div><div style="display:flex;justify-content:space-between" class="sm"><span>Morphs</span><span class="mono muted">980 GB</span></div><div class="bar"><i style="width:23%;background:#a78bfa"></i></div></div>
+          <div><div style="display:flex;justify-content:space-between" class="sm"><span>Scenes</span><span class="mono muted">720 GB</span></div><div class="bar"><i style="width:17%;background:var(--accent)"></i></div></div>
+          <div><div style="display:flex;justify-content:space-between" class="sm"><span>Clothing</span><span class="mono muted">540 GB</span></div><div class="bar"><i style="width:13%;background:#2dd4bf"></i></div></div>
+        </div></div>
+        <div class="card"><h3>Top space by creator</h3><div style="margin-top:10px;display:flex;flex-direction:column;gap:7px">
+          <div><div style="display:flex;justify-content:space-between" class="sm"><span>Spacedog</span><span class="mono muted">210 GB</span></div><div class="bar"><i style="width:80%;background:var(--accent)"></i></div></div>
+          <div><div style="display:flex;justify-content:space-between" class="sm"><span>Kemenate</span><span class="mono muted">180 GB</span></div><div class="bar"><i style="width:68%;background:var(--accent)"></i></div></div>
+          <div><div style="display:flex;justify-content:space-between" class="sm"><span>Riccio</span><span class="mono muted">96 GB</span></div><div class="bar"><i style="width:36%;background:var(--accent)"></i></div></div>
+        </div></div>
+        <div class="card"><h3>⚠ Wasting fast storage</h3><div class="muted sm" style="margin:6px 0">Cold vars sitting on Tier-1 NVMe.</div><div class="mono" style="font-size:22px;color:var(--warn)">190 GB</div><a onclick="go('tiering')">review in Tiering →</a></div>
+        <div class="card"><h3>Usage over time</h3><div class="muted sm" style="margin-top:6px">Loads/day, last 90d</div><svg viewBox="0 0 300 70" style="width:100%;height:70px;margin-top:8px"><polyline fill="none" stroke="var(--accent)" stroke-width="2" points="0,55 30,48 60,52 90,30 120,35 150,20 180,25 210,12 240,22 270,10 300,15"/><polygon fill="var(--accent-bg)" points="0,55 30,48 60,52 90,30 120,35 150,20 180,25 210,12 240,22 270,10 300,15 300,70 0,70"/></svg></div>
+      </div>
+    </div></section>
+
+    <!-- ============ TRASH & BACKUP ============ -->
+    <section class="screen" id="trash"><div class="screen-pad">
+      <div class="screen-head"><div><h2>Trash &amp; backup</h2><div class="muted sm">Nothing is hard-deleted · catalog auto-backed-up</div></div></div>
+      <div class="tabs"><button class="on">Trash (recoverable)</button><button>Catalog backups</button></div>
+      <div class="card"><div style="display:flex;align-items:center;margin-bottom:8px"><span class="muted sm">2,140 items · 340 GB · same-volume moves</span><div class="grow" style="flex:1"></div><button class="btn sm">Restore selected</button><button class="btn danger sm" onclick="openModal('m-confirm')">Purge selected…</button></div>
+        <table class="t"><thead><tr><th style="width:22px"><input type="checkbox"></th><th>Package</th><th>Reason</th><th class="num">Size</th><th class="num">Trashed</th><th></th></tr></thead><tbody>
+          <tr><td><input type="checkbox"></td><td class="nm">OldLook.v1.1</td><td class="muted sm">superseded by v3</td><td class="num">120 MB</td><td class="num">2d ago</td><td><button class="btn sm">Restore</button></td></tr>
+          <tr><td><input type="checkbox"></td><td class="nm">Dupe.Copy.2</td><td class="muted sm">duplicate removed</td><td class="num">88 MB</td><td class="num">5d ago</td><td><button class="btn sm">Restore</button></td></tr>
+        </tbody></table></div>
+    </div></section>
+
+    <!-- ============ HISTORY ============ -->
+    <section class="screen" id="history"><div class="screen-pad">
+      <div class="screen-head"><div><h2>Activity history</h2><div class="muted sm">Audit log of every move, install, delete, fix</div></div><div class="grow"></div><select class="fld" style="width:auto"><option>All actions</option><option>Migrations</option><option>Deletes</option><option>Fixes</option></select></div>
+      <div class="card"><table class="t"><thead><tr><th class="num">When</th><th>Action</th><th>Package</th><th>Detail</th></tr></thead><tbody>
+        <tr><td class="num muted">2h ago</td><td><span class="tag good">migrate</span></td><td class="nm">VeeRifter.CyberRoom.4</td><td class="muted sm mono">T3 → T1 · verified · 880 MB</td></tr>
+        <tr><td class="num muted">3h ago</td><td><span class="tag warn">fix</span></td><td class="nm">作者14.和服.3</td><td class="muted sm mono">Shift-JIS → UTF-8 · original retained</td></tr>
+        <tr><td class="num muted">yesterday</td><td><span class="tag crit">delete</span></td><td class="nm">Dupe.Copy.2</td><td class="muted sm mono">→ trash · verified duplicate</td></tr>
+        <tr><td class="num muted">yesterday</td><td><span class="tag">alias</span></td><td class="nm">Gone.Deleted.1</td><td class="muted sm mono">→ Owned.Sub.2 (global)</td></tr>
+      </tbody></table></div>
+    </div></section>
+
+    <!-- ============ SETTINGS ============ -->
+    <section class="screen" id="settings"><div class="screen-pad" style="max-width:820px">
+      <div class="screen-head"><div><h2>Settings</h2></div></div>
+      <div class="tabs"><button class="on">General</button><button>Tiers &amp; policy</button><button>Automation</button><button>Import</button><button>Advanced</button></div>
+      <div class="card"><div class="kv" style="grid-template-columns:200px 1fr;gap:14px">
+        <dt>VaM install path</dt><dd style="text-align:left"><input class="fld" value="D:\VaM_1.20.77.9"></dd>
+        <dt>Catalog DB location</dt><dd style="text-align:left"><input class="fld" value="C:\Users\me\VarVault\catalog.db"></dd>
+        <dt>Symlink type</dt><dd style="text-align:left"><select class="fld"><option>Directory-swap profiles (fast)</option></select></dd>
+        <dt>Fix-on-import</dt><dd style="text-align:left"><select class="fld"><option>Flag only</option><option>Prompt</option><option>Auto (high-confidence)</option></select></dd>
+        <dt>Preset extraction defaults</dt><dd style="text-align:left" class="muted sm">Morphs ✓ · Hair ✓ · Skin ✓ · Clothing ✗ · Breast ✓ · Glute ✗</dd>
+      </div><div style="margin-top:14px"><button class="btn primary">Save</button></div></div>
+    </div></section>
+
+    <!-- LOG DOCK -->
+    <div class="logdock"><span class="idx"><span class="spin"></span> Indexing T3 · <b>18,204</b>/26,455 · stage 2</span><span class="grow"></span><span>selected <b>3</b></span><span>Storage T1 70% · T2 95% · T3 39%</span></div>
+  </div>
+</div>
+
+<!-- ============ MODALS ============ -->
+<div class="modal-bg" id="m-onboard"><div class="modal wide"><div class="modal-h"><h3>Welcome — set up your library</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-b">
+  <div class="stepper"><div class="step done"><div class="n">✓</div>Add drives</div><div class="step on"><div class="n">2</div>Benchmark</div><div class="step"><div class="n">3</div>Index</div><div class="step"><div class="n">4</div>Rescue baseline</div></div>
+  <div class="infobox">Point VarVault at the folders where your <b>.var</b> files live — across every drive. It ranks each by speed into tiers, then indexes without touching your files.</div>
+  <table class="t" style="margin-top:14px"><thead><tr><th>Folder</th><th>Drive</th><th>Benchmark</th><th>Tier</th></tr></thead><tbody>
+    <tr><td class="mono sm">D:\vars</td><td>Samsung 990 Pro</td><td class="mono">7,100 MB/s ✓</td><td><span class="tag" style="color:var(--hot)">T1</span></td></tr>
+    <tr><td class="mono sm">E:\vars</td><td>WD SN850X</td><td class="mono">6,300 MB/s ✓</td><td><span class="tag" style="color:var(--warm)">T2</span></td></tr>
+    <tr><td class="mono sm">G:\archive</td><td>Seagate 8TB</td><td class="mono">benchmarking…</td><td class="muted">—</td></tr>
+  </tbody></table>
+</div><div class="modal-f"><button class="btn" onclick="closeModal()">Back</button><button class="btn primary" onclick="closeModal()">Continue →</button></div></div></div>
+
+<div class="modal-bg" id="m-addrepo"><div class="modal"><div class="modal-h"><h3>Add repository</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-b">
+  <label class="muted sm">Folder</label><div style="display:flex;gap:8px;margin:5px 0 14px"><input class="fld" value="G:\more_vars"><button class="btn">Browse…</button></div>
+  <div class="okbox">Detected: <b>Seagate 8TB</b> · HDD · benchmarked <b>240 MB/s</b> → suggested <b>Tier 3 (cold)</b>. 12,900 .var files found.</div>
+  <div class="kv" style="grid-template-columns:160px 1fr;gap:12px;margin-top:14px"><dt>Tier</dt><dd style="text-align:left"><select class="fld"><option>T3 · cold (suggested)</option><option>T2</option><option>T1</option></select></dd><dt>Reserve free space</dt><dd style="text-align:left"><input class="fld" value="200 GB"></dd></div>
+  <label style="display:flex;gap:7px;margin-top:12px;font-size:var(--fs-sm)"><input type="checkbox"> Rebalance existing data onto this drive to relieve full tiers</label>
+</div><div class="modal-f"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="closeModal()">Add &amp; index</button></div></div></div>
+
+<div class="modal-bg" id="m-migrate"><div class="modal wide"><div class="modal-h"><h3>Migration plan — review before it runs</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-b">
+  <div class="infobox">Nothing moves until you approve. Each move is <b>copy → verify → then delete source</b>, crash-safe and resumable.</div>
+  <div class="kv" style="grid-template-columns:200px 1fr;margin:14px 0"><dt>Files to move</dt><dd style="text-align:left">1,240</dd><dt>Data</dt><dd style="text-align:left">312 GB</dd><dt>Estimated time</dt><dd style="text-align:left">~42 min (throttled)</dd><dt>Frees on T1</dt><dd style="text-align:left" style="color:var(--good)">190 GB</dd></div>
+  <div class="flow" style="margin-bottom:12px">Per file: <span class="stg done">copy</span> → <span class="stg act">verify (checksum)</span> → <span class="stg">atomic rename</span> → <span class="stg">delete source</span></div>
+  <table class="t"><thead><tr><th>Package</th><th>From → To</th><th class="num">Size</th></tr></thead><tbody>
+    <tr><td class="nm">Spacedog.Import.12</td><td class="mono muted">T1 → T3</td><td class="num">3.4 GB</td></tr>
+    <tr><td class="nm">Kemenate.Morphs.14</td><td class="mono muted">T1 → T3</td><td class="num">2.1 GB</td></tr>
+  </tbody></table>
+  <div class="warnbox" style="margin-top:12px">⚠ 2 single-copy vars excluded from this plan — they have no backup and won't be moved automatically.</div>
+</div><div class="modal-f"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn">Dry run</button><button class="btn primary" onclick="closeModal()">Approve &amp; run</button></div></div></div>
+
+<div class="modal-bg" id="m-fix"><div class="modal"><div class="modal-h"><h3>Fix encoding → UTF-8</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-b">
+  <div class="mono sm" style="color:var(--text-hi)">作者14.和服.3 · detected <b style="color:var(--warn)">Shift-JIS</b> · confidence high</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:12px 0">
+    <div><div class="muted sm" style="margin-bottom:5px">Before (mojibake)</div><div class="card mono" style="font-size:11px;color:var(--crit);padding:9px">Custom/è¡£è£…/ã‚¹ã‚«ãƒ¼ãƒˆ.vam</div></div>
+    <div><div class="muted sm" style="margin-bottom:5px">After (UTF-8)</div><div class="card mono" style="font-size:11px;color:var(--good);padding:9px">Custom/衣装/スカート.vam</div></div>
+  </div>
+  <div class="okbox">Writes a <b>new</b> UTF-8 var, validates it loads in VaM, keeps the <b>original retained</b> (not trashed) until you confirm.</div>
+  <label style="display:flex;gap:7px;margin-top:12px;font-size:var(--fs-sm)"><input type="checkbox"> Also slim: remove plugins / assets / morphs (advanced, off by default)</label>
+</div><div class="modal-f"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="closeModal()">Fix this + apply to group (431)</button></div></div></div>
+
+<div class="modal-bg" id="m-alias"><div class="modal"><div class="modal-h"><h3>Resolve missing dependency</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-b">
+  <div class="mono sm">Missing: <b style="color:var(--crit)">Vanished.Pack.2</b> — needed by 41 packages &amp; 6 of your saves</div>
+  <label class="muted sm" style="display:block;margin:14px 0 5px">Map to an owned package</label>
+  <input class="fld" placeholder="search your library…" value="Owned.Similar.3">
+  <label class="muted sm" style="display:block;margin:14px 0 5px">Save scope</label>
+  <select class="fld"><option>Global — apply everywhere, always</option><option>Only preset: Cinematic set</option></select>
+  <div class="infobox" style="margin-top:14px">Saved aliases re-apply automatically on every load &amp; preset switch — you never set this up twice.</div>
+</div><div class="modal-f"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="closeModal()">Save alias</button></div></div></div>
+
+<div class="modal-bg" id="m-confirm"><div class="modal"><div class="modal-h"><h3>Delete 3 packages?</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-b">
+  <div class="warnbox">⚠ <b>1 of these is a single copy</b> (irreplaceable — no other copy anywhere). It's excluded by default.</div>
+  <div style="margin:12px 0" class="sm">Deleted items go to <b>Trash</b> (recoverable), never hard-deleted. Reverse-dependency check: <b>2 packages &amp; 1 save</b> depend on these.</div>
+  <table class="t"><thead><tr><th>Package</th><th>Copies</th><th></th></tr></thead><tbody>
+    <tr><td class="nm">Dupe.Copy.2</td><td class="sm muted">2 online</td><td><span class="st ok">safe</span></td></tr>
+    <tr><td class="nm">OldLook.v1.1</td><td class="sm muted">superseded</td><td><span class="st ok">safe</span></td></tr>
+    <tr><td class="nm crit">刘亦菲.RealLook.3</td><td class="sm" style="color:var(--crit)">1 copy</td><td><span class="st miss">protected</span></td></tr>
+  </tbody></table>
+</div><div class="modal-f"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn danger" onclick="closeModal();showToast('Moved 2 items to trash')">Move 2 safe items to trash</button></div></div></div>
+
+<div class="modal-bg" id="m-preset"><div class="modal wide"><div class="modal-h"><h3>Edit preset — Cinematic set</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-b">
+  <div style="display:flex;gap:8px;margin-bottom:12px"><input class="fld" value="Cinematic set" style="max-width:240px"><div class="grow" style="flex:1"></div><button class="btn sm">Add from filter…</button><button class="btn sm">Import txt</button></div>
+  <div class="infobox">241 members → auto-pulls 38 deps · 3 aliases applied · <b>1 missing</b> (<a onclick="openModal('m-alias')">resolve</a>). Switch is instant (directory-swap).</div>
+  <table class="t" style="margin-top:12px"><thead><tr><th>Package</th><th>Mode</th><th>Pin version</th><th></th></tr></thead><tbody>
+    <tr><td class="nm">AshAuryn.Expressions.5</td><td class="mono muted">exact</td><td><input type="checkbox"></td><td><button class="btn sm">×</button></td></tr>
+    <tr><td class="nm">Cloth.latest</td><td class="mono muted">latest → .5</td><td><input type="checkbox" checked></td><td><button class="btn sm">×</button></td></tr>
+  </tbody></table>
+</div><div class="modal-f"><button class="btn">Export txt</button><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="closeModal()">Save preset</button></div></div></div>
+
+<div class="modal-bg" id="m-dupe"><div class="modal"><div class="modal-h"><h3>Review duplicate — keep one</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-b">
+  <div class="mono sm">Hunting-Succubus.EnhancedEyes.6 · <b>4 content-identical copies</b> · same signature</div>
+  <table class="t" style="margin-top:10px"><thead><tr><th></th><th>Location</th><th>Tier</th><th>Integrity</th></tr></thead><tbody>
+    <tr><td><input type="radio" name="keep" checked></td><td class="mono sm">T1\…\EnhancedEyes.6.var</td><td><span class="tag" style="color:var(--hot)">T1</span></td><td><span class="st ok">verified ✓</span></td></tr>
+    <tr><td><input type="radio" name="keep"></td><td class="mono sm">T3\…\EnhancedEyes.6.var</td><td><span class="tag" style="color:var(--cold)">T3</span></td><td><span class="st ok">verified</span></td></tr>
+  </tbody></table>
+  <div class="okbox" style="margin-top:12px">Deletes verified with full hash first. 3 copies → trash · reclaim <b>288 MB</b>.</div>
+</div><div class="modal-f"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="closeModal()">Keep T1, trash 3</button></div></div></div>
+
+<div class="modal-bg" id="m-rescue"><div class="modal"><div class="modal-h"><h3>⛑ Rescue — get the game to launch</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-b">
+  <div class="infobox">Too many active vars can stop VaM loading. This deactivates everything and gives you a clean, minimal active set — then you add back deliberately.</div>
+  <div style="margin:14px 0" class="sm">Currently active: <b class="mono">1,847</b> packages. Recommended baseline: <b class="mono">0</b> (empty) or a small preset.</div>
+  <select class="fld"><option>Empty — deactivate all</option><option>Quick play preset (86)</option></select>
+</div><div class="modal-f"><button class="btn" onclick="closeModal()">Cancel</button><button class="btn primary" onclick="closeModal()">Apply rescue baseline</button></div></div></div>
+
+<div class="modal-bg" id="m-vardetail"><div class="modal wide"><div class="modal-h"><h3>五一莉刻.精神分裂1号.1</h3><button class="x" onclick="closeModal()">×</button></div><div class="modal-b">
+  <div class="tabs"><button class="on">Overview</button><button>Dependency graph</button><button>Content items</button><button>Copies &amp; lineage</button></div>
+  <div class="kv" style="grid-template-columns:180px 1fr"><dt>Identity</dt><dd>五一莉刻.精神分裂1号.1</dd><dt>Fold key</dt><dd class="muted">五一莉刻.精神分裂1号.1</dd><dt>License</dt><dd>CC BY</dd><dt>Size</dt><dd>514 MB</dd><dt>Depended on by</dt><dd>27</dd><dt>Class</dt><dd style="color:var(--hot)">hot</dd></div>
+  <div class="infobox" style="margin-top:14px">Full dependency-graph view (forward + reverse closure), content-item previews, and original↔fixed lineage live under the tabs above.</div>
+</div><div class="modal-f"><button class="btn primary" onclick="closeModal()">Close</button></div></div></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const TYPES={scene:'#7c86f0',look:'#f472b6',clothing:'#2dd4bf',hair:'#f4b740',morph:'#a78bfa',plugin:'#34d399',asset:'#8b97a8',pose:'#38bdf8',skin:'#fb923c'};
+  const TEMP={hot:'var(--hot)',warm:'var(--warm)',cold:'var(--cold)'};
+  const D=[
+    ['五一莉刻.精神分裂1号.1','五一莉刻','hot','T1',[1,11,14,0,0,11],'514',2,3,'ok',false],
+    ['爱发电Shao名超级捆.1','爱发电','hot','T1',[1,0,1,0,0,0],'1.3',1,2,'miss',false],
+    ['Sxr4.Sxr4_Adventures_32.6','Sxr4','hot','T1',[1,0,0,0,0,0],'1.6',1,19,'ok',false],
+    ['Riccio.Yuuko.1','Riccio','warm','T2',[0,1,0,0,7,7],'3.9',2,11,'ok',false],
+    ['作者14.和服.3','作者14','cold','T3',[0,0,5,0,0,0],'340',1,6,'fix',true],
+    ['Kemenate.Morphs.14','Kemenate','cold','T3',[0,0,0,0,0,289],'2100',2,0,'ok',false],
+    ['백설공주.Pose_Set.1','백설공주','warm','T2',[0,0,0,0,0,0],'44',1,3,'fix',true],
+    ['AcidBubbles.Timeline.317','AcidBubbles','hot','T1',[0,0,0,0,1,0],'8.0',2,0,'ok',false],
+  ];
+  const ctd=n=>`<td class="ct ${n?'':'z'}">${n||'·'}</td>`;
+  document.getElementById('libRows').innerHTML=D.map((v,i)=>`<tr onclick="void 0">
+    <td><input type="checkbox" ${i<3?'checked':''}></td>
+    <td class="nm">${v[9]==='ok'&&i<4?'<span style="color:var(--good)">●</span> ':''}${v[0]}</td><td>${v[1]}</td>
+    ${v[4].map(ctd).join('')}
+    <td class="num">${v[3]==='T1'?v[5]:v[5]}</td>
+    <td><span class="temp" style="background:${TEMP[v[2]]}"></span> ${v[3]}</td>
+    <td class="num">${v[6]}</td><td class="num">${v[7]}</td>
+    <td>${v[9]==='miss'?'<span class="st miss">missing</span>':v[9]==='fix'?'<span class="st sub">needs fix</span>':'<span class="st ok">ok</span>'}</td>
+    <td class="mono muted sm">${v[10]?'<a>rebuild →</a>':v[0].slice(0,14)}</td>
+    <td><button class="btn sm" onclick="event.stopPropagation();openModal('m-vardetail')">Detail</button></td></tr>`).join('');
+
+  /* package gallery view (restored) */
+  const CT=['scene','look','clothing','hair','plugin','morph'];
+  function primType(ct){let mi=0;ct.forEach((n,i)=>{if(n>ct[mi])mi=i;});return CT[mi];}
+  document.getElementById('libGallery').innerHTML=D.map((v,i)=>{const pt=primType(v[4]),col=TYPES[pt];
+    return `<div class="gcard" onclick="openModal('m-vardetail')"><div class="gthumb" style="background:linear-gradient(150deg,${col}38,${col}14 60%,var(--bg-2))"><span class="letter">${[...v[0]][0]}</span>
+      <div class="badges"><span class="pill tier">${v[3]}</span>${v[8]==='miss'?'<span class="pill crit">!</span>':v[8]==='fix'?'<span class="pill warn">⚑</span>':''}</div>
+      ${v[8]==='ok'&&i<4?'<span class="inst">installed</span>':''}</div>
+      <div class="gbody"><div class="gname">${v[0]}</div><div class="gmeta"><span class="temp" style="background:${TEMP[v[2]]}"></span> <span style="color:${col}">${pt}</span><span class="sz">${v[5]} MB</span></div></div></div>`;}).join('');
+  function setLibView(x){document.getElementById('libTable').classList.toggle('hidden',x!=='table');document.getElementById('libGallery').classList.toggle('hidden',x!=='gallery');
+    document.getElementById('vtTable').classList.toggle('on',x==='table');document.getElementById('vtGallery').classList.toggle('on',x==='gallery');}
+
+  function go(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'));const el=document.getElementById(id);if(el)el.classList.add('on');
+    document.querySelectorAll('.rnav').forEach(n=>n.classList.toggle('on',n.dataset.s===id));}
+  function openModal(id){document.getElementById(id).classList.add('on');}
+  function closeModal(){document.querySelectorAll('.modal-bg').forEach(m=>m.classList.remove('on'));}
+  document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)closeModal();}));
+  function toggleJobs(e){e.stopPropagation();document.getElementById('jobsPanel').classList.toggle('on');}
+  function sortCol(th){const cur=th.classList.contains('desc')?'desc':th.classList.contains('asc')?'asc':'';
+    th.parentNode.querySelectorAll('th.sortable').forEach(h=>{if(h!==th){h.classList.remove('asc','desc');const c=h.querySelector('.cr');if(c)c.textContent='▲▼';}});
+    const next=cur==='desc'?'asc':'desc';th.classList.remove('asc','desc');th.classList.add(next);th.querySelector('.cr').textContent=next==='desc'?'▼':'▲';}
+  function showToast(msg,undo){const t=document.getElementById('toast');t.innerHTML=msg+(undo===false?'':' <a onclick="hideToast()">Undo</a>');t.classList.add('on');clearTimeout(window._tt);window._tt=setTimeout(hideToast,4500);}
+  function hideToast(){document.getElementById('toast').classList.remove('on');}
+  document.querySelectorAll('.tabs').forEach(t=>t.addEventListener('click',e=>{if(e.target.tagName==='BUTTON'){t.querySelectorAll('button').forEach(b=>b.classList.remove('on'));e.target.classList.add('on');}}));
+  function toggleTheme(){const r=document.documentElement,c=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');r.setAttribute('data-theme',c==='dark'?'light':'dark');}
+
+  /* searchable creator combobox */
+  const CREATORS=[['All',69660],['MeshedVR',412],['DaniPunani',241],['NoStage3',140],['ClothingCreator',52],['AshAuryn',88],['Riccio',54],['Spacedog',44],['Kemenate',36],['Hunting-Succubus',31],['Chokaphi',27],['Roac',22],['AcidBubbles',20],['VeeRifter',18],['HelloTokyo',15],['五一莉刻',12],['Vazh',11],['爱发电',9],['Sxr4',9],['作者14',7],['via5',6],['백설공주',5],['刘亦菲',3]];
+  function renderCombo(filter){const f=(filter||'').toLowerCase();const list=CREATORS.filter(c=>c[0].toLowerCase().includes(f));
+    document.getElementById('creatorList').innerHTML=list.length?list.map((c,i)=>`<div class="combo-opt ${i===0&&filter?'hi':''}" data-name="${c[0]}" onclick="pickCreator(this)">${c[0]}<span class="count">${c[1].toLocaleString()}</span></div>`).join(''):'<div class="combo-empty">No creators match</div>';}
+  function toggleCombo(e,id){e.stopPropagation();const el=document.getElementById(id);const open=el.classList.toggle('open');if(open){renderCombo('');const s=el.querySelector('.combo-search');s.value='';setTimeout(()=>s.focus(),0);}}
+  function filterCombo(v){renderCombo(v);}
+  function pickCreator(el){document.getElementById('creatorVal').textContent=el.dataset.name;document.getElementById('creatorCombo').classList.remove('open');}
+  function comboKey(e){const opts=[...document.querySelectorAll('#creatorList .combo-opt')];let hi=opts.findIndex(o=>o.classList.contains('hi'));
+    if(e.key==='ArrowDown'){e.preventDefault();if(hi<opts.length-1){opts[hi]&&opts[hi].classList.remove('hi');opts[hi+1].classList.add('hi');opts[hi+1].scrollIntoView({block:'nearest'});}}
+    else if(e.key==='ArrowUp'){e.preventDefault();if(hi>0){opts[hi].classList.remove('hi');opts[hi-1].classList.add('hi');opts[hi-1].scrollIntoView({block:'nearest'});}}
+    else if(e.key==='Enter'){e.preventDefault();(opts[hi]||opts[0])&&(opts[hi]||opts[0]).click();}
+    else if(e.key==='Escape'){document.getElementById('creatorCombo').classList.remove('open');}}
+  document.addEventListener('click',()=>{document.querySelectorAll('.combo.open').forEach(c=>c.classList.remove('open'));document.getElementById('jobsPanel').classList.remove('on');});
+
+  addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();hideToast();}});
+</script>

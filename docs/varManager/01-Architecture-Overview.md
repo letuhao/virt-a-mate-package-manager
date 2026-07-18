@@ -1,204 +1,84 @@
-# Phase 1: Architecture Overview
+# 01 — Architecture Overview
 
-## Solution Structure
+## Solution layout
 
-The varManager-MMDLoader system is organized as a multi-project Visual Studio solution containing 8 distinct projects, each serving a specific purpose in the overall system architecture.
+`varManager.sln` (VS 2022, format 12.00) contains five projects. Two are applications; the rest are libraries/controls.
 
-### Solution File
+| Project | Type | Framework | Role |
+|---|---|---|---|
+| **varManager** | WinExe (WinForms) | .NET Framework 4.8, x64 | The main VAR package manager. ~90% of all logic. |
+| **MMDLoader** | WinExe (WPF + WinForms interop) | .NET 6.0-windows | Standalone GUI to convert MMD motions for VaM. Writes `loadscene.json`. |
+| **LoadScene** | Library (Unity plugin / `MVRScript`) | .NET Framework 3.5 | In-game VaM plugin. Polls `loadscene.json`, applies scenes/presets/MMD motion. ILMerged. |
+| **DgvFilterPopup** | Library | .NET Framework 4.8 | Excel-style column filter popups for `DataGridView`. |
+| **DragNDrop** | Library | .NET Framework 4.8 | Drag-and-drop `ListView` helper (used by FormScenes). |
 
-- **File**: `varManager.sln`
-- **Visual Studio Version**: 17.1.32407.343
-- **Minimum Version**: 10.0.40219.1
-- **Format**: Visual Studio Solution File Format Version 12.00
+> Note: the older docs referenced `HUB`, `StarRatingControl`, and `ThreeStateTreeView` as separate projects. In this snapshot the star-rating and three-state-tree behaviors are implemented **inside** the varManager project (`ThreeStateTreeview.cs`, hand-drawn star `PictureBox`es in `HubItem`), and `HUB` is a stub. The five projects above are the ones in the solution.
 
-### Project Breakdown
+## Two independent integration surfaces
 
-The solution consists of the following projects:
-
-1. **varManager** - Main Windows Forms application
-2. **MMDLoader** - WPF application for MMD loading
-3. **LoadScene** - Unity plugin library
-4. **DgvFilterPopup** - DataGridView filter component
-5. **DragNDrop** - Drag and drop ListView component
-6. **StarRatingControl** - Star rating UI control
-7. **ThreeStateTreeView** - Three-state checkbox tree view
-8. **HUB** - Minimal placeholder component
-
-## Architecture Pattern
-
-The system follows a **layered component architecture** with clear separation of concerns:
+varManager never controls VaM through an API. It integrates through **two file-based contracts** and one HTTP API:
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    Application Layer                     │
-│  ┌──────────────┐              ┌──────────────┐         │
-│  │  varManager  │              │  MMDLoader   │         │
-│  │ (WinForms)   │              │   (WPF)      │         │
-│  └──────┬───────┘              └──────┬───────┘         │
-└─────────┼──────────────────────────────┼─────────────────┘
-          │                              │
-┌─────────┼──────────────────────────────┼─────────────────┐
-│         │    Component Layer           │                 │
-│  ┌──────▼──────┐              ┌───────▼────────┐        │
-│  │DgvFilterPopup│              │   DragNDrop    │        │
-│  │StarRating    │              │ThreeStateTree  │        │
-│  └──────────────┘              └────────────────┘        │
-└──────────────────────────────────────────────────────────┘
-          │                              │
-┌─────────┼──────────────────────────────┼─────────────────┐
-│         │    Plugin/Unity Layer        │                 │
-│  ┌──────▼──────────────────────────────▼───────┐        │
-│  │            LoadScene                         │        │
-│  │        (Unity Plugin)                        │        │
-│  └──────────────────────────────────────────────┘        │
-└──────────────────────────────────────────────────────────┘
-          │
-┌─────────┼─────────────────────────────────────────────────┐
-│         │    Data Layer                                   │
-│  ┌──────▼───────────────────────────────────────┐        │
-│  │     varManager.mdb (Access Database)         │        │
-│  │     SimpleJSON (JSON Parser)                 │        │
-│  │     ZipHandler (ZIP Operations)              │        │
-│  └──────────────────────────────────────────────┘        │
-└──────────────────────────────────────────────────────────┘
+                          ┌─────────────────────────────────────────┐
+                          │  hub.virtamate.com / s3cdn.virtamate.com │  (HTTP JSON)
+                          └───────────────▲─────────────────────────┘
+                                          │ browse / find packages / updates
+┌──────────────────────────┐             │
+│  varManager (WinForms)    │─────────────┘
+│  - repository (varspath)  │
+│  - Access .mdb DB         │        symlinks          ┌───────────────────────────┐
+│  - dependency graph       │────────────────────────► │  VaM install (vampath)     │
+│  - scene/preview browser  │   AddonPackages\...\*.var │  AddonPackages\ (symlinks) │
+└─────────────┬─────────────┘                          │  Saves\, Custom\           │
+              │ writes                                  │  Custom\PluginData\feelfar\│
+              │ loadscene.json                          │       loadscene.json  ◄────┼── polled by
+              └────────────────────────────────────────►│                            │   in-game plugin
+                                                        └───────────────────────────┘
+   MMDLoader (WPF) ── copies VMD/audio + writes loadscene.json ──► same feelfar channel ──► LoadScene plugin
 ```
 
-## Project Dependencies
+- **Symlink contract (⚠ load-bearing):** "install" = an NTFS symbolic link in `AddonPackages` pointing at the real `.var` in the repository. VaM sees a normal package. Uninstall = delete the link.
+- **`loadscene.json` contract (⚠ load-bearing):** varManager (and MMDLoader) write `{vampath}\Custom\PluginData\feelfar\loadscene.json`; a cooperating in-game plugin ("feelfar", i.e. LoadScene) polls it, performs the load/preset/rescan, then deletes the file. See [06](./06-Preview-Scene-Analysis-and-Loading.md) and [09](./09-MMDLoader-and-LoadScene.md).
+- **Hub API:** read-only browsing + link generation against `hub.virtamate.com`. varManager does not download files itself. See [08](./08-Hub-Integration-API.md).
 
-### varManager Project
-- **Depends on**:
-  - `DgvFilterPopup`
-  - `DragNDrop`
-  - External: `ICSharpCode.SharpZipLib` (v1.4.2)
-  - .NET Framework 4.8
-  - Windows Forms
+## Layering (as-built vs. as-should-be)
 
-### MMDLoader Project
-- **Depends on**:
-  - .NET 6.0-windows
-  - WPF
-  - Windows Forms (for FolderBrowserDialog)
-  - SimpleJSON library
+**As-built:** there are effectively no layers. `Form1.cs` mixes UI event handlers, file I/O, ZIP extraction, Win32 P/Invoke, Access queries, LINQ-to-DataSet, and business rules in one class. The only separations are:
+- `Comm.cs` — static filesystem/symlink/reparse-point helpers.
+- `ZipHandler.cs` — static ZIP extraction/compression (SharpZipLib + 7-Zip shell-out).
+- `SimpleLogger.cs` — file logger.
+- `varManagerDataSet` — generated typed DataSet + TableAdapters (data access).
+- The dialog forms (`FormHub`, `FormScenes`, `FormAnalysis`, …) — each still reaches back into `Form1` public methods for all business logic.
 
-### LoadScene Project
-- **Depends on**:
-  - Unity engine libraries (Assembly-CSharp, UnityEngine, etc.)
-  - .NET Framework 3.5 (for Unity compatibility)
-  - Uses ILMerge for assembly merging
+**As-should-be** (target for the rebuild — see [12](./12-Rebuild-Blueprint.md)): Core (domain) / Application (use-cases) / Infrastructure (DB, filesystem, zip, hub, VaM IPC) / Presentation (UI), with dependency injection and async throughout.
 
-## Key Architectural Decisions
+## Process & threading model (legacy)
 
-### 1. Repository Pattern for VAR Files
+- Single UI thread. Long operations run on a **`BackgroundWorker`** (`backgroundWorkerInstall`) dispatched by a string command argument (`"UpdDB"`, `"FillDataTables"`, `"MissingDepends"`, `"StaleVars"`, …).
+- A single `Mutex` serializes the whole background pipeline; a second `Mutex` guards preview filtering.
+- UI updates from the worker are marshaled via `BeginInvoke` delegates (`UpdateProgress`, `UpdateAddLoglist`, `UpdateVarsViewDataGridView`, …).
+- The entire DataSet (all `vars`, `scenes`, `dependencies`) is **loaded into memory** at startup and queried with LINQ-to-DataSet; writes go back through TableAdapters per-row. This is the root of the startup-time and memory problems (see [Criticism](./Criticism-Document.md)).
 
-The system implements a repository-based approach where:
-- All VAR files are stored in a centralized repository directory
-- Symbolic links are created in `AddonPackages` directory pointing to repository files
-- This allows efficient disk space usage and easier management
+## Key architectural decisions (and their consequences)
 
-### 2. Symbolic Link Management
+1. **Repository + symlinks instead of copying** — space-efficient, instant install/uninstall, and lets one physical `.var` be shared across AddonPackages "profiles". Requires Windows Developer Mode or admin to create symlinks. (⚠ load-bearing model.)
+2. **Access `.mdb` via ACE OLEDB** — chosen for zero-setup single-file storage, but slow, 2 GB-limited, single-writer, and needs the Access Database Engine installed. App.config shows a **staged, unfinished migration to SQLite** (EF6 + System.Data.SQLite registered, no connection string yet). ✎ Rebuild target: SQLite + EF Core.
+3. **Regex-based JSON scanning for dependencies** — deliberately tolerant of malformed/huge scene files; scans raw text for `"Creator.Package.Version":` keys anywhere, not strict JSON parsing. (See [04](./04-Dependency-Resolution-and-Versioning.md).) ✎ Preserve the *tolerance*, not the regex.
+4. **7-Zip shell-out for the extract/re-zip round-trip** — 7z handles CJK entry names and is faster; SharpZipLib is used for encoding-aware single-archive work. Hardcoded path `C:\Program Files\7-Zip\7z.exe`. ✎ Rebuild: discover the binary or use `System.IO.Compression` for metadata reads.
+5. **Special `___XXX___` directories** as semantic markers on disk (organized vars, quarantine, previews, links, profiles). (⚠ load-bearing — existing user libraries are laid out this way; see [02](./02-VAR-Format-and-Repository-Layout.md).)
 
-The application uses Windows symbolic links (both hard links and symbolic links) to manage VAR installations:
-- Uses P/Invoke to call Windows Kernel32 APIs
-- Supports both file and directory symbolic links
-- Handles reparse point detection and resolution
+## Technology stack summary
 
-### 3. Database-Driven Metadata
+| Concern | Legacy | Rebuild target (recommended) |
+|---|---|---|
+| App framework | .NET Framework 4.8 (WinForms) | .NET 8/9 |
+| UI | Windows Forms | Avalonia or WPF (MVVM) |
+| DB | Access `.mdb` (ACE OLEDB) + typed DataSet | SQLite + EF Core |
+| ZIP | SharpZipLib 1.4.2 + external 7z.exe | `System.IO.Compression` (+ optional 7z for rebuild) |
+| Symlinks | Win32 P/Invoke (`kernel32`/`advapi32`) | `File/Directory.CreateSymbolicLink` + `ResolveLinkTarget` (.NET 6+) |
+| JSON | SimpleJSON (vendored) + regex scanning | `System.Text.Json` (+ tolerant fallback) |
+| Async | `BackgroundWorker` + `Mutex` + `Thread.Sleep` | `async`/`await` + `IProgress<T>` + `CancellationToken` |
+| Logging | SimpleLogger (open/close per line) | Serilog/`ILogger` |
+| MMD plugin | .NET 3.5 Unity plugin, ILMerged | unchanged (bound to VaM's Mono runtime) |
 
-- Uses Microsoft Access database for tracking:
-  - VAR installation status
-  - Dependency relationships
-  - Package metadata
-- Implements DataSet/DataAdapter pattern for database operations
-
-### 4. JSON-Based Configuration
-
-- Uses SimpleJSON library for parsing VAR package metadata
-- JSON files used for:
-  - VAR package definitions (`meta.json`)
-  - Scene configurations
-  - LoadScene plugin communication
-
-### 5. Component-Based UI
-
-- Reusable UI components for common functionality:
-  - Filter popups for DataGridView
-  - Drag-and-drop list views
-  - Star rating controls
-  - Three-state tree views
-
-## Communication Patterns
-
-### Inter-Process Communication
-
-1. **File-Based Communication**:
-   - `loadscene.json` file in `Custom\PluginData\feelfar\` directory
-   - MMDLoader writes JSON configuration
-   - LoadScene Unity plugin reads the file
-
-2. **Directory Structure Communication**:
-   - `MMDForLoad` directory for MMD files
-   - Various special directories with `___` prefix for organization
-
-### Threading Model
-
-- Uses `BackgroundWorker` for long-running operations
-- UI updates via `Invoke` and `BeginInvoke` patterns
-- Thread-safe logging with `SimpleLogger`
-
-## Directory Structure Strategy
-
-The system uses special directory names prefixed with `___` for organization:
-
-- `___VarTidied___` - Organized VAR files by creator
-- `___VarRedundant___` - Duplicate VAR files
-- `___VarnotComplyRule___` - Non-compliant VAR names
-- `___PreviewPics___` - Preview images
-- `___StaleVars___` - Outdated VAR files
-- `___OldVersionVars___` - Older versions
-- `___DeletedVars___` - Deleted VAR files
-- `___AddonPacksSwitch ___` - Package switching
-- `___VarsLink___` - Installation links
-- `___MissingVarLink___` - Missing VAR links
-
-## Technology Stack Summary
-
-| Component | Technology | Version |
-|-----------|-----------|---------|
-| varManager | .NET Framework | 4.8 |
-| MMDLoader | .NET | 6.0-windows |
-| LoadScene | .NET Framework | 3.5 |
-| UI Framework | Windows Forms / WPF | - |
-| Database | Microsoft Access | OLEDB |
-| JSON Library | SimpleJSON | Custom |
-| ZIP Library | SharpZipLib | 1.4.2 |
-| Build Tool | ILMerge | 3.0.29 |
-
-## Build Configuration
-
-- **Platform**: x64 (varManager), AnyCPU (others)
-- **Configuration**: Debug/Release
-- **AllowUnsafeBlocks**: Enabled for varManager (symbolic link operations)
-
-## Security Considerations
-
-1. **Privilege Escalation**: Uses backup privileges for reparse point access
-2. **File System Operations**: Comprehensive error handling for file operations
-3. **Path Validation**: Validates file paths and prevents directory traversal
-4. **Symlink Handling**: Careful handling of symbolic links to prevent security issues
-
-## Extension Points
-
-The architecture supports extensibility through:
-
-1. **Custom Filters**: Extendable filter system for DataGridView
-2. **Plugin System**: LoadScene can be extended with new scene loaders
-3. **Custom Scripts**: VAR packages can include custom C# scripts
-4. **Component Library**: Reusable UI components for other projects
-
-## Next Steps
-
-Continue to:
-- [Phase 2: varManager Core Application](./02-varManager-Core.md) - Detailed analysis of the main application
-- [Phase 3: MMDLoader Application](./03-MMDLoader.md) - MMD loading functionality
-- [Phase 4: LoadScene Component](./04-LoadScene.md) - Unity plugin details
-
+Continue to [02 — VAR Format & Repository Layout](./02-VAR-Format-and-Repository-Layout.md).
