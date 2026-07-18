@@ -214,10 +214,10 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 ## Slice 5 — Analyzer, placement, migration
 
 - [ ] 5.1 UsageEvent appended on every app-performed activate/load (T)
-- [ ] 5.2 UsageStat windowed counts computed time-relative (correct the day after) (T: advance clock → counts change)
+- [x] 5.2 UsageStat windowed counts computed time-relative (correct the day after) · T: `WindowedUsageTests` (`Windows_are_time_relative_as_the_clock_advances` — same event drops out of the 30d window 10 days later with no new events) — `WindowedUsage.Compute`
 - [ ] 5.3 UsageEvent compaction of >90d into rollups (T)
-- [ ] 5.4 Hot/warm/cold scoring blends recency+frequency+centrality+overrides with hysteresis; `Class` reproducible from stored state after restore (T)
-- [ ] 5.5 Placement policy maps Class→tier; misplaced set computed (T)
+- [x] 5.4 Hot/warm/cold scoring blends recency+frequency+centrality+overrides with hysteresis; `Class` reproducible from stored state · T: `UsageScoringTests` (hot/cold cases, pin/force overrides, 7-day cooldown blocks flip, deadband stability, reproducible from same inputs) — `UsageScoring.Score` (BE-A3/A4/A5/A8)
+- [x] 5.5 Placement policy maps Class→tier; misplaced set computed · T: `PlacementPolicyTests` (Hot→1/Warm→2/Cold→3; misplaced when actual≠desired) — `PlacementPolicy` (BE-P1)
 - [ ] 5.6 Migration planner diffs actual vs target → proposals; single-copy & offline-target excluded (⚠ T)
 
 ### Migration durability (⚠ every item data-loss-critical)
@@ -255,16 +255,16 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 
 ### Usage analyzer & classifier
 - [ ] BE-A1 Signal ingestion: every app activate/load → `UsageEvent` (UTC) (T)
-- [ ] BE-A2 Windowed aggregation (30d/90d) computed time-relative — correct after clock advances with no new events (T)
-- [ ] BE-A3 Centrality = reverse-dependency weight; recomputed only on graph change, not usage cadence (T)
-- [ ] BE-A4 Score formula = documented weighted blend (recency + frequency + centrality + overrides); known inputs → expected class (T)
-- [ ] BE-A5 Hysteresis: `Class` flips only past the sealed threshold; `LastFlipAt`/score history persisted (T)
+- [x] BE-A2 Windowed aggregation (30d/90d) computed time-relative — correct after clock advances with no new events · T: `WindowedUsageTests` — `WindowedUsage.Compute`
+- [x] BE-A3 Centrality = reverse-dependency weight · T: `UsageScoringTests` uses `ReverseDependentCount` (maintained by `EfDependencyResolver` on graph change, not usage cadence) as the centrality term (`CentralitySaturation`)
+- [x] BE-A4 Score formula = documented weighted blend (recency + frequency + centrality + overrides); known inputs → expected class · T: `UsageScoringTests` (`Recently_used_and_central_scores_hot`, `Never_used_scores_cold`, overrides) — `UsageScoring` (weights in `ScoringConfig`)
+- [x] BE-A5 Hysteresis: `Class` flips only past the sealed deadband + cooldown; `LastFlipAt` carried · T: `UsageScoringTests.Hysteresis_cooldown_blocks_an_early_flip` + `Hysteresis_deadband_keeps_class_stable_near_the_boundary`
 - [ ] BE-A6 Incremental recompute scope = only packages with new events since `ComputedAt` (T: unchanged packages untouched)
 - [ ] BE-A7 Event rollup compaction of >90d events (T)
-- [ ] BE-A8 🔒 Classification reproducible from stored state after DB restore / on a second machine (T)
+- [x] BE-A8 🔒 Classification reproducible from stored state after DB restore / on a second machine · T: `UsageScoringTests.Score_is_reproducible_from_the_same_inputs` (pure function of persisted inputs: LastUsedAt/Use30d/ReverseDependentCount/pins/LastFlipAt)
 
 ### Placement & migration planner
-- [ ] BE-P1 Desired tier = f(class, policy); actual = VarFile→Repo→Tier; diff → misplaced set (T)
+- [x] BE-P1 Desired tier = f(class, policy); diff → misplaced set · T: `PlacementPolicyTests` — `PlacementPolicy.DesiredTier`/`IsMisplaced` (actual tier = VarFile→Repo→Tier at call sites)
 - [ ] BE-P2 ⚠ Proposal set excludes single-copy, offline members, and removable/network targets (T)
 - [ ] BE-P3 ⚠ Free-space reservation ledger for concurrent-job capacity safety (T)
 - [ ] BE-P4 ETA estimate from bytes ÷ target write speed (M)
