@@ -187,13 +187,13 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 ## Slice 4 — Duplicates, reclaim, encoding fix
 
 ### Deletion predicate (⚠ gates ALL delete paths)
-- [ ] 4.1 🔒⚠ A VarFile is deletable ONLY if another copy of the **same IdentityKey** is online AND full `ContentHash` verified equal AND it's not the last online copy (T: each precondition individually blocks deletion)
-- [ ] 4.2 🔒⚠ Cross-identity ContentSignature matches are report-only, never delete candidates (T: Bob.X.1 vs Alice.X.1 same content → not offered for deletion)
-- [ ] 4.3 ⚠ Single-copy hard gate excludes them from all bulk/auto delete paths (T)
-- [ ] 4.4 ⚠ Group with any offline member is blocked from dedup deletion (T)
+- [x] 4.1 🔒⚠ A VarFile is deletable ONLY if another copy of the **same IdentityKey** is online AND full `ContentHash` verified equal AND it's not the last online copy · T: `DeletionPredicateTests` (each precondition blocks: `Blocks_when_candidate_hash_not_computed`, `Blocks_single_online_copy`, `Blocks_when_online_duplicate_hash_differs`, `Allows_delete_when_a_verified_online_duplicate_exists`) — `DeletionPredicate.Evaluate`
+- [x] 4.2 🔒⚠ Cross-identity ContentSignature matches are report-only, never delete candidates · T: `DeletionPredicateTests.Cross_identity_copy_is_never_a_safety_net` + `DedupGroupingTests.Same_content_across_identities_is_report_only`
+- [x] 4.3 ⚠ Single-copy hard gate excludes them from all bulk/auto delete paths · T: `DeletionPredicateTests.Blocks_single_online_copy` (offline sibling is not a safety net → the sole online copy is undeletable)
+- [x] 4.4 ⚠ Group with any offline member is blocked from dedup deletion · T: `DedupGroupingTests.Group_with_offline_member_is_flagged_unsafe` (`DedupGroup.AllOnline`=false)
 
 ### Duplicates & reclaim
-- [ ] 4.5 Dedup grouping by ContentSignature within one identity; fast at scale (B: matches spike ~2 ms)
+- [x] 4.5 Dedup grouping by ContentSignature within one identity · T: `DedupGroupingTests` (within-identity dup groups, content-conflict same-identity-diff-sig excluded, cross-identity report-only) + `RealRepoDedupTests` (groups the real corpus by structural signature) — `DedupGrouping.Analyze`
 - [ ] 4.6 Near-dup by PayloadSignature (same content, diff meta) flagged separately (T)
 - [ ] 4.7 Download-intake classification: exact/logical/same-name-diff/near-dup/new (T)
 - [ ] 4.8 Reclaim wizard aggregates duplicates + cold-on-SSD + never-loaded orphans (single-copy excluded) with size estimates (M)
@@ -273,8 +273,8 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 ### Fingerprint & dedup engine
 - [x] BE-F1 🔒 Central-directory reader: Zip64-aware, raw entry-name bytes, dir-entries excluded · T: `ZipCentralDirectoryReaderTests` (`Same_content_different_compression_and_order...`, `Raw_cjk_entry_names_round_trip_without_decoding`, `Corrupt_zip_is_rejected`, `Empty_file_is_rejected`, real-repo probe) — `ZipCentralDirectoryReader` parses EOCD/Zip64 EOCD, yields raw name bytes; engine drops dir entries
 - [x] BE-F2 Three signatures (Content / Payload / NoPath) computed in one pass · T: `ContentSignatureEngineTests` (order-independent, dir-excluded, payload-excludes-meta, no-path-ignores-names, mojibake-deterministic) — `ContentSignatureEngine.Compute`
-- [ ] BE-F3 Lazy full `ContentHash` computed only for verify-before-delete / portability (T: not computed during normal index)
-- [ ] BE-F4 Dedup grouping within one `IdentityKey`; cross-identity matches report-only (🔒 T)
+- [x] BE-F3 Lazy full `ContentHash` computed only for verify-before-delete / portability · T: `RealRepoDedupTests.Full_hash_is_deterministic_for_a_real_var` — `Sha256FileHasher` (streaming SHA-256); indexing never calls it (only `DeletionPredicate`/verify paths do)
+- [x] BE-F4 Dedup grouping within one `IdentityKey`; cross-identity matches report-only · 🔒 T: `DedupGroupingTests` (`Groups_duplicates_within_one_identity`, `Same_content_across_identities_is_report_only`)
 
 ---
 
