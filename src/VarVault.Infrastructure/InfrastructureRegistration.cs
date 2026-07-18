@@ -23,6 +23,7 @@ public static class InfrastructureRegistration
         services.AddSingleton<IWriteQueue>(_ => new WriteQueue());
         services.AddSingleton<IUiDispatcher, InlineUiDispatcher>();
         services.AddSingleton<IRepositoryEnumerator, RepositoryEnumerator>();
+        services.AddSingleton<IVarInspector, VarInspector>();
 
         services.AddHealthChecks()
             .AddCheck<WriteQueueHealthCheck>("write-queue", tags: ["live"]);

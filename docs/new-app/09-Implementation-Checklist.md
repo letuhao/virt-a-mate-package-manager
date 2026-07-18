@@ -97,7 +97,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 1.13 🔒 Identity parse: 3-part `Creator.Package.Version`, digit version; else failure → Unrecognized bucket · T: `IdentityFacetsTests` (`.007` preserved, `A.B.C.1`/non-numeric → failure, `Long_version_clamps_without_overflow` 20-digit → `long.MaxValue`)
 - [x] 1.14 🔒 `IdentityKey` computed; `Creator.Pkg.007` and `creator.pkg.007` collapse to same key · T: `IdentityFoldTests` + `IdentityFacetsTests.Dot_seven_and_dot_zerozeroseven_stay_distinct_versions` (case collapses, `.7`≠`.007`)
 - [x] 1.15 Facets (Creator/PackageName/VersionToken/VersionSort) parsed **from filename** · T: `IdentityFacetsTests` — `PackageId.TryParse` derives every facet from the filename and structurally cannot read meta.json (identity is filename-only by construction; `MetaDivergent` set separately at index time, 1.17)
-- [ ] 1.16 Read `meta.json`; missing → `IntegrityStatus=MissingMeta` (T)
+- [x] 1.16 Read `meta.json`; missing → `IntegrityStatus=MissingMeta` · T: `VarInspectorTests` (`Inspects_a_healthy_var_end_to_end` reads meta, `Missing_meta_is_flagged`) + `VarMetaParserTests` (tolerant parse, CJK dep ref) — `VarInspector` + `VarMetaParser`
 - [ ] 1.17 Store `MetaCreator`/`MetaPackage` + `MetaDivergent` flag when they differ from filename (T)
 - [x] 1.18 Content classification by prefix+ext rules → per-type counts; matches legacy type table · T: `ContentClassificationEngineTests` (scene/look/clothing/hair/asset counts, preset flags per legacy table, plugin cslist-else-cs, case/separator-agnostic) + `RealRepoClassificationTests` (real corpus classifies)
 - [x] 1.19 `PrimaryType` chosen by fixed precedence · T: `ContentClassificationEngineTests` (scene wins over look/clothing; `ChoosePrimary` precedence) + `RealRepoClassificationTests` (every classified real var → non-Unknown primary)
@@ -108,7 +108,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] 1.24 Per-physical-drive parallelism: HDD degree=1, NVMe higher (M: two repos on one HDD don't run concurrent reads)
 - [ ] 1.25 Bulk writes batched in transactions; FTS triggers disabled during bulk then rebuilt once (T/B: bulk insert rate acceptable)
 - [ ] 1.26 Incremental re-index: second scan of unchanged repo opens 0 files (D: real repo, timed, 0 opens)
-- [ ] 1.27 Corrupt zip → `IntegrityStatus=CorruptZip`, not indexed as content (T)
+- [x] 1.27 Corrupt zip → `IntegrityStatus=CorruptZip`, not indexed as content · T: `VarInspectorTests.Corrupt_zip_is_flagged_without_throwing` (empty entries, no signatures) + `ZipCentralDirectoryReaderTests.Corrupt_zip_is_rejected`
 - [ ] 1.28 Prune: VarFile whose file vanished (repo confirmed online) removed; offline → kept unavailable (⚠ T both branches)
 - [x] 1.29 Quarantine-dir recognition (`___VarRedundant___` etc.) → `QuarantineKind` set, not treated as live · T: `RepositoryScanRulesTests.Classifies_quarantine_directories_by_prefix` (incl. legacy suffix) + `RepositoryEnumeratorTests` (tagged Redundant, `IsLive`=false) + real-repo probe
 - [ ] 1.30 Filesystem watch triggers incremental re-index of changed files (M: drop a var → appears)
