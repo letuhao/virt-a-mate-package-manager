@@ -26,6 +26,12 @@ public static class PersistenceRegistration
 
         services.AddScoped<IUnitOfWork>(sp => new EfUnitOfWork(sp.GetRequiredService<VarVaultDbContext>()));
         services.AddScoped<ICatalogStore, EfCatalogStore>();
+
+        // Staged-index pass-2: preview extraction into a packed thumbnail store (separate DB). (1.23/1.32/1.33)
+        var thumbsPath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(databasePath)) ?? ".", "thumbnails.db");
+        services.AddSingleton<Domain.Indexing.IThumbnailStore>(_ => new Indexing.SqliteThumbnailStore(thumbsPath));
+        services.AddSingleton<Indexing.PreviewExtractor>();
+        services.AddScoped<Domain.Indexing.IPreviewIndexer, Indexing.EfPreviewIndexer>();
         services.AddScoped<IDependencyResolver, EfDependencyResolver>();
         services.AddScoped<Domain.Analyzer.IUsageAnalyzer, EfUsageAnalyzer>();
         services.AddScoped<IDependencyGraph, EfDependencyGraph>();

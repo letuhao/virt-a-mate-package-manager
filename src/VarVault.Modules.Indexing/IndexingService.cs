@@ -29,6 +29,7 @@ internal sealed class IndexingService(
         using var activity = Telemetry.StartActivity("index.repository");
         using var scope = scopeFactory.CreateScope();
         var store = scope.ServiceProvider.GetRequiredService<ICatalogStore>();
+        var previews = scope.ServiceProvider.GetRequiredService<IPreviewIndexer>();
 
         var online = await store.RepositoryIsOnlineAsync(repositoryId, cancellationToken).ConfigureAwait(false);
         var existing = (await store.ListVarFilesAsync(repositoryId, cancellationToken).ConfigureAwait(false))
@@ -79,7 +80,14 @@ internal sealed class IndexingService(
             }
         }
 
-        await dirty.FlushAsync(store, cancellationToken).ConfigureAwait(false);
+        // Pass-1 complete: refresh the read model so the catalog is browsable (names/meta/deps/counts). (1.23)
+        var affected = dirty.Drain();
+        if (affected.Count > 0)
+            await store.RefreshReadModelAsync(affected, cancellationToken).ConfigureAwait(false);
+
+        // Pass-2: previews/thumbnails fill in afterwards — the gallery already shows type placeholders. (1.23/1.32)
+        if (affected.Count > 0)
+            await previews.BuildPreviewsAsync(affected, cancellationToken).ConfigureAwait(false);
 
         logger.LogInformation(
             "Indexed repository {RepositoryId}: {Indexed} indexed, {Skipped} skipped, {Pruned} pruned, {Corrupt} corrupt, {Unrecognized} unrecognized",
