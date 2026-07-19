@@ -27,6 +27,7 @@ public static class InfrastructureRegistration
         services.AddSingleton<Domain.Dedup.IFileHasher, Sha256FileHasher>();
         services.AddSingleton<Domain.Content.IEncodingFixer, Indexing.EncodingFixer>();
         services.AddSingleton<Domain.Migration.IDurableFileMover, Indexing.DurableFileMover>();
+        services.AddSingleton<Domain.Activation.ISymlinkService, Activation.SymlinkService>();
         services.AddSingleton<Domain.Repositories.IDriveProfiler, Repositories.DriveProfiler>();
 
         services.AddHealthChecks()

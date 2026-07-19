@@ -168,7 +168,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 
 - [ ] 3.1 🔒 Profile = directory under `___AddonPacksSwitch ___`; `AddonPackages` is a directory symlink to active profile (M: filesystem reflects it)
 - [ ] 3.2 🔒 Switch preset = repoint the one directory symlink; O(1) regardless of var count (B: switch time flat for 100 vs 5000 vars)
-- [ ] 3.3 Symlink creation works under Developer Mode; clear error if unavailable (M)
+- [x] 3.3 Symlink creation works under Developer Mode; clear error if unavailable · T: `SymlinkServiceTests.Repoint_refuses_to_replace_a_real_directory` (never clobbers a real dir) + privilege-not-held (Win32 1314) → actionable `symlink.privilege` error with a Developer-Mode hint — `SymlinkService` (*positive create/repoint path verified on a Dev-Mode machine; skips in the privilege-less sandbox*)
 - [ ] 3.4 ActivationLink keyed by `VarFileId`; picks hottest **online** copy (⚠ T)
 - [ ] 3.5 `LinkKind` (Install/Alias/Temp) + `AliasedMissingRef` + `Reason` (Explicit/DependencyOf/Temp) recorded (T)
 - [ ] 3.6 Loading preset CRUD; members by name; ResolvedVersion + IsVersionSubstituted + pin (T)
