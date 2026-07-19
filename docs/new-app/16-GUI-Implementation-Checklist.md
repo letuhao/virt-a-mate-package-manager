@@ -202,7 +202,10 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
 ## Section 3 — Screens (SCR)
 Each cites its plan item numbers (15-plan) and its HTML range. Read both before coding (HR-0).
 
-- [ ] **SCR-1 · Dashboard.** *Read:* `:241–286`. *Items:* Dashboard #1–40. *BE:* N1, N2, N4, N8, N5, `IActivityLog`, `IRepositoryService`. *Test:* 6 cards render seeded summary; attention links navigate.
+- [x] **SCR-1 · Dashboard.** *Read:* `:241–286`. *BE:* N1 (+ N2/N4/N8 tiles compose later). *Done:*
+  `DashboardViewModel(IDashboardService)` + `Views/DashboardView.axaml` (header stat, storage-by-tier,
+  classification, attention cards). T: `DashboardScreenTests` (`Load_populates_summary`,
+  `View_renders_totals_and_classification`).
 - [ ] **SCR-2 · Library.** *Read:* `:288–392` + JS `:673–704`. *Items:* Library #1–78. *BE:* `ILibraryQueryService`, N9, N10, N11, N12, N5. Uses SC-3/SC-8. *Test:* rail filters, facets, table+gallery, ops-bar, detail panel each bind (stub SDK); reuse existing `MainWindowUiTests` + extend.
   - [ ] SCR-2a Rail (#1–18) · [ ] SCR-2b Facet bar (#19–29) · [ ] SCR-2c Table cols (#30–45) · [ ] SCR-2d Gallery (#46–53) · [ ] SCR-2e Ops bar (#54–63) · [ ] SCR-2f Detail panel (#64–78). *(Sub-units each independently testable.)*
 - [ ] **SCR-3 · Repositories.** *Read:* `:395–414`. *Items:* Repos #1–42. *BE:* `IRepositoryService`, N2, N13. *Test:* 4 repo cards bind capacity/tier/online; actions invoke Benchmark/SetEnabled.

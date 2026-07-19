@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:VarVault.App.Controls"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             x:Class="VarVault.App.Views.DashboardView"
+             x:DataType="vm:DashboardViewModel">
+  <ScrollViewer Padding="18">
+    <StackPanel Spacing="14" DataContext="{Binding Summary}" x:CompileBindings="False">
+      <TextBlock Text="Dashboard" FontSize="21" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+      <TextBlock Name="PART_Header" Foreground="{DynamicResource TextLoBrush}"
+                 Text="{Binding TotalPackages, StringFormat='{}{0} packages'}" />
+
+      <WrapPanel>
+        <c:Card Header="Storage by tier" Width="320" Margin="0,0,14,14">
+          <ItemsControl ItemsSource="{Binding Tiers}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,3">
+                  <TextBlock Grid.Column="0" Text="{Binding Tier, StringFormat='T{0}'}" />
+                  <c:MeterBar Grid.Column="1" Margin="8,0" VerticalAlignment="Center"
+                              Value="{Binding UsedBytes}" Fill="{DynamicResource AccentBrush}" />
+                  <TextBlock Grid.Column="2" Text="{Binding CapacityBytes}" Opacity="0.7" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </c:Card>
+
+        <c:Card Header="Classification" Width="320" Margin="0,0,14,14">
+          <StackPanel Spacing="4">
+            <TextBlock Text="{Binding HotCount, StringFormat='hot {0}'}" />
+            <TextBlock Text="{Binding WarmCount, StringFormat='warm {0}'}" />
+            <TextBlock Text="{Binding ColdCount, StringFormat='cold {0}'}" />
+          </StackPanel>
+        </c:Card>
+
+        <c:Card Header="Needs your attention" Width="320" Margin="0,0,14,14">
+          <StackPanel Spacing="4">
+            <TextBlock Text="{Binding MissingDepsCount, StringFormat='{}{0} missing dependencies'}" />
+            <TextBlock Text="{Binding OfflineRepositoryCount, StringFormat='{}{0} offline repositories'}" />
+          </StackPanel>
+        </c:Card>
+      </WrapPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
