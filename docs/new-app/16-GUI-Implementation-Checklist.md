@@ -108,7 +108,11 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
   + `Infrastructure/Library/EfDashboardService` (totals, class counts, active, missing-deps, per-tier
   storage from repos), registered. T: `EfDashboardServiceTests` (`Summary_aggregates_totals_classes_and_tiers`,
   `Empty_catalog_returns_zeros`). *(reclaim tiles compose BE-N4/N2 at the Dashboard screen.)*
-- [ ] **BE-N2 · `ITieringService`** (PlacementPolicy/MigrationPlanner/RebalancePlanner/UsageAnalyzer). *Test:* misplaced detection + plan build with a full-tier.
+- [x] **BE-N2 · `ITieringService`** (PlacementPolicy/MigrationPlanner). *Done:* SDK `ITieringService`
+  (`TierClassCounts`/`MisplacedItem`/`TierMigrationPlan`) + `EfTieringService` (class counts, misplaced via
+  `PlacementPolicy.IsMisplaced`, propose-only plan via `MigrationPlanner.Plan` with safe-tier predicate),
+  registered. T: `EfTieringServiceTests` (`Class_counts_and_misplaced_from_read_model`,
+  `Build_plan_proposes_moves_and_excludes_single_copy`).
 - [ ] **BE-N3 · `IMigrationService`** (MigrationRunner/DurableFileMover). *Test:* run a plan → copy→verify→rename→delete, source trashed, single-copy excluded.
 - [ ] **BE-N4 · `IReclaimService`** (DedupGrouping/DeletionPredicate/Sha256FileHasher). *Test:* exact groups; keep-one trashes only hash-verified redundant copies; single-copy protected.
 - [ ] **BE-N5 · `IHealthService`** (EncodingHealthEngine/EncodingFixCoordinator). *Test:* encoding groups; fix writes UTF-8 var, keeps original, validates load.
