@@ -22,6 +22,9 @@ public sealed partial class TieringViewModel(
 
     public ObservableCollection<MisplacedItem> Misplaced { get; } = [];
 
+    /// <summary>Explicit empty-state flag for the misplaced list. (GF-2)</summary>
+    public bool IsEmpty => Misplaced.Count == 0;
+
     [ObservableProperty] private TierClassCounts? _counts;
     [ObservableProperty] private int _plannedMoves;
 
@@ -32,6 +35,7 @@ public sealed partial class TieringViewModel(
         Misplaced.Clear();
         foreach (var m in await tiering.MisplacedAsync(cancellationToken).ConfigureAwait(true))
             Misplaced.Add(m);
+        OnPropertyChanged(nameof(IsEmpty));
     }
 
     [RelayCommand]

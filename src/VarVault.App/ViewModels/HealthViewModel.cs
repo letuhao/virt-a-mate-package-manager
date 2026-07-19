@@ -26,6 +26,9 @@ public sealed partial class HealthViewModel(
     [RelayCommand] private void FixAll() => launcher?.OpenFix(0, null);
 
     public ObservableCollection<EncodingGroup> EncodingGroups { get; } = [];
+
+    /// <summary>Explicit empty-state flag for the encoding groups. (GF-2)</summary>
+    public bool IsEmpty => EncodingGroups.Count == 0;
     public ObservableCollection<IntegrityIssue> Integrity { get; } = [];
 
     [ObservableProperty] private string? _statusMessage;
@@ -36,6 +39,7 @@ public sealed partial class HealthViewModel(
         EncodingGroups.Clear();
         foreach (var g in await health.EncodingGroupsAsync(cancellationToken).ConfigureAwait(true))
             EncodingGroups.Add(g);
+        OnPropertyChanged(nameof(IsEmpty));
         Integrity.Clear();
         foreach (var i in await health.IntegrityAsync(cancellationToken).ConfigureAwait(true))
             Integrity.Add(i);

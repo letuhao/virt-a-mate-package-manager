@@ -26,12 +26,16 @@ public sealed partial class AnalyticsViewModel(IAnalyticsService analytics) : Ob
     /// <summary>Cold-on-fast-storage waste (GB), for the "wasting fast storage" card. (GD-14)</summary>
     [ObservableProperty] private long _wastedOnFastBytes;
 
+    /// <summary>Explicit empty-state flag. (GF-2)</summary>
+    public bool IsEmpty => ByType.Count == 0 && ByCreator.Count == 0;
+
     [RelayCommand]
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
         await FillAsync(ByCreator, analytics.SpaceByCreatorAsync(cancellationToken)).ConfigureAwait(true);
         await FillAsync(ByType, analytics.SpaceByTypeAsync(cancellationToken)).ConfigureAwait(true);
         await FillAsync(ByTier, analytics.SpaceByTierAsync(cancellationToken)).ConfigureAwait(true);
+        OnPropertyChanged(nameof(IsEmpty));
     }
 
     private static async Task FillAsync(ObservableCollection<SpaceRowViewModel> target, Task<IReadOnlyList<SpaceByGroup>> source)

@@ -31,5 +31,6 @@
         <TextBlock Text="{Binding StatusMessage}" Opacity="0.7" />
       </StackPanel>
     </c:Card>
+    <TextBlock DockPanel.Dock="Top" Text="No encoding issues detected." Opacity="0.6" IsVisible="{Binding IsEmpty}" Margin="0,8,0,0" />
   </DockPanel>
 </UserControl>

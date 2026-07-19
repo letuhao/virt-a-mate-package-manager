@@ -25,7 +25,9 @@ public interface IDialogLauncher
 }
 
 /// <summary>Default launcher: resolves dialog VMs from the app service provider and shows them. (GD/GE.)</summary>
-public sealed class DialogLauncher(IServiceProvider services, IDialogService dialogs, Action? afterRepoAdded = null)
+public sealed class DialogLauncher(
+    IServiceProvider services, IDialogService dialogs,
+    Action? afterRepoAdded = null, Action<string, Action?>? toast = null)
     : IDialogLauncher
 {
     public void OpenAddRepo() =>
@@ -56,7 +58,10 @@ public sealed class DialogLauncher(IServiceProvider services, IDialogService dia
 
     public void OpenConfirmDelete(IReadOnlyList<ConfirmItem> items)
     {
-        var vm = new ConfirmDeleteViewModel(services.GetRequiredService<Sdk.Library.ILibraryActionService>());
+        var vm = new ConfirmDeleteViewModel(services.GetRequiredService<Sdk.Library.ILibraryActionService>())
+        {
+            OnDeleted = count => toast?.Invoke($"Moved {count} items to trash", null),
+        };
         vm.SetItems(items);
         dialogs.Show(vm);
     }

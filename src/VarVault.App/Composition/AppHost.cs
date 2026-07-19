@@ -18,7 +18,11 @@ public static class AppHost
     public static ShellViewModel CreateShell(IServiceProvider services)
     {
         var dialogs = new Services.DialogService();
-        var launcher = new Services.DialogLauncher(services, dialogs, afterRepoAdded: () => EnqueueIndexAll(services));
+        // Forward-declared so the launcher's toast can reach the shell once it's built.
+        ShellViewModel? shellRef = null;
+        var launcher = new Services.DialogLauncher(services, dialogs,
+            afterRepoAdded: () => EnqueueIndexAll(services),
+            toast: (msg, undo) => shellRef?.ShowToast(msg, undo));
 
         var screens = new Dictionary<string, object>
         {
@@ -48,6 +52,7 @@ public static class AppHost
         var jobQueue = services.GetService<Sdk.Threading.IJobQueue>();
         var feeds = TryBuildFeeds(services, jobQueue);
         var shell = new ShellViewModel(screens, initial: "library", dialogs: dialogs, jobQueue: jobQueue, feeds: feeds);
+        shellRef = shell; // wires the launcher toast callback above
 
         // GA-6 · top-bar handlers → open the matching dialog through the launcher.
         shell.AddRepoHandler = launcher.OpenAddRepo;

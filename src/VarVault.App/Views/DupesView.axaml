@@ -28,5 +28,6 @@
         </ItemsControl>
       </ScrollViewer>
     </c:Card>
+    <TextBlock DockPanel.Dock="Top" Text="No duplicate groups found." Opacity="0.6" IsVisible="{Binding IsEmpty}" Margin="0,8,0,0" />
   </DockPanel>
 </UserControl>

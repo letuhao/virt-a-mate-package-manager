@@ -18,6 +18,9 @@ public sealed partial class ConfirmDeleteViewModel(ILibraryActionService actions
 
     [ObservableProperty] private string? _resultMessage;
 
+    /// <summary>Invoked after a successful delete with the trashed count (drives a shell toast). (GF-1)</summary>
+    public System.Action<int>? OnDeleted { get; set; }
+
     public IEnumerable<ConfirmItem> Deletable => Items.Where(i => !i.IsSingleCopy);
     public int ProtectedCount => Items.Count(i => i.IsSingleCopy);
     public int SafeCount => Items.Count(i => !i.IsSingleCopy);
@@ -44,5 +47,7 @@ public sealed partial class ConfirmDeleteViewModel(ILibraryActionService actions
         }
         var result = await actions.DeleteAsync(ids, cancellationToken).ConfigureAwait(true);
         ResultMessage = $"Moved {result.Succeeded} to trash ({result.Failed} blocked)";
+        if (result.Succeeded > 0)
+            OnDeleted?.Invoke(result.Succeeded);
     }
 }

@@ -40,5 +40,6 @@
         </ItemsControl>
       </ScrollViewer>
     </c:Card>
+    <TextBlock DockPanel.Dock="Top" Text="No misplaced packages — tiering is balanced." Opacity="0.6" IsVisible="{Binding IsEmpty}" Margin="0,8,0,0" />
   </DockPanel>
 </UserControl>

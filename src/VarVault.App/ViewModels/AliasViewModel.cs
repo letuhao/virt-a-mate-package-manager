@@ -12,6 +12,9 @@ public sealed partial class AliasViewModel(IAliasService aliases) : ObservableOb
     [ObservableProperty] private string _scope = "Global — apply everywhere, always";
     [ObservableProperty] private string? _statusMessage;
 
+    /// <summary>Alias save-scope options (prototype dropdown). (GE-5)</summary>
+    public IReadOnlyList<string> ScopeOptions { get; } = ["Global — apply everywhere, always", "Only this preset"];
+
     [RelayCommand]
     public async Task SaveAsync(CancellationToken cancellationToken = default)
     {
