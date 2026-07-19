@@ -53,9 +53,11 @@ public static class AppHost
         shell.AddRepoHandler = launcher.OpenAddRepo;
         shell.RescueHandler = () => { launcher.OpenRescue(); return System.Threading.Tasks.Task.CompletedTask; };
 
-        // GD-1 · let the dashboard navigate the shell (attention rows / quick actions).
+        // GD-1/GD-2 · let the dashboard + library navigate the shell.
         if (screens["dashboard"] is DashboardViewModel dash)
             dash.NavigateTo = shell.Navigate;
+        if (screens["library"] is LibraryViewModel lib)
+            lib.NavigateTo = shell.Navigate;
 
         return shell;
     }

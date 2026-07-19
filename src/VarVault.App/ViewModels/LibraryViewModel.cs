@@ -26,6 +26,12 @@ public sealed partial class LibraryViewModel(
     ILibraryActionService? actions = null,
     Services.IDialogLauncher? launcher = null) : ObservableObject
 {
+    /// <summary>Navigate callback set by the shell so maintenance tools can jump screens. (GD-2)</summary>
+    public System.Action<string>? NavigateTo { get; set; }
+
+    /// <summary>Maintenance-tool / dependency-analysis navigation to another screen. (GD-2)</summary>
+    [RelayCommand] private void Go(string screenId) => NavigateTo?.Invoke(screenId);
+
     /// <summary>"Detail" / "Open full detail →" → var-detail dialog for the row. (GD-4/GD-6)</summary>
     [RelayCommand]
     private void OpenDetail(PackageListEntry entry)
@@ -196,6 +202,41 @@ public sealed partial class LibraryViewModel(
         FavoritesOnly = false;
         MissingDepsOnly = false;
         await RefreshAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    /// <summary>Rail saved-view: only rows with missing dependencies. (GD-2)</summary>
+    [RelayCommand]
+    public async Task ShowMissingDepsAsync(CancellationToken cancellationToken = default)
+    {
+        FavoritesOnly = false;
+        MissingDepsOnly = true;
+        await RefreshAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    /// <summary>Facet-bar "Reset": clear all filters + search back to All packages. (GD-3)</summary>
+    [RelayCommand]
+    public async Task ResetFiltersAsync(CancellationToken cancellationToken = default)
+    {
+        CreatorFilter = null;
+        PackageNameFilter = null;
+        SearchText = null;
+        FavoritesOnly = false;
+        MissingDepsOnly = false;
+        await RefreshAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    /// <summary>Sort options for the facet-bar dropdown (prototype: Recently used / Size↓ / Hot→Cold / Most depended-on). (GD-3)</summary>
+    public IReadOnlyList<string> SortOptions { get; } = ["Name", "Creator", "Size", "Class"];
+
+    /// <summary>Two-way selected sort label → drives <see cref="Sort"/>. (GD-3)</summary>
+    public string SelectedSortLabel
+    {
+        get => Sort.ToString();
+        set
+        {
+            if (Enum.TryParse<LibrarySort>(value, out var s) && s != Sort)
+                _ = SortByAsync(s);
+        }
     }
 
     /// <summary>
