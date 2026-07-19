@@ -86,7 +86,10 @@ Build once, reused everywhere. Read the CSS token block `prototype.html:1–195`
 - [x] **SC-11 · RailNavItem.** *Read:* `:202–220`. Icon + label + optional badge + active state. *Done:*
   `Controls/RailNavItem.cs` (icon Content, Label, Badge+BadgeKind, IsActive) + ControlTheme. T:
   `RailNavItemTests` (`Active_toggles_class`, `Badge_count_renders_when_present`, `No_badge_hides_the_badge`).
-- [ ] **SC-12 · JobRow.** *Read:* `:235–237`. Title + cancel × + progress bar + sub-line. *Test:* binds `JobHandle` progress; cancel invokes `JobContext.Cancellation`.
+- [x] **SC-12 · JobRow.** *Read:* `:235–237`. Title + cancel × + progress bar + sub-line. *Done:*
+  `Controls/JobRow.cs` (binds `JobHandle`; `Refresh` re-reads the non-observable handle; MeterBar fraction).
+  T: `JobRowTests` (`Binds_handle_title_progress_and_subline`, `Cancel_button_cancels_the_job_token`,
+  `Refresh_repicks_updated_progress`).
 
 ---
 

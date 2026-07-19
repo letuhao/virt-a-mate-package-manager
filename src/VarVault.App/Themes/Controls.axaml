@@ -26,6 +26,24 @@
     </Setter>
   </ControlTheme>
 
+  <!-- SC-12 · JobRow -->
+  <ControlTheme x:Key="{x:Type c:JobRow}" TargetType="c:JobRow">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <StackPanel Spacing="4" Margin="0,4">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Grid.Column="0" Text="{TemplateBinding Title}" Foreground="{DynamicResource TextHiBrush}"
+                       TextTrimming="CharacterEllipsis" />
+            <Button Grid.Column="1" Name="PART_Cancel" Content="✕" Background="Transparent" BorderThickness="0"
+                    Padding="4,0" Foreground="{DynamicResource TextLoBrush}" />
+          </Grid>
+          <c:MeterBar Value="{TemplateBinding Fraction}" Fill="{DynamicResource AccentBrush}" />
+          <TextBlock Text="{TemplateBinding SubLine}" Foreground="{DynamicResource TextLoBrush}" FontSize="11" />
+        </StackPanel>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
   <!-- SC-11 · RailNavItem -->
   <ControlTheme x:Key="{x:Type c:RailNavItem}" TargetType="c:RailNavItem">
     <Setter Property="Template">
