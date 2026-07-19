@@ -1,0 +1,29 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:c="clr-namespace:VarVault.App.Controls">
+
+  <!-- Shared control themes for the reusable GUI components (SC-2 … SC-12). -->
+
+  <!-- SC-2 · Card -->
+  <ControlTheme x:Key="{x:Type c:Card}" TargetType="c:Card">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{DynamicResource Bg1Brush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1"
+                CornerRadius="{DynamicResource RadiusMd}"
+                Padding="14">
+          <StackPanel Spacing="2">
+            <TextBlock Text="{TemplateBinding Header}"
+                       Foreground="{DynamicResource TextHiBrush}"
+                       FontWeight="SemiBold" FontSize="14"
+                       IsVisible="{Binding Header, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <ContentPresenter Content="{TemplateBinding Content}"
+                              ContentTemplate="{TemplateBinding ContentTemplate}" />
+          </StackPanel>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
+</ResourceDictionary>

@@ -44,7 +44,9 @@ Build once, reused everywhere. Read the CSS token block `prototype.html:1–195`
   `ThemeDictionaries` (23 colours + brushes + non-colour tokens) · T: `ThemeTokensTests`
   (`Every_colour_token_resolves_in_light_and_dark`, `Every_brush_token_resolves`,
   `Light_and_dark_variants_actually_differ`, `Non_colour_tokens_resolve`).
-- [ ] **SC-2 · Card.** *Read:* any `.card` (e.g. `:244`). Padded container + `<h3>` title slot. *Test:* renders title + content.
+- [x] **SC-2 · Card.** *Read:* any `.card` (e.g. `:244`). Padded container + `<h3>` title slot. *Done:*
+  `Controls/Card.cs` + `Themes/Controls.axaml` ControlTheme (bg-1/border/radius/14px, optional header). T:
+  `CardControlTests` (`Card_renders_header_and_content`, `Card_without_header_hides_the_title`).
 - [ ] **SC-3 · DataTable.** *Read:* `:335–343` (thead) + JS `:673–693` (row template).
   *Items:* checkbox column, sortable header (asc/desc caret, single active col), virtualized rows,
   numeric/right-align cells, per-row action slot. *Rule:* **must virtualize** (70k rows); sort toggles like
