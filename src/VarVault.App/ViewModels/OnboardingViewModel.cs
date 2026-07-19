@@ -18,13 +18,24 @@ public sealed partial class OnboardingViewModel(IOnboardingService? onboarding =
     [ObservableProperty] private string? _folderPath;
     [ObservableProperty] private string? _resultMessage;
 
+    /// <summary>Folders that have been added + benchmarked/indexed (the benchmarked-folder table). (AC-29)</summary>
+    public System.Collections.ObjectModel.ObservableCollection<string> BenchmarkedFolders { get; } = [];
+
     [RelayCommand]
     public async Task AddAndIndexAsync(CancellationToken cancellationToken = default)
     {
         if (onboarding is null || string.IsNullOrWhiteSpace(FolderPath))
             return;
         var result = await onboarding.AddAndIndexAsync("repository", FolderPath!, cancellationToken: cancellationToken).ConfigureAwait(true);
-        ResultMessage = result.IsSuccess ? $"Indexed {result.Value.Index.Indexed} vars" : result.Error.Message;
+        if (result.IsSuccess)
+        {
+            ResultMessage = $"Indexed {result.Value.Index.Indexed} vars";
+            BenchmarkedFolders.Add($"{FolderPath} — indexed {result.Value.Index.Indexed} vars");
+        }
+        else
+        {
+            ResultMessage = result.Error.Message;
+        }
         Step = OnboardingStep.Done;
     }
 

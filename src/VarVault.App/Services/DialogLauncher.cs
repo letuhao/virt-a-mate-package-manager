@@ -18,7 +18,7 @@ public interface IDialogLauncher
     void OpenMigratePlan();
     void OpenVarDetail(long packageId);
     void OpenAlias(string missingRef);
-    void OpenConfirmDelete(IReadOnlyList<ConfirmItem> items);
+    void OpenConfirmDelete(IReadOnlyList<ConfirmItem> items, int reverseDepCount = 0);
     void OpenFix(long varFileId, string? codepage);
     void OpenDupeReview(VarVault.Sdk.Library.DuplicateGroup group);
     void OpenPresetEdit(long presetId, string name);
@@ -33,14 +33,27 @@ public sealed class DialogLauncher(
     public void OpenAddRepo() =>
         dialogs.Show(new AddRepoViewModel(services.GetRequiredService<Sdk.Repositories.IRepositoryService>(), afterRepoAdded));
 
-    public void OpenRescue() =>
-        dialogs.Show(new RescueViewModel(services.GetRequiredService<Sdk.Activation.IActivationService>()));
+    public void OpenRescue()
+    {
+        var vm = new RescueViewModel(
+            services.GetRequiredService<Sdk.Activation.IActivationService>(),
+            services.GetService<Sdk.Presets.IPresetService>());
+        _ = vm.LoadAsync();
+        dialogs.Show(vm);
+    }
 
     public void OpenOnboarding() =>
         dialogs.Show(new OnboardingViewModel(services.GetService<Sdk.Library.IOnboardingService>()));
 
-    public void OpenMigratePlan() =>
-        dialogs.Show(new MigrateViewModel(services.GetRequiredService<Sdk.Library.ITieringService>()));
+    public void OpenMigratePlan()
+    {
+        var vm = new MigrateViewModel(
+            services.GetRequiredService<Sdk.Library.ITieringService>(),
+            services.GetService<Sdk.Library.IMigrationService>(),
+            services.GetService<Sdk.Repositories.IRepositoryService>());
+        _ = vm.LoadPlanAsync();
+        dialogs.Show(vm);
+    }
 
     public void OpenVarDetail(long packageId)
     {
@@ -51,16 +64,19 @@ public sealed class DialogLauncher(
 
     public void OpenAlias(string missingRef)
     {
-        var vm = new AliasViewModel(services.GetRequiredService<Sdk.Library.IAliasService>());
+        var vm = new AliasViewModel(
+            services.GetRequiredService<Sdk.Library.IAliasService>(),
+            services.GetService<Sdk.Library.ILibraryQueryService>());
         vm.MissingRef = missingRef;
         dialogs.Show(vm);
     }
 
-    public void OpenConfirmDelete(IReadOnlyList<ConfirmItem> items)
+    public void OpenConfirmDelete(IReadOnlyList<ConfirmItem> items, int reverseDepCount = 0)
     {
         var vm = new ConfirmDeleteViewModel(services.GetRequiredService<Sdk.Library.ILibraryActionService>())
         {
             OnDeleted = count => toast?.Invoke($"Moved {count} items to trash", null),
+            ReverseDepCount = reverseDepCount,
         };
         vm.SetItems(items);
         dialogs.Show(vm);
@@ -90,6 +106,7 @@ public sealed class DialogLauncher(
             PresetId = presetId,
             Name = name,
         };
+        _ = vm.LoadMembersAsync();
         _ = vm.RefreshPreviewAsync();
         dialogs.Show(vm);
     }

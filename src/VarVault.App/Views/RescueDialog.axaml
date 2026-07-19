@@ -1,11 +1,18 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             xmlns:p="clr-namespace:VarVault.Sdk.Presets;assembly=VarVault.Sdk"
              x:Class="VarVault.App.Views.RescueDialog"
              x:DataType="vm:RescueViewModel">
   <StackPanel Spacing="10" MinWidth="420">
     <TextBlock Text="⛑ Rescue — get the game to launch" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
     <TextBlock Text="Too many active vars can stop VaM loading. This deactivates everything and gives you a clean baseline." Opacity="0.8" TextWrapping="Wrap" />
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <TextBlock Text="Baseline preset" VerticalAlignment="Center" Opacity="0.8" />
+      <ComboBox Width="220" ItemsSource="{Binding BaselineOptions}" SelectedItem="{Binding SelectedBaseline}">
+        <ComboBox.ItemTemplate><DataTemplate x:DataType="p:PresetInfo"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
+      </ComboBox>
+    </StackPanel>
     <StackPanel Orientation="Horizontal" Spacing="8">
       <Button Content="Apply rescue baseline" Command="{Binding ApplyCommand}" Background="{DynamicResource AccentBrush}" Foreground="White" />
       <TextBlock Text="{Binding ResultMessage}" Opacity="0.8" VerticalAlignment="Center" Foreground="{DynamicResource GoodBrush}" />

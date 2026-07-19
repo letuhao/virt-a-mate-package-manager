@@ -7,7 +7,7 @@
   <StackPanel Margin="18" Spacing="12" MaxWidth="640" HorizontalAlignment="Left">
     <TextBlock Text="Settings" FontSize="21" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
     <c:Tabs ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" />
-    <c:Card Header="General">
+    <c:Card Header="General" IsVisible="{Binding IsGeneralTab}">
       <Grid ColumnDefinitions="200,*" RowDefinitions="Auto,Auto,Auto,Auto">
         <TextBlock Grid.Row="0" Grid.Column="0" Text="VaM install path" VerticalAlignment="Center" Opacity="0.8" Margin="0,0,14,10" />
         <TextBox Grid.Row="0" Grid.Column="1" Name="PART_VamPath" Text="{Binding VamPath}" Margin="0,0,0,10" />
@@ -21,6 +21,27 @@
                   ItemsSource="{Binding FixOnImportOptions}" SelectedItem="{Binding FixOnImport}" />
       </Grid>
     </c:Card>
+
+    <c:Card Header="Tiers &amp; policy" IsVisible="{Binding IsTiersTab}">
+      <Grid ColumnDefinitions="200,*">
+        <TextBlock Grid.Column="0" Text="Hot threshold (days)" VerticalAlignment="Center" Opacity="0.8" />
+        <TextBox Grid.Column="1" Text="{Binding HotThresholdDays}" />
+      </Grid>
+    </c:Card>
+    <c:Card Header="Automation" IsVisible="{Binding IsAutomationTab}">
+      <CheckBox Content="Auto-rebalance tiers on idle" IsChecked="{Binding AutoRebalance}" />
+    </c:Card>
+    <c:Card Header="Import" IsVisible="{Binding IsImportTab}">
+      <Grid ColumnDefinitions="200,*">
+        <TextBlock Grid.Column="0" Text="Preset extraction folder" VerticalAlignment="Center" Opacity="0.8" />
+        <TextBox Grid.Column="1" Text="{Binding PresetExtractionDir}" Watermark="default subfolder…" />
+      </Grid>
+    </c:Card>
+    <c:Card Header="Advanced" IsVisible="{Binding IsAdvancedTab}">
+      <TextBlock Text="Catalog is WAL-journaled and auto-backed-up. Rebuild the index from the library rail."
+                 Opacity="0.7" TextWrapping="Wrap" />
+    </c:Card>
+
     <StackPanel Orientation="Horizontal" Spacing="10">
       <Button Content="Save" Command="{Binding SaveCommand}" Background="{DynamicResource AccentBrush}" Foreground="White" />
       <TextBlock Text="{Binding StatusMessage}" Opacity="0.7" VerticalAlignment="Center" />

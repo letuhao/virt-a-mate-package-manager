@@ -27,6 +27,11 @@ public sealed partial class HealthViewModel(
 
     public ObservableCollection<EncodingGroup> EncodingGroups { get; } = [];
 
+    // Summary-card counts by codepage family (AC-16).
+    public int GbkCount => EncodingGroups.Where(g => g.Codepage.Contains("GB", StringComparison.OrdinalIgnoreCase)).Sum(g => g.Count);
+    public int ShiftJisCount => EncodingGroups.Where(g => g.Codepage.Contains("Shift", StringComparison.OrdinalIgnoreCase) || g.Codepage.Contains("932", StringComparison.Ordinal)).Sum(g => g.Count);
+    public int OtherEncodingCount => EncodingGroups.Sum(g => g.Count) - GbkCount - ShiftJisCount;
+
     /// <summary>Explicit empty-state flag for the encoding groups. (GF-2)</summary>
     public bool IsEmpty => EncodingGroups.Count == 0;
     public ObservableCollection<IntegrityIssue> Integrity { get; } = [];
@@ -40,6 +45,9 @@ public sealed partial class HealthViewModel(
         foreach (var g in await health.EncodingGroupsAsync(cancellationToken).ConfigureAwait(true))
             EncodingGroups.Add(g);
         OnPropertyChanged(nameof(IsEmpty));
+        OnPropertyChanged(nameof(GbkCount));
+        OnPropertyChanged(nameof(ShiftJisCount));
+        OnPropertyChanged(nameof(OtherEncodingCount));
         Integrity.Clear();
         foreach (var i in await health.IntegrityAsync(cancellationToken).ConfigureAwait(true))
             Integrity.Add(i);

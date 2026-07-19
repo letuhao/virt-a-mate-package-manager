@@ -6,17 +6,21 @@
              x:Class="VarVault.App.Views.MissingView"
              x:DataType="vm:MissingDepsViewModel">
   <DockPanel Margin="18">
-    <TextBlock DockPanel.Dock="Top" Text="Missing dependencies" FontSize="21" FontWeight="SemiBold"
-               Foreground="{DynamicResource TextHiBrush}" Margin="0,0,0,12" />
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+      <TextBlock Grid.Column="0" Text="Missing dependencies" FontSize="21" FontWeight="SemiBold"
+                 Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center" />
+      <Button Grid.Column="1" Content="Export links txt" Command="{Binding ExportLinksCommand}" />
+    </Grid>
     <c:Card Header="Referenced packages not in your library">
       <ScrollViewer>
         <ItemsControl ItemsSource="{Binding Items}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="lib:MissingDependency">
-              <Grid ColumnDefinitions="*,Auto,Auto" Height="26">
+              <Grid ColumnDefinitions="*,Auto,70,Auto" Height="26">
                 <TextBlock Grid.Column="0" Text="{Binding Ref}" VerticalAlignment="Center" FontFamily="{DynamicResource MonoFont}" />
                 <TextBlock Grid.Column="1" Text="{Binding NeededByCount, StringFormat='{}{0} pkgs'}" VerticalAlignment="Center" Opacity="0.7" Margin="0,0,12,0" />
-                <Button Grid.Column="2" Content="Resolve…"
+                <c:Tag Grid.Column="2" Content="global" VerticalAlignment="Center" />
+                <Button Grid.Column="3" Content="Resolve…"
                         Command="{Binding ((vm:MissingDepsViewModel)DataContext).ResolveCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                         CommandParameter="{Binding}" />
               </Grid>

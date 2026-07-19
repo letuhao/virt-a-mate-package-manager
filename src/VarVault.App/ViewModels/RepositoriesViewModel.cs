@@ -16,6 +16,11 @@ public sealed class RepositoryCardViewModel(RepositoryInfo info)
     public string MountPath => Info.MountPath;
     public bool IsOnline => Info.IsOnline;
 
+    // Tier-override arguments for the "Tier ▾" menu (BE-G2 SetTier). (AC-19)
+    public string TierArg1 => $"{Id}|1";
+    public string TierArg2 => $"{Id}|2";
+    public string TierArg3 => $"{Id}|3";
+
     /// <summary>Used fraction 0..1 for the meter bar (0 when capacity unknown).</summary>
     public double UsedFraction => Info is { CapacityBytes: > 0 } and { FreeBytes: not null }
         ? Math.Clamp((Info.CapacityBytes.Value - Info.FreeBytes!.Value) / (double)Info.CapacityBytes.Value, 0, 1)
@@ -43,6 +48,9 @@ public sealed partial class RepositoriesViewModel(
 
     /// <summary>Screen-head "Review rebalance plan" / per-card "Rebalance…" → migrate dialog. (GD-7)</summary>
     [RelayCommand] private void Rebalance() => launcher?.OpenMigratePlan();
+
+    /// <summary>Per-card "Edit" → repository settings dialog (reuses add-repo for path/tier edits). (GD-7/AC-19)</summary>
+    [RelayCommand] private void Edit() => launcher?.OpenAddRepo();
 
     /// <summary>Per-card manual tier override (BE-G2). (GD-7)</summary>
     [RelayCommand]

@@ -48,6 +48,22 @@
           </StackPanel>
         </c:Card>
 
+        <c:Card Header="Usage over time" Width="320" Margin="0,0,14,14">
+          <StackPanel Spacing="6">
+            <TextBlock Text="Space profile across content types." Opacity="0.7" FontSize="12" />
+            <Border Height="40" Background="{DynamicResource Bg2Brush}" CornerRadius="4" Padding="4">
+              <ItemsControl ItemsSource="{Binding SparkBars}" VerticalAlignment="Bottom">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Bottom" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <Border Width="6" Height="{Binding}" Background="{DynamicResource AccentBrush}" CornerRadius="1" VerticalAlignment="Bottom" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </Border>
+          </StackPanel>
+        </c:Card>
+
         <c:Card Header="Space by tier" Width="320" Margin="0,0,14,14">
           <ItemsControl ItemsSource="{Binding ByTier}">
             <ItemsControl.ItemTemplate>

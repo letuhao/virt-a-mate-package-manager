@@ -13,6 +13,8 @@
     <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
       <Button Content="Back up now" Command="{Binding BackupNowCommand}" />
+      <Button Content="Restore selected" Command="{Binding RestoreSelectedCommand}" />
+      <Button Content="Purge selected" Foreground="{DynamicResource CritBrush}" Command="{Binding PurgeSelectedCommand}" />
       <TextBlock Text="{Binding TrashSummary}" Opacity="0.7" VerticalAlignment="Center" />
       <TextBlock Text="{Binding StatusMessage}" Opacity="0.7" VerticalAlignment="Center" />
     </StackPanel>
@@ -23,15 +25,18 @@
         <ItemsControl ItemsSource="{Binding Items}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="lib:TrashItemDto">
-              <Grid ColumnDefinitions="*,*,Auto,Auto,Auto,Auto" Height="26">
-                <TextBlock Grid.Column="0" Text="{Binding OriginalPath}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                <TextBlock Grid.Column="1" Text="{Binding Reason}" VerticalAlignment="Center" Opacity="0.7" />
-                <TextBlock Grid.Column="2" Text="{Binding Bytes}" VerticalAlignment="Center" Opacity="0.7" Margin="0,0,8,0" />
-                <TextBlock Grid.Column="3" Text="{Binding TrashedAtUtc}" VerticalAlignment="Center" Opacity="0.5" FontSize="11" Margin="0,0,8,0" />
-                <Button Grid.Column="4" Content="Restore"
+              <Grid ColumnDefinitions="28,*,*,Auto,Auto,Auto,Auto" Height="26">
+                <CheckBox Grid.Column="0" VerticalAlignment="Center" MinWidth="0"
+                          Command="{Binding ((vm:TrashViewModel)DataContext).ToggleSelectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                          CommandParameter="{Binding}" />
+                <TextBlock Grid.Column="1" Text="{Binding OriginalPath}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="2" Text="{Binding Reason}" VerticalAlignment="Center" Opacity="0.7" />
+                <TextBlock Grid.Column="3" Text="{Binding Bytes}" VerticalAlignment="Center" Opacity="0.7" Margin="0,0,8,0" />
+                <TextBlock Grid.Column="4" Text="{Binding TrashedAtUtc}" VerticalAlignment="Center" Opacity="0.5" FontSize="11" Margin="0,0,8,0" />
+                <Button Grid.Column="5" Content="Restore"
                         Command="{Binding ((vm:TrashViewModel)DataContext).RestoreCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                         CommandParameter="{Binding}" />
-                <Button Grid.Column="5" Content="Purge" Margin="6,0,0,0" Foreground="{DynamicResource CritBrush}"
+                <Button Grid.Column="6" Content="Purge" Margin="6,0,0,0" Foreground="{DynamicResource CritBrush}"
                         Command="{Binding ((vm:TrashViewModel)DataContext).PurgeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                         CommandParameter="{Binding}" />
               </Grid>

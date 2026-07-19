@@ -27,7 +27,7 @@ public sealed class EfLibraryQueryService(VarVaultDbContext db) : ILibraryQueryS
             .Select(x => new PackageListEntry(
                 x.PackageId, x.VarName, x.Creator, x.PackageName, x.VersionToken,
                 x.PrimaryType.ToString(), x.TotalSize, x.OnlineInstanceCount, x.TotalInstanceCount,
-                x.IsSingleCopy, x.IsFavorite, x.Class.ToString(), x.HasMissingDeps, x.LastUsedAt))
+                x.IsSingleCopy, x.IsFavorite, x.Class.ToString(), x.HasMissingDeps, x.LastUsedAt, x.ActualTierMin))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
 
         return new LibraryPage(rows, total);
@@ -89,6 +89,13 @@ public sealed class EfLibraryQueryService(VarVaultDbContext db) : ILibraryQueryS
     public async Task<IReadOnlyList<string>> GetCreatorsAsync(CancellationToken cancellationToken = default) =>
         await db.PackageListItems.AsNoTracking()
             .Select(x => x.Creator).Distinct().OrderBy(c => c)
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<CreatorCount>> GetCreatorCountsAsync(CancellationToken cancellationToken = default) =>
+        await db.PackageListItems.AsNoTracking()
+            .GroupBy(x => x.Creator)
+            .OrderBy(g => g.Key)
+            .Select(g => new CreatorCount(g.Key, g.Count()))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
 
     // FTS5 trigram MATCH → matching package ids (rowid = PackageId). Handles CJK. (1.40)

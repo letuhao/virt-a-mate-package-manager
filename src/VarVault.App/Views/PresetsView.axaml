@@ -9,8 +9,11 @@
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
       <TextBlock Grid.Column="0" Text="Loading presets" FontSize="21" FontWeight="SemiBold"
                  Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center" />
-      <Button Grid.Column="1" Content="+ New preset" Command="{Binding NewPresetCommand}"
-              Background="{DynamicResource AccentBrush}" Foreground="White" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+        <Button Content="Import from txt…" Command="{Binding ImportTxtCommand}" />
+        <Button Content="+ New preset" Command="{Binding NewPresetCommand}"
+                Background="{DynamicResource AccentBrush}" Foreground="White" />
+      </StackPanel>
     </Grid>
     <Grid ColumnDefinitions="260,*">
       <ListBox Grid.Column="0" ItemsSource="{Binding Presets}" SelectedItem="{Binding Selected}">
@@ -30,6 +33,8 @@
           <StackPanel Orientation="Horizontal" Spacing="10">
             <TextBlock Text="{Binding Selected.Name}" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center" />
             <Button Content="Edit" Command="{Binding EditCommand}" />
+            <Button Content="Diff" Command="{Binding DiffCommand}" />
+            <Button Content="Export" Command="{Binding ExportCommand}" />
           </StackPanel>
           <TextBlock Opacity="0.8" IsVisible="{Binding Preview, Converter={x:Static ObjectConverters.IsNotNull}}"
                      Text="{Binding Preview.TotalWithClosure, StringFormat='{}{0} packages with closure'}" />

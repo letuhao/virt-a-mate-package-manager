@@ -24,10 +24,23 @@ public sealed partial class LibraryViewModel(
     ISettingsService? settings = null,
     Func<TimeSpan, CancellationToken, Task>? delay = null,
     ILibraryActionService? actions = null,
-    Services.IDialogLauncher? launcher = null) : ObservableObject
+    Services.IDialogLauncher? launcher = null,
+    IPackageDetailQuery? detail = null,
+    Sdk.Presets.IPresetService? presets = null,
+    ITagService? tags = null,
+    Domain.Indexing.IThumbnailStore? thumbnails = null) : ObservableObject
 {
+    // Off-thread, cached loader for the extracted preview thumbnails the indexer stores (gallery). (1.35)
+    private readonly Services.ThumbnailLoader<Avalonia.Media.Imaging.Bitmap>? _thumbLoader =
+        thumbnails is null ? null : Services.ThumbnailLoader.ForBitmap(thumbnails);
+
+    /// <summary>Gallery cards (row + extracted preview thumbnail) for the gallery view. (Gallery)</summary>
+    public ObservableCollection<GalleryCardViewModel> GalleryItems { get; } = [];
     /// <summary>Navigate callback set by the shell so maintenance tools can jump screens. (GD-2)</summary>
     public System.Action<string>? NavigateTo { get; set; }
+
+    /// <summary>Raise a shell toast (with optional undo) after a real ops-bar action completes. (GF-1/AC-1/AC-3)</summary>
+    public System.Action<string, System.Action?>? ShowToast { get; set; }
 
     /// <summary>Maintenance-tool / dependency-analysis navigation to another screen. (GD-2)</summary>
     [RelayCommand] private void Go(string screenId) => NavigateTo?.Invoke(screenId);
@@ -40,7 +53,7 @@ public sealed partial class LibraryViewModel(
             launcher?.OpenVarDetail(entry.PackageId);
     }
 
-    /// <summary>Ops-bar "Add to preset…" is a no-op stub → real add-to-preset needs a preset picker; wired via detail.</summary>
+    /// <summary>Ops-bar "Install from txt": resolve a txt package list against the owned library. (BE-G1/AC-9)</summary>
     [RelayCommand]
     private async Task InstallFromTxtAsync(string txt, CancellationToken cancellationToken = default)
     {
@@ -48,6 +61,139 @@ public sealed partial class LibraryViewModel(
             return;
         var res = await actions.ResolveTxtAsync(txt, cancellationToken).ConfigureAwait(true);
         LastActionMessage = $"Matched {res.MatchedPackageIds.Count}, {res.Unmatched.Count} not owned";
+    }
+
+    /// <summary>Presets available as add-to-preset targets (drives the ops-bar "Add to preset…" flyout). (AC-2)</summary>
+    public ObservableCollection<Sdk.Presets.PresetInfo> Presets { get; } = [];
+
+    private async Task LoadPresetsAsync(CancellationToken cancellationToken)
+    {
+        if (presets is null)
+            return;
+        var list = await presets.ListAsync(cancellationToken).ConfigureAwait(true);
+        Presets.Clear();
+        foreach (var p in list)
+            Presets.Add(p);
+    }
+
+    /// <summary>Resolve the selected packages to their physical var-file ids (all copies) via the detail query.</summary>
+    private async Task<List<ConfirmItem>> SelectedConfirmItemsAsync(CancellationToken cancellationToken)
+    {
+        var items = new List<ConfirmItem>();
+        if (detail is null)
+            return items;
+        foreach (var pkg in SelectedItems.ToList())
+        {
+            var d = await detail.GetAsync(pkg.PackageId, cancellationToken).ConfigureAwait(true);
+            if (d is null)
+                continue;
+            foreach (var copy in d.Copies)
+                items.Add(new ConfirmItem(copy.VarFileId, pkg.VarName, pkg.IsSingleCopy));
+        }
+        return items;
+    }
+
+    /// <summary>Ops-bar "Delete": open the predicate-gated confirm dialog for the selection. (AC-1/AC-4)</summary>
+    [RelayCommand]
+    public async Task DeleteSelectedAsync(CancellationToken cancellationToken = default)
+    {
+        if (launcher is null || SelectedItems.Count == 0)
+        {
+            LastActionMessage = "Nothing selected";
+            return;
+        }
+        var items = await SelectedConfirmItemsAsync(cancellationToken).ConfigureAwait(true);
+        var reverseDeps = 0;
+        if (detail is not null)
+            foreach (var pkg in SelectedItems.ToList())
+                reverseDeps += (await detail.GetAsync(pkg.PackageId, cancellationToken).ConfigureAwait(true))?.DependedOnByCount ?? 0;
+        launcher.OpenConfirmDelete(items, reverseDeps);
+    }
+
+    /// <summary>Ops-bar "Fix encoding": fix mojibake on the selected packages' var files. (AC-3)</summary>
+    [RelayCommand]
+    public async Task FixEncodingSelectedAsync(CancellationToken cancellationToken = default)
+    {
+        if (actions is null || SelectedItems.Count == 0)
+        {
+            LastActionMessage = "Nothing selected";
+            return;
+        }
+        var ids = (await SelectedConfirmItemsAsync(cancellationToken).ConfigureAwait(true)).Select(i => i.VarFileId).ToList();
+        if (ids.Count == 0)
+            return;
+        var result = await actions.FixEncodingAsync(ids, cancellationToken).ConfigureAwait(true);
+        LastActionMessage = $"Fixed {result.Succeeded} ({result.Failed} skipped)";
+        ShowToast?.Invoke($"Fixed encoding on {result.Succeeded} files", null);
+    }
+
+    /// <summary>Sub-folder name typed into the ops-bar "Move to subfolder…" input. (AC-9)</summary>
+    [ObservableProperty] private string? _subfolderName;
+
+    /// <summary>Txt package-list pasted into the ops-bar "Install from txt" input. (AC-9)</summary>
+    [ObservableProperty] private string? _installTxtInput;
+
+    /// <summary>Ops-bar "Move to subfolder…": relocate the selection's var files within their repo. (AC-9/BE-G1)</summary>
+    [RelayCommand]
+    public async Task MoveToSubfolderAsync(CancellationToken cancellationToken = default)
+    {
+        if (actions is null || SelectedItems.Count == 0 || string.IsNullOrWhiteSpace(SubfolderName))
+        {
+            LastActionMessage = "Select rows and enter a sub-folder";
+            return;
+        }
+        var ids = (await SelectedConfirmItemsAsync(cancellationToken).ConfigureAwait(true)).Select(i => i.VarFileId).ToList();
+        var result = await actions.MoveToSubfolderAsync(ids, SubfolderName!.Trim(), cancellationToken).ConfigureAwait(true);
+        LastActionMessage = $"Moved {result.Succeeded} ({result.Failed} failed)";
+        ShowToast?.Invoke($"Moved {result.Succeeded} files to {SubfolderName}", null);
+    }
+
+    /// <summary>Ops-bar "select all N matching": select every currently-loaded row. (AC-9)</summary>
+    [RelayCommand]
+    public void SelectAllMatching() => SelectVisible();
+
+    /// <summary>Row checkbox: toggle a single row's membership in the ops selection. (AC-11)</summary>
+    [RelayCommand]
+    public void ToggleSelection(PackageListEntry entry)
+    {
+        if (entry is null)
+            return;
+        if (SelectedItems.Contains(entry))
+            SelectedItems.Remove(entry);
+        else
+            SelectedItems.Add(entry);
+    }
+
+    /// <summary>Whether a row is in the ops selection (drives the row checkbox state). (AC-11)</summary>
+    public bool IsSelected(PackageListEntry entry) => SelectedItems.Contains(entry);
+
+    /// <summary>Per-row "Fix Var" (rebuild): fix encoding on that package's var files. (AC-11)</summary>
+    [RelayCommand]
+    public async Task FixRowAsync(PackageListEntry entry, CancellationToken cancellationToken = default)
+    {
+        if (actions is null || entry is null || detail is null)
+            return;
+        var d = await detail.GetAsync(entry.PackageId, cancellationToken).ConfigureAwait(true);
+        if (d is null)
+            return;
+        var result = await actions.FixEncodingAsync(d.Copies.Select(c => c.VarFileId).ToList(), cancellationToken).ConfigureAwait(true);
+        LastActionMessage = $"Fixed {result.Succeeded} ({result.Failed} skipped)";
+        ShowToast?.Invoke($"Fixed {entry.VarName}", null);
+    }
+
+    /// <summary>Ops-bar "Add to preset…": add the selected packages to the chosen preset. (AC-2)</summary>
+    [RelayCommand]
+    public async Task AddToPresetAsync(long presetId, CancellationToken cancellationToken = default)
+    {
+        if (actions is null || SelectedItems.Count == 0)
+        {
+            LastActionMessage = "Nothing selected";
+            return;
+        }
+        var ids = SelectedItems.Select(s => s.PackageId).ToList();
+        var result = await actions.AddToPresetAsync(presetId, ids, cancellationToken).ConfigureAwait(true);
+        LastActionMessage = $"Added {result.Succeeded} to preset";
+        ShowToast?.Invoke($"Added {result.Succeeded} packages to preset", null);
     }
     private const int PageSize = 100;
 
@@ -62,7 +208,15 @@ public sealed partial class LibraryViewModel(
 
     public ObservableCollection<PackageListEntry> Items { get; } = [];
     public ObservableCollection<string> Creators { get; } = [];
+    /// <summary>Creators with owned-package counts for the searchable creator combo. (AC-10)</summary>
+    public ObservableCollection<Controls.ComboOption> CreatorOptions { get; } = [];
     public ObservableCollection<PackageListEntry> SelectedItems { get; } = [];
+
+    /// <summary>Facet "Installed" filter — active profile members only (prototype checkbox). (AC-10)</summary>
+    [ObservableProperty] private bool _installedOnly;
+
+    /// <summary>"rows 1–N of Total" position label for the facet bar. (AC-10)</summary>
+    public string PositionLabel => TotalCount == 0 ? "no rows" : $"rows 1–{Items.Count} of {TotalCount}";
 
     [ObservableProperty] private string? _creatorFilter;
     [ObservableProperty] private string? _packageNameFilter;
@@ -75,6 +229,29 @@ public sealed partial class LibraryViewModel(
     [ObservableProperty] private int _totalCount;
     [ObservableProperty] private LibraryState _state = LibraryState.Loading;
     [ObservableProperty] private PackageListEntry? _selectedEntry;
+
+    /// <summary>Full detail (copies + dependency closure) for the selected row, for the detail panel. (AC-13)</summary>
+    [ObservableProperty] private PackageDetail? _selectedDetail;
+
+    partial void OnSelectedEntryChanged(PackageListEntry? value) => _ = LoadSelectedDetailAsync(value);
+
+    private async Task LoadSelectedDetailAsync(PackageListEntry? entry)
+    {
+        if (detail is null || entry is null)
+        {
+            SelectedDetail = null;
+            return;
+        }
+        SelectedDetail = await detail.GetAsync(entry.PackageId).ConfigureAwait(true);
+    }
+
+    /// <summary>Detail-panel "resolve via alias →": open the alias dialog for the selected package. (AC-13)</summary>
+    [RelayCommand]
+    public void ResolveAlias()
+    {
+        if (SelectedEntry is not null)
+            launcher?.OpenAlias(SelectedEntry.VarName);
+    }
 
     /// <summary>
     /// True while a keystroke is pending settle: the displayed <see cref="TotalCount"/> is the last exact
@@ -92,6 +269,20 @@ public sealed partial class LibraryViewModel(
     public bool IsTableView => ViewMode == LibraryViewMode.Table;
     public bool IsGalleryView => ViewMode == LibraryViewMode.Gallery;
 
+    // Sortable column headers with a caret on the active sort column. (AC-11)
+    private string Caret(LibrarySort col) => Sort == col ? (Descending ? " ▼" : " ▲") : string.Empty;
+    public string NameHeader => "Name" + Caret(LibrarySort.Name);
+    public string CreatorHeader => "Creator" + Caret(LibrarySort.Creator);
+    public string SizeHeader => "Size" + Caret(LibrarySort.Size);
+    public string ClassHeader => "Class" + Caret(LibrarySort.Class);
+    private void NotifySortHeaders()
+    {
+        OnPropertyChanged(nameof(NameHeader));
+        OnPropertyChanged(nameof(CreatorHeader));
+        OnPropertyChanged(nameof(SizeHeader));
+        OnPropertyChanged(nameof(ClassHeader));
+    }
+
     private int _loaded;
 
     /// <summary>Whether more rows remain beyond what's loaded (drives incremental scroll load).</summary>
@@ -105,6 +296,7 @@ public sealed partial class LibraryViewModel(
         try
         {
             Items.Clear();
+            GalleryItems.Clear();
             SelectedItems.Clear();
             _loaded = 0;
 
@@ -112,7 +304,16 @@ public sealed partial class LibraryViewModel(
             {
                 foreach (var creator in await library.GetCreatorsAsync(cancellationToken).ConfigureAwait(true))
                     Creators.Add(creator);
+                var counts = await library.GetCreatorCountsAsync(cancellationToken).ConfigureAwait(true);
+                foreach (var c in counts)
+                    CreatorOptions.Add(new Controls.ComboOption(c.Creator, c.Count));
             }
+
+            if (Presets.Count == 0)
+                await LoadPresetsAsync(cancellationToken).ConfigureAwait(true);
+
+            if (Tags.Count == 0)
+                await LoadTagsAsync(cancellationToken).ConfigureAwait(true);
 
             await LoadPageAsync(cancellationToken).ConfigureAwait(true);
             State = Items.Count == 0 ? LibraryState.Empty : LibraryState.Loaded;
@@ -213,15 +414,69 @@ public sealed partial class LibraryViewModel(
         await RefreshAsync(cancellationToken).ConfigureAwait(true);
     }
 
+    /// <summary>Facet "Single copy" filter — packages with only one physical copy (irreplaceable). (AC-12)</summary>
+    [ObservableProperty] private bool _singleCopyOnly;
+
+    /// <summary>Rail saved-view "Active in game": only packages active in the current profile. (AC-12)</summary>
+    [RelayCommand]
+    public async Task ShowActiveInGameAsync(CancellationToken cancellationToken = default)
+    {
+        _suppressAutoRefresh = true;
+        FavoritesOnly = false; MissingDepsOnly = false; SingleCopyOnly = false; InstalledOnly = true;
+        _suppressAutoRefresh = false;
+        await RefreshAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    /// <summary>Rail saved-view "Single copy": only irreplaceable single-copy packages. (AC-12)</summary>
+    [RelayCommand]
+    public async Task ShowSingleCopyAsync(CancellationToken cancellationToken = default)
+    {
+        _suppressAutoRefresh = true;
+        FavoritesOnly = false; MissingDepsOnly = false; InstalledOnly = false; SingleCopyOnly = true;
+        _suppressAutoRefresh = false;
+        await RefreshAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    /// <summary>Tags for the rail Tags section (name + owned count). (AC-12)</summary>
+    public ObservableCollection<Sdk.Library.TagInfo> Tags { get; } = [];
+
+    /// <summary>New-tag name typed into the rail "+ new tag" box. (AC-12)</summary>
+    [ObservableProperty] private string? _newTagName;
+
+    private async Task LoadTagsAsync(CancellationToken cancellationToken)
+    {
+        if (tags is null)
+            return;
+        var list = await tags.ListAsync(cancellationToken).ConfigureAwait(true);
+        Tags.Clear();
+        foreach (var t in list)
+            Tags.Add(t);
+    }
+
+    /// <summary>Rail "+ new tag": create a tag via the tag service and refresh the section. (AC-12)</summary>
+    [RelayCommand]
+    public async Task CreateTagAsync(CancellationToken cancellationToken = default)
+    {
+        if (tags is null || string.IsNullOrWhiteSpace(NewTagName))
+            return;
+        await tags.CreateAsync(NewTagName!.Trim(), cancellationToken).ConfigureAwait(true);
+        NewTagName = null;
+        await LoadTagsAsync(cancellationToken).ConfigureAwait(true);
+    }
+
     /// <summary>Facet-bar "Reset": clear all filters + search back to All packages. (GD-3)</summary>
     [RelayCommand]
     public async Task ResetFiltersAsync(CancellationToken cancellationToken = default)
     {
+        _suppressAutoRefresh = true;
         CreatorFilter = null;
         PackageNameFilter = null;
         SearchText = null;
         FavoritesOnly = false;
         MissingDepsOnly = false;
+        InstalledOnly = false;
+        SingleCopyOnly = false;
+        _suppressAutoRefresh = false;
         await RefreshAsync(cancellationToken).ConfigureAwait(true);
     }
 
@@ -254,6 +509,7 @@ public sealed partial class LibraryViewModel(
     {
         if (settings is null)
             return;
+        _suppressAutoRefresh = true;
         var sort = await settings.GetAsync(PrefSort, cancellationToken).ConfigureAwait(true);
         if (Enum.TryParse<LibrarySort>(sort, out var parsedSort))
             Sort = parsedSort;
@@ -262,6 +518,7 @@ public sealed partial class LibraryViewModel(
         if (Enum.TryParse<LibraryViewMode>(view, out var parsedView))
             ViewMode = parsedView;
         CreatorFilter = await settings.GetAsync(PrefCreator, cancellationToken).ConfigureAwait(true);
+        _suppressAutoRefresh = false;
     }
 
     private async Task SavePreferencesAsync(CancellationToken cancellationToken)
@@ -283,17 +540,25 @@ public sealed partial class LibraryViewModel(
         MissingDepsOnly: MissingDepsOnly,
         Sort: Sort,
         Descending: Descending,
-        PackageName: string.IsNullOrWhiteSpace(PackageNameFilter) ? null : PackageNameFilter);
+        PackageName: string.IsNullOrWhiteSpace(PackageNameFilter) ? null : PackageNameFilter,
+        InstalledOnly: InstalledOnly,
+        SingleCopyOnly: SingleCopyOnly);
 
     private async Task LoadPageAsync(CancellationToken cancellationToken)
     {
         var page = await library.GetPageAsync(CurrentQuery(_loaded, PageSize), cancellationToken).ConfigureAwait(true);
         foreach (var item in page.Items)
+        {
             Items.Add(item);
+            var card = new GalleryCardViewModel(item, _thumbLoader);
+            GalleryItems.Add(card);
+            _ = card.LoadAsync(); // extract/decode the preview off the UI thread; placeholder until it lands
+        }
 
         _loaded += page.Items.Count;
         TotalCount = page.TotalCount;
         OnPropertyChanged(nameof(HasMore));
+        OnPropertyChanged(nameof(PositionLabel));
         LoadMoreCommand.NotifyCanExecuteChanged();
     }
 
@@ -328,6 +593,22 @@ public sealed partial class LibraryViewModel(
             // Superseded by a newer keystroke — the newer one owns the refresh.
         }
     }
+
+    /// <summary>Set while filters are reset/restored in bulk so per-field setters don't each trigger a refresh.</summary>
+    private bool _suppressAutoRefresh;
+
+    partial void OnInstalledOnlyChanged(bool value)
+    {
+        if (!_suppressAutoRefresh) _ = RefreshAsync();
+    }
+
+    partial void OnCreatorFilterChanged(string? value)
+    {
+        if (!_suppressAutoRefresh) _ = RefreshAsync();
+    }
+
+    partial void OnSortChanged(LibrarySort value) => NotifySortHeaders();
+    partial void OnDescendingChanged(bool value) => NotifySortHeaders();
 
     partial void OnViewModeChanged(LibraryViewMode value)
     {

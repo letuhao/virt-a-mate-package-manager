@@ -26,6 +26,11 @@ public sealed partial class DupesViewModel(
 
     [ObservableProperty] private long _reclaimableBytes;
 
+    /// <summary>Reclaim summary card: number of duplicate groups. (AC-15)</summary>
+    public int GroupCount => Groups.Count;
+    /// <summary>Total redundant copies across all groups (each group keeps one). (AC-15)</summary>
+    public int RedundantCopies => Groups.Sum(g => Math.Max(0, g.Copies.Count - 1));
+
     public bool IsEmpty => Groups.Count == 0;
 
     [RelayCommand]
@@ -40,6 +45,8 @@ public sealed partial class DupesViewModel(
         }
         ReclaimableBytes = reclaim2;
         OnPropertyChanged(nameof(IsEmpty));
+        OnPropertyChanged(nameof(GroupCount));
+        OnPropertyChanged(nameof(RedundantCopies));
     }
 
     [RelayCommand]

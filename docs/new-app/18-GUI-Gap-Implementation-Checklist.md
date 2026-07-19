@@ -1,5 +1,13 @@
 # 18 — GUI Gap Implementation Checklist (close the audit gap)
 
+> **⚠ Superseded at the item level by [19-Audit-Correction-Checklist.md](19-Audit-Correction-Checklist.md).**
+> An independent re-audit (2026-07-19) found several boxes below were ticked at skeleton level but were
+> *dead-wired* or missing controls at the item level (Library Delete/Add-to-preset/Fix-encoding had no command,
+> the Migrate dialog could not execute, the Alias search was unbound, several screens/dialogs missed controls).
+> **Doc 19 closes those for real** — each unit there names a green *wired* UI-E2E test (many driving the real
+> shell over the real `.var` corpus, incl. the gallery preview-image feature). Trust doc 19's status over the
+> boxes here. (AC-D1.)
+
 Built from the source-vs-prototype audit [17-GUI-Completeness-Audit.md](17-GUI-Completeness-Audit.md) and the
 sealed prototype [mockups/prototype.html](mockups/prototype.html). Where `16` ticked skeletons, **this list
 closes the real gap**: dead wiring, unreachable dialogs, missing controls, missing columns, missing tabs.

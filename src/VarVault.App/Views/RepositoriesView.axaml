@@ -38,6 +38,17 @@
                   <Button Content="Re-benchmark"
                           Command="{Binding ((vm:RepositoriesViewModel)DataContext).BenchmarkCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                           CommandParameter="{Binding}" />
+                  <Button Content="Tier ▾">
+                    <Button.Flyout>
+                      <MenuFlyout>
+                        <MenuItem Header="T1 (hot)" Command="{Binding ((vm:RepositoriesViewModel)DataContext).SetTierCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding TierArg1}" />
+                        <MenuItem Header="T2 (warm)" Command="{Binding ((vm:RepositoriesViewModel)DataContext).SetTierCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding TierArg2}" />
+                        <MenuItem Header="T3 (cold)" Command="{Binding ((vm:RepositoriesViewModel)DataContext).SetTierCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding TierArg3}" />
+                      </MenuFlyout>
+                    </Button.Flyout>
+                  </Button>
+                  <Button Content="Edit"
+                          Command="{Binding ((vm:RepositoriesViewModel)DataContext).EditCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
                   <Button Content="Rebalance…"
                           Command="{Binding ((vm:RepositoriesViewModel)DataContext).RebalanceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
                 </StackPanel>

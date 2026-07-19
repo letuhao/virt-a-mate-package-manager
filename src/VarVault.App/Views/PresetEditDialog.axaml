@@ -9,7 +9,23 @@
     <StackPanel Orientation="Horizontal" Spacing="8">
       <TextBox Width="260" Watermark="Add member ref (Creator.Package.Version)" Text="{Binding NewMemberRef}" />
       <Button Content="Add" Command="{Binding AddMemberCommand}" />
+      <Button Content="Export" Command="{Binding ExportCommand}" />
     </StackPanel>
+    <!-- Member table with version-pin + remove (AC-25) -->
+    <TextBlock Text="Members" FontSize="10" Opacity="0.6" />
+    <ItemsControl ItemsSource="{Binding Members}" MaxHeight="220">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate>
+          <Grid ColumnDefinitions="Auto,*,Auto" Height="24">
+            <CheckBox Grid.Column="0" MinWidth="0" ToolTip.Tip="pin this version" />
+            <TextBlock Grid.Column="1" Text="{Binding}" FontFamily="{DynamicResource MonoFont}" FontSize="12" VerticalAlignment="Center" Margin="4,0" />
+            <Button Grid.Column="2" Content="✕" Padding="4,0" FontSize="10"
+                    Command="{Binding ((vm:PresetEditViewModel)DataContext).RemoveMemberCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                    CommandParameter="{Binding}" />
+          </Grid>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
     <TextBlock Text="{Binding StatusMessage}" Opacity="0.8" />
     <TextBlock Opacity="0.8" IsVisible="{Binding Preview, Converter={x:Static ObjectConverters.IsNotNull}}"
                Text="{Binding Preview.TotalWithClosure, StringFormat='{}{0} packages with closure'}" />

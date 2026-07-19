@@ -14,8 +14,11 @@
                  Text="{Binding ExcludedCount, StringFormat='⚠ {0} single-copy vars excluded — no backup, not moved automatically.'}" />
     </Border>
     <StackPanel Orientation="Horizontal" Spacing="8">
-      <Button Content="Dry run" />
-      <Button Content="Approve &amp; run" Background="{DynamicResource AccentBrush}" Foreground="White" />
+      <Button Content="Dry run" Command="{Binding DryRunCommand}" />
+      <Button Content="Approve &amp; run" Background="{DynamicResource AccentBrush}" Foreground="White"
+              Command="{Binding ApproveAndRunCommand}" IsEnabled="{Binding CanApprove}" />
     </StackPanel>
+    <TextBlock Text="{Binding StatusMessage}" Opacity="0.85" TextWrapping="Wrap"
+               Foreground="{DynamicResource GoodBrush}" IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
   </StackPanel>
 </UserControl>

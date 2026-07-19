@@ -64,4 +64,39 @@ public sealed partial class TrashViewModel(ITrashQueryService trash) : Observabl
         StatusMessage = r.IsSuccess ? "Backup created" : r.Error.Message;
         await LoadAsync(cancellationToken).ConfigureAwait(true);
     }
+
+    /// <summary>Rows checked for the bulk Restore/Purge actions. (AC-23)</summary>
+    public ObservableCollection<TrashItemDto> SelectedItems { get; } = [];
+
+    /// <summary>Row checkbox toggle → membership in the bulk selection. (AC-23)</summary>
+    [RelayCommand]
+    public void ToggleSelection(TrashItemDto item)
+    {
+        if (item is null) return;
+        if (SelectedItems.Contains(item)) SelectedItems.Remove(item);
+        else SelectedItems.Add(item);
+    }
+
+    /// <summary>Bulk "Restore selected". (AC-23)</summary>
+    [RelayCommand]
+    public async Task RestoreSelectedAsync(CancellationToken cancellationToken = default)
+    {
+        var ids = SelectedItems.Select(i => i.Id).ToList();
+        var ok = 0;
+        foreach (var id in ids)
+            if ((await trash.RestoreAsync(id, cancellationToken).ConfigureAwait(true)).IsSuccess) ok++;
+        StatusMessage = $"Restored {ok} of {ids.Count}";
+        await LoadAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    /// <summary>Bulk "Purge selected". (AC-23)</summary>
+    [RelayCommand]
+    public async Task PurgeSelectedAsync(CancellationToken cancellationToken = default)
+    {
+        var ids = SelectedItems.Select(i => i.Id).ToList();
+        foreach (var id in ids)
+            await trash.PurgeAsync(id, cancellationToken).ConfigureAwait(true);
+        StatusMessage = $"Purged {ids.Count}";
+        await LoadAsync(cancellationToken).ConfigureAwait(true);
+    }
 }

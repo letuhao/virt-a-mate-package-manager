@@ -35,6 +35,27 @@ public sealed partial class PresetsViewModel(
     /// <summary>"Deactivate all" → rescue baseline (drop all active links). (GD-8)</summary>
     [RelayCommand] private void DeactivateAll() => launcher?.OpenRescue();
 
+    /// <summary>Screen-head "Import from txt…" → preset-edit dialog (import tab). (AC-20)</summary>
+    [RelayCommand] private void ImportTxt() => launcher?.OpenPresetEdit(0, "Import from txt");
+
+    /// <summary>The most recent export text (member refs, one per line). (AC-20)</summary>
+    [ObservableProperty] private string? _lastExportText;
+
+    /// <summary>Detail "Export" → member refs as a txt list. (AC-20)</summary>
+    [RelayCommand]
+    private void Export()
+    {
+        LastExportText = string.Join(System.Environment.NewLine, Members);
+        StatusMessage = $"Exported {Members.Count} members";
+    }
+
+    /// <summary>Detail "Diff" → summarize this preset vs its resolved closure. (AC-20)</summary>
+    [RelayCommand]
+    private void Diff() =>
+        StatusMessage = Preview is null
+            ? "No preview loaded"
+            : $"{Members.Count} direct → {Preview.TotalWithClosure} with closure, {Preview.MissingRefs.Count} missing";
+
     [RelayCommand]
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {

@@ -29,4 +29,12 @@ public sealed partial class MissingDepsViewModel(
             Items.Add(item);
         OnPropertyChanged(nameof(IsEmpty));
     }
+
+    /// <summary>The most recent export text (missing refs, one per line) for save-to-file. (AC-17)</summary>
+    [ObservableProperty] private string? _lastExportText;
+
+    /// <summary>Screen-head "Export links txt": export the missing refs as a txt list. (AC-17)</summary>
+    [RelayCommand]
+    public void ExportLinks() =>
+        LastExportText = string.Join(System.Environment.NewLine, Items.Select(i => i.Ref));
 }

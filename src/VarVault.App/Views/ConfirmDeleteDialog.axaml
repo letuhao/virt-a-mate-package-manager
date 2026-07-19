@@ -10,6 +10,10 @@
       <TextBlock Foreground="{DynamicResource WarnBrush}" TextWrapping="Wrap"
                  Text="{Binding ProtectedCount, StringFormat='⚠ {0} single-copy (irreplaceable) — excluded by default.'}" />
     </Border>
+    <Border Background="{DynamicResource WarnBgBrush}" CornerRadius="4" Padding="8" IsVisible="{Binding HasReverseDeps}">
+      <TextBlock Foreground="{DynamicResource WarnBrush}" TextWrapping="Wrap"
+                 Text="{Binding ReverseDepCount, StringFormat='⚠ {0} other package(s) depend on these — deleting may break dependents.'}" />
+    </Border>
     <ItemsControl ItemsSource="{Binding Items}">
       <ItemsControl.ItemTemplate>
         <DataTemplate x:DataType="vm:ConfirmItem">

@@ -11,15 +11,34 @@
     <TextBlock DockPanel.Dock="Top" Foreground="{DynamicResource TextLoBrush}" Margin="0,0,0,12"
                Text="{Binding ReclaimableBytes, StringFormat='{}{0} bytes reclaimable'}" />
     <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
+
+    <!-- Reclaim summary cards (AC-15) -->
+    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+      <c:Card Header="Duplicate copies" Width="200" Margin="0,0,10,0">
+        <StackPanel Spacing="2">
+          <TextBlock Text="{Binding RedundantCopies}" FontSize="24" Foreground="{DynamicResource AccentBrush}" />
+          <TextBlock Text="{Binding ReclaimableBytes, StringFormat='{}{0} bytes reclaimable'}" Opacity="0.7" FontSize="11" />
+          <Button Content="Review groups below" Command="{Binding LoadCommand}" />
+        </StackPanel>
+      </c:Card>
+      <c:Card Header="Duplicate groups" Width="200">
+        <TextBlock Text="{Binding GroupCount}" FontSize="24" Foreground="{DynamicResource WarmBrush}" />
+      </c:Card>
+    </WrapPanel>
+
     <c:Card Header="Exact duplicate groups">
       <ScrollViewer>
         <ItemsControl ItemsSource="{Binding Groups}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="lib:DuplicateGroup">
-              <Grid ColumnDefinitions="*,80,Auto" Height="28">
+              <Grid ColumnDefinitions="*,80,90,Auto,Auto" Height="28">
                 <TextBlock Grid.Column="0" Text="{Binding IdentityKey}" VerticalAlignment="Center" />
                 <TextBlock Grid.Column="1" Text="{Binding Copies.Count, StringFormat='{}{0} copies'}" VerticalAlignment="Center" Opacity="0.7" />
-                <Button Grid.Column="2" Content="Review"
+                <TextBlock Grid.Column="2" Text="{Binding Copies.Count, StringFormat='{}{0} loc'}" VerticalAlignment="Center" Opacity="0.6" FontSize="11" />
+                <Button Grid.Column="3" Content="Reclaim"
+                        Command="{Binding ((vm:DupesViewModel)DataContext).TrashGroupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding}" />
+                <Button Grid.Column="4" Content="Review" Margin="6,0,0,0"
                         Command="{Binding ((vm:DupesViewModel)DataContext).ReviewCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                         CommandParameter="{Binding}" />
               </Grid>

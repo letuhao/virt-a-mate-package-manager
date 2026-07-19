@@ -17,7 +17,7 @@ public sealed class FakeDialogLauncher : IDialogLauncher
     public void OpenMigratePlan() => Opened.Add("migrate");
     public void OpenVarDetail(long packageId) => Opened.Add($"var-detail:{packageId}");
     public void OpenAlias(string missingRef) => Opened.Add($"alias:{missingRef}");
-    public void OpenConfirmDelete(IReadOnlyList<ConfirmItem> items) => Opened.Add($"confirm:{items.Count}");
+    public void OpenConfirmDelete(IReadOnlyList<ConfirmItem> items, int reverseDepCount = 0) => Opened.Add($"confirm:{items.Count}");
     public void OpenFix(long varFileId, string? codepage) => Opened.Add($"fix:{codepage}");
     public void OpenDupeReview(DuplicateGroup group) => Opened.Add($"dupe:{group.IdentityKey}");
     public void OpenPresetEdit(long presetId, string name) => Opened.Add($"preset:{presetId}");

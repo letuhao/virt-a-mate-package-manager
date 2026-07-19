@@ -13,6 +13,26 @@
               Background="{DynamicResource AccentBrush}" Foreground="White" />
     </Grid>
     <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
+
+    <!-- Encoding summary cards (AC-16) -->
+    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+      <c:Card Header="GBK / GB2312" Width="180" Margin="0,0,10,0">
+        <StackPanel Spacing="4">
+          <TextBlock Text="{Binding GbkCount}" FontSize="24" Foreground="{DynamicResource CritBrush}" />
+          <Button Content="Fix GBK…" Command="{Binding FixAllCommand}" />
+        </StackPanel>
+      </c:Card>
+      <c:Card Header="Shift-JIS" Width="180" Margin="0,0,10,0">
+        <StackPanel Spacing="4">
+          <TextBlock Text="{Binding ShiftJisCount}" FontSize="24" Foreground="{DynamicResource WarnBrush}" />
+          <Button Content="Fix Shift-JIS…" Command="{Binding FixAllCommand}" />
+        </StackPanel>
+      </c:Card>
+      <c:Card Header="Other / low-confidence" Width="180">
+        <TextBlock Text="{Binding OtherEncodingCount}" FontSize="24" Foreground="{DynamicResource TextLoBrush}" />
+      </c:Card>
+    </WrapPanel>
+
     <c:Card Header="Encoding — fixable groups">
       <StackPanel Spacing="6">
         <ItemsControl ItemsSource="{Binding EncodingGroups}">

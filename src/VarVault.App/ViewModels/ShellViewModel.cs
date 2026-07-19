@@ -176,8 +176,20 @@ public sealed partial class ShellViewModel : ObservableObject
     }
 
     [RelayCommand] private void ToggleJobs() => JobsPanelOpen = !JobsPanelOpen;
-    [RelayCommand] private void OpenPalette() => PaletteOpen = true;
     [RelayCommand] private void AddRepo() => AddRepoHandler?.Invoke();
+
+    /// <summary>Handler set by AppHost: run the top-bar search (drives the library filter). (AC-8)</summary>
+    public System.Action<string>? SearchHandler { get; set; }
+
+    /// <summary>Top-bar search Enter: run the global search through the wired handler; falls back to the flag. (AC-8)</summary>
+    [RelayCommand]
+    private void OpenPalette()
+    {
+        if (SearchHandler is not null)
+            SearchHandler(SearchText ?? string.Empty);
+        else
+            PaletteOpen = true;
+    }
 
     [RelayCommand]
     private async System.Threading.Tasks.Task RescueAsync()

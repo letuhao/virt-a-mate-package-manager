@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:lib="clr-namespace:VarVault.Sdk.Library;assembly=VarVault.Sdk"
+             xmlns:preset="clr-namespace:VarVault.Sdk.Presets;assembly=VarVault.Sdk"
              xmlns:vm="clr-namespace:VarVault.App.ViewModels"
              xmlns:c="clr-namespace:VarVault.App.Controls"
              x:Class="VarVault.App.Views.LibraryView"
@@ -12,7 +13,26 @@
       <TextBlock Text="Library" FontWeight="Bold" Foreground="{DynamicResource TextLoBrush}" FontSize="10" Margin="4,0,0,6" />
       <Button Content="All packages" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding ShowAllCommand}" />
       <Button Content="Favorites" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding ShowFavoritesCommand}" />
+      <Button Content="Active in game" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding ShowActiveInGameCommand}" />
+      <Button Content="Single copy" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding ShowSingleCopyCommand}" />
       <Button Content="Missing deps" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding ShowMissingDepsCommand}" />
+
+      <TextBlock Text="Tags" FontWeight="Bold" Foreground="{DynamicResource TextLoBrush}" FontSize="10" Margin="4,10,0,4" />
+      <ItemsControl ItemsSource="{Binding Tags}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="lib:TagInfo">
+            <Grid ColumnDefinitions="*,Auto" Height="22">
+              <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" FontSize="12" />
+              <TextBlock Grid.Column="1" Text="{Binding PackageCount}" VerticalAlignment="Center" Opacity="0.6" FontSize="11" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBox Grid.Column="0" Watermark="new tag…" Text="{Binding NewTagName}" FontSize="11" />
+        <Button Grid.Column="1" Content="+" Command="{Binding CreateTagCommand}" />
+      </Grid>
+
       <TextBlock Text="Maintenance" FontWeight="Bold" Foreground="{DynamicResource TextLoBrush}" FontSize="10" Margin="4,10,0,4" />
       <Button Content="⚑ Batch fix encoding" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
               Command="{Binding GoCommand}" CommandParameter="health" />
@@ -20,44 +40,82 @@
               Command="{Binding GoCommand}" CommandParameter="dupes" />
       <Button Content="↕ Find stale / old" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
               Command="{Binding GoCommand}" CommandParameter="tiering" />
+      <Button Content="⟳ Rebuild symlinks" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+              Command="{Binding GoCommand}" CommandParameter="repos" />
+
+      <TextBlock Text="Dependency analysis" FontWeight="Bold" Foreground="{DynamicResource TextLoBrush}" FontSize="10" Margin="4,10,0,4" />
+      <Button Content="⚠ Scan missing deps" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+              Command="{Binding GoCommand}" CommandParameter="missing" />
+      <Button Content="◱ Analyze proposals" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+              Command="{Binding GoCommand}" CommandParameter="proposals" />
     </StackPanel>
 
     <!-- Center: facet + list + ops -->
     <DockPanel Grid.Column="1" Margin="0,8">
       <!-- Facet bar (SCR-2b) -->
       <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,0,0,6">
-        <AutoCompleteBox Grid.Column="0" Width="150" Watermark="All creators"
-                         ItemsSource="{Binding Creators}" Text="{Binding CreatorFilter}" FilterMode="Contains" />
+        <c:SearchableCombo Grid.Column="0" Width="150"
+                           ItemsSource="{Binding CreatorOptions}" SelectedName="{Binding CreatorFilter}" />
         <TextBox Grid.Column="1" Margin="8,0" Watermark="Search packages…" Text="{Binding SearchText}" />
         <TextBox Grid.Column="2" Width="120" Watermark="packageName…" Text="{Binding PackageNameFilter}" />
-        <CheckBox Grid.Column="3" Margin="8,0" Content="Favorites" IsChecked="{Binding FavoritesOnly}" />
+        <CheckBox Grid.Column="3" Margin="8,0" Content="Installed" IsChecked="{Binding InstalledOnly}" />
         <Button Grid.Column="4" Content="Reset" Command="{Binding ResetFiltersCommand}" />
         <ComboBox Grid.Column="5" Margin="8,0,0,0" Width="110" ItemsSource="{Binding SortOptions}"
                   SelectedItem="{Binding SelectedSortLabel}" />
         <Button Grid.Column="6" Margin="6,0,0,0" Content="Refresh" Command="{Binding RefreshCommand}" />
         <Button Grid.Column="7" Margin="6,0,0,0" Content="Table / Gallery" Command="{Binding ToggleViewModeCommand}" />
       </Grid>
+      <!-- Filter chips + position (AC-10) -->
+      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="0,0,0,6">
+        <Border Background="{DynamicResource Bg2Brush}" CornerRadius="10" Padding="8,2" IsVisible="{Binding CreatorFilter, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <TextBlock Text="{Binding CreatorFilter, StringFormat='creator: {0}'}" FontSize="11" VerticalAlignment="Center" />
+            <Button Content="✕" Padding="2,0" FontSize="10" Command="{Binding ResetFiltersCommand}" />
+          </StackPanel>
+        </Border>
+        <TextBlock Text="{Binding PositionLabel}" Opacity="0.6" FontSize="11" VerticalAlignment="Center" />
+      </StackPanel>
 
       <!-- Column headers (sortable, SCR-2c) -->
-      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,140,90,70,60,40,60,70" Margin="6,0">
-        <Button Grid.Column="0" Content="Name" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+      <Grid DockPanel.Dock="Top" ColumnDefinitions="28,*,140,90,70,50,60,40,60,60,70" Margin="6,0">
+        <TextBlock Grid.Column="0" Text="" />
+        <Button Grid.Column="1" Content="{Binding NameHeader}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                 Command="{Binding SortByCommand}" CommandParameter="{x:Static lib:LibrarySort.Name}" />
-        <Button Grid.Column="1" Content="Creator" Command="{Binding SortByCommand}" CommandParameter="{x:Static lib:LibrarySort.Creator}" />
-        <TextBlock Grid.Column="2" Text="Type" VerticalAlignment="Center" Opacity="0.7" />
-        <Button Grid.Column="3" Content="Size" Command="{Binding SortByCommand}" CommandParameter="{x:Static lib:LibrarySort.Size}" />
-        <Button Grid.Column="4" Content="Class" Command="{Binding SortByCommand}" CommandParameter="{x:Static lib:LibrarySort.Class}" />
-        <TextBlock Grid.Column="5" Text="Cop" VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0.7" />
-        <TextBlock Grid.Column="6" Text="State" VerticalAlignment="Center" Opacity="0.7" />
-        <TextBlock Grid.Column="7" Text="" />
+        <Button Grid.Column="2" Content="{Binding CreatorHeader}" Command="{Binding SortByCommand}" CommandParameter="{x:Static lib:LibrarySort.Creator}" />
+        <TextBlock Grid.Column="3" Text="Type" VerticalAlignment="Center" Opacity="0.7" />
+        <Button Grid.Column="4" Content="{Binding SizeHeader}" Command="{Binding SortByCommand}" CommandParameter="{x:Static lib:LibrarySort.Size}" />
+        <TextBlock Grid.Column="5" Text="Tier" VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0.7" />
+        <Button Grid.Column="6" Content="{Binding ClassHeader}" Command="{Binding SortByCommand}" CommandParameter="{x:Static lib:LibrarySort.Class}" />
+        <TextBlock Grid.Column="7" Text="Cop" VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0.7" />
+        <TextBlock Grid.Column="8" Text="State" VerticalAlignment="Center" Opacity="0.7" />
+        <TextBlock Grid.Column="9" Text="Fix" VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0.7" />
+        <TextBlock Grid.Column="10" Text="" />
       </Grid>
 
       <!-- Ops bar (SCR-2e) -->
       <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="6,6,0,0">
         <TextBlock Text="{Binding SelectedItems.Count, StringFormat='{}{0} selected'}" VerticalAlignment="Center" Opacity="0.8" />
-        <Button Content="Add to preset…" />
-        <Button Content="Delete" Foreground="{DynamicResource CritBrush}" />
-        <Button Content="Fix encoding" />
+        <Button Content="{Binding TotalCount, StringFormat='select all {0} matching'}" Command="{Binding SelectAllMatchingCommand}" />
+        <Button Content="Add to preset…">
+          <Button.Flyout>
+            <MenuFlyout ItemsSource="{Binding Presets}">
+              <MenuFlyout.ItemTemplate>
+                <DataTemplate x:DataType="preset:PresetInfo">
+                  <MenuItem Header="{Binding Name}"
+                            Command="{Binding ((vm:LibraryViewModel)DataContext).AddToPresetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding Id}" />
+                </DataTemplate>
+              </MenuFlyout.ItemTemplate>
+            </MenuFlyout>
+          </Button.Flyout>
+        </Button>
+        <Button Content="Delete" Foreground="{DynamicResource CritBrush}" Command="{Binding DeleteSelectedCommand}" />
+        <Button Content="Fix encoding" Command="{Binding FixEncodingSelectedCommand}" />
+        <TextBox Width="120" Watermark="sub-folder…" Text="{Binding SubfolderName}" VerticalAlignment="Center" />
+        <Button Content="Move to subfolder…" Command="{Binding MoveToSubfolderCommand}" />
         <Button Content="Export → txt" Command="{Binding ExportSelectedCommand}" />
+        <TextBox Width="120" Watermark="paste txt list…" Text="{Binding InstallTxtInput}" VerticalAlignment="Center" />
+        <Button Content="Install from txt" Command="{Binding InstallFromTxtCommand}" CommandParameter="{Binding InstallTxtInput}" />
         <TextBlock Text="{Binding LastActionMessage}" VerticalAlignment="Center" Opacity="0.7" />
       </StackPanel>
 
@@ -73,17 +131,24 @@
                  IsVisible="{Binding IsTableView}">
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="lib:PackageListEntry">
-              <Grid ColumnDefinitions="*,140,90,70,60,40,60,70" Height="26">
-                <TextBlock Grid.Column="0" Text="{Binding VarName}" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Text="{Binding Creator}" VerticalAlignment="Center" Opacity="0.85" />
-                <TextBlock Grid.Column="2" Text="{Binding PrimaryType}" VerticalAlignment="Center" Opacity="0.85" />
-                <TextBlock Grid.Column="3" Text="{Binding TotalSize}" VerticalAlignment="Center" Opacity="0.85" HorizontalAlignment="Right" FontFamily="{DynamicResource MonoFont}" />
-                <TextBlock Grid.Column="4" Text="{Binding StorageClass}" VerticalAlignment="Center" Opacity="0.85" />
-                <TextBlock Grid.Column="5" Text="{Binding OnlineInstanceCount}" VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0.7" FontFamily="{DynamicResource MonoFont}" />
+              <Grid ColumnDefinitions="28,*,140,90,70,50,60,40,60,60,70" Height="26">
+                <CheckBox Grid.Column="0" VerticalAlignment="Center" MinWidth="0"
+                          Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleSelectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                          CommandParameter="{Binding}" />
+                <TextBlock Grid.Column="1" Text="{Binding VarName}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" Text="{Binding Creator}" VerticalAlignment="Center" Opacity="0.85" />
+                <TextBlock Grid.Column="3" Text="{Binding PrimaryType}" VerticalAlignment="Center" Opacity="0.85" />
+                <TextBlock Grid.Column="4" Text="{Binding TotalSize}" VerticalAlignment="Center" Opacity="0.85" HorizontalAlignment="Right" FontFamily="{DynamicResource MonoFont}" />
+                <TextBlock Grid.Column="5" Text="{Binding Tier, StringFormat='T{0}'}" VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0.85" />
+                <TextBlock Grid.Column="6" Text="{Binding StorageClass}" VerticalAlignment="Center" Opacity="0.85" />
+                <TextBlock Grid.Column="7" Text="{Binding OnlineInstanceCount}" VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0.7" FontFamily="{DynamicResource MonoFont}" />
                 <!-- State pill: ok / missing -->
-                <c:StatePill Grid.Column="6" State="Miss" Text="missing" IsVisible="{Binding HasMissingDeps}" VerticalAlignment="Center" />
-                <c:StatePill Grid.Column="6" State="Ok" Text="ok" IsVisible="{Binding !HasMissingDeps}" VerticalAlignment="Center" />
-                <Button Grid.Column="7" Content="Detail" Padding="6,2" FontSize="11"
+                <c:StatePill Grid.Column="8" State="Miss" Text="missing" IsVisible="{Binding HasMissingDeps}" VerticalAlignment="Center" />
+                <c:StatePill Grid.Column="8" State="Ok" Text="ok" IsVisible="{Binding !HasMissingDeps}" VerticalAlignment="Center" />
+                <Button Grid.Column="9" Content="Fix" Padding="6,2" FontSize="11"
+                        Command="{Binding ((vm:LibraryViewModel)DataContext).FixRowCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding}" />
+                <Button Grid.Column="10" Content="Detail" Padding="6,2" FontSize="11"
                         Command="{Binding ((vm:LibraryViewModel)DataContext).OpenDetailCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                         CommandParameter="{Binding}" />
               </Grid>
@@ -91,16 +156,21 @@
           </ListBox.ItemTemplate>
         </ListBox>
 
-        <ListBox ItemsSource="{Binding Items}" SelectionMode="Multiple" SelectedItem="{Binding SelectedEntry}"
+        <ListBox ItemsSource="{Binding GalleryItems}" SelectionMode="Multiple"
                  IsVisible="{Binding IsGalleryView}">
           <ListBox.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
           <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="lib:PackageListEntry">
-              <Border Width="150" Height="120" Margin="4" Padding="8" BorderBrush="#22808080" BorderThickness="1" CornerRadius="6">
+            <DataTemplate x:DataType="vm:GalleryCardViewModel">
+              <Border Width="150" Height="150" Margin="4" Padding="8" BorderBrush="#22808080" BorderThickness="1" CornerRadius="6">
                 <StackPanel Spacing="4">
-                  <Border Height="64" Background="#18808080" CornerRadius="4">
-                    <TextBlock Text="{Binding PrimaryType}" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.6" />
-                  </Border>
+                  <Panel Height="90">
+                    <!-- Extracted preview thumbnail (from the packed thumbnail store) -->
+                    <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" IsVisible="{Binding HasThumbnail}" />
+                    <!-- Type placeholder until/unless a preview was extracted -->
+                    <Border Background="#18808080" CornerRadius="4" IsVisible="{Binding !HasThumbnail}">
+                      <TextBlock Text="{Binding PrimaryType}" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.6" />
+                    </Border>
+                  </Panel>
                   <TextBlock Text="{Binding PackageName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                   <TextBlock Text="{Binding Creator}" Opacity="0.7" FontSize="11" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
@@ -131,8 +201,40 @@
           <TextBlock Text="Single copy — protected" Opacity="0.8" IsVisible="{Binding IsSingleCopy}" Foreground="{DynamicResource WarnBrush}" />
           <TextBlock Text="Missing dependencies" Foreground="{DynamicResource CritBrush}" IsVisible="{Binding HasMissingDeps}" />
         </StackPanel>
-        <!-- Actions -->
-        <Button Content="Open full detail →" HorizontalAlignment="Stretch"
+        <!-- Actions grid (AC-13) -->
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <Button Content="★ Favorite" />
+          <Button Content="⌖ Locate" />
+          <Button Content="Resolve via alias →" Command="{Binding ResolveAliasCommand}"
+                  IsVisible="{Binding SelectedEntry.HasMissingDeps}" />
+        </StackPanel>
+
+        <!-- Dependencies (AC-13) -->
+        <TextBlock Text="Dependencies" FontWeight="SemiBold" Margin="0,6,0,0"
+                   IsVisible="{Binding SelectedDetail, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <StackPanel DataContext="{Binding SelectedDetail}" x:DataType="lib:PackageDetail" Spacing="2"
+                    IsVisible="{Binding ., Converter={x:Static ObjectConverters.IsNotNull}}">
+          <TextBlock Text="{Binding ForwardClosure.Count, StringFormat='depends on {0} package(s)'}" Opacity="0.8" FontSize="12" />
+          <TextBlock Text="{Binding DependedOnByCount, StringFormat='depended on by {0}'}" Opacity="0.8" FontSize="12" />
+        </StackPanel>
+
+        <!-- Copies list (AC-13) -->
+        <TextBlock Text="Copies" FontWeight="SemiBold" Margin="0,6,0,0"
+                   IsVisible="{Binding SelectedDetail, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <ItemsControl ItemsSource="{Binding SelectedDetail.Copies}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="lib:CopyDto">
+              <Grid ColumnDefinitions="Auto,*,Auto" Height="22">
+                <c:Tag Grid.Column="0" Content="{Binding Tier, StringFormat='T{0}'}" />
+                <TextBlock Grid.Column="1" Text="{Binding Path}" Opacity="0.75" FontSize="11" Margin="6,0"
+                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                <c:StatePill Grid.Column="2" State="Ok" Text="online" IsVisible="{Binding IsOnline}" VerticalAlignment="Center" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Button Content="Open full detail →" HorizontalAlignment="Stretch" Margin="0,6,0,0"
                 Command="{Binding OpenDetailCommand}" CommandParameter="{Binding SelectedEntry}" />
       </StackPanel>
     </Border>

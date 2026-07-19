@@ -5,7 +5,14 @@
              x:DataType="vm:AddRepoViewModel">
   <StackPanel Spacing="10" MinWidth="420">
     <TextBlock Text="Add repository" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
-    <TextBox Watermark="G:\more_vars" Text="{Binding FolderPath}" />
+    <Grid ColumnDefinitions="*,Auto">
+      <TextBox Grid.Column="0" Watermark="G:\more_vars" Text="{Binding FolderPath}" />
+      <Button Grid.Column="1" Content="Browse…" Margin="6,0,0,0" Command="{Binding BrowseCommand}" />
+    </Grid>
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <TextBlock Text="Tier" VerticalAlignment="Center" Opacity="0.8" />
+      <ComboBox Width="160" ItemsSource="{Binding TierOptions}" SelectedItem="{Binding PreferredTier}" />
+    </StackPanel>
     <TextBlock Text="{Binding Message}" Opacity="0.8" Foreground="{DynamicResource GoodBrush}" />
     <StackPanel Orientation="Horizontal" Spacing="8">
       <TextBlock Text="Reserve free space" VerticalAlignment="Center" Opacity="0.8" />

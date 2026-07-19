@@ -30,7 +30,11 @@ public static class AppHost
                 services.GetRequiredService<ILibraryQueryService>(),
                 services.GetService<Sdk.Settings.ISettingsService>(),
                 actions: services.GetService<ILibraryActionService>(),
-                launcher: launcher),
+                launcher: launcher,
+                detail: services.GetService<IPackageDetailQuery>(),
+                presets: services.GetService<Sdk.Presets.IPresetService>(),
+                tags: services.GetService<ITagService>(),
+                thumbnails: services.GetService<Domain.Indexing.IThumbnailStore>()),
             ["analytics"] = new AnalyticsViewModel(services.GetRequiredService<IAnalyticsService>()),
             ["dashboard"] = new DashboardViewModel(services.GetRequiredService<IDashboardService>(), launcher),
             ["repos"] = new RepositoriesViewModel(services.GetRequiredService<Sdk.Repositories.IRepositoryService>(), launcher),
@@ -62,7 +66,29 @@ public static class AppHost
         if (screens["dashboard"] is DashboardViewModel dash)
             dash.NavigateTo = shell.Navigate;
         if (screens["library"] is LibraryViewModel lib)
+        {
             lib.NavigateTo = shell.Navigate;
+            lib.ShowToast = shell.ShowToast;
+
+            // GA-4/AC-7 · log-dock "selected N" tracks the library selection when it is the active screen.
+            lib.SelectedItems.CollectionChanged += (_, _) =>
+            {
+                if (ReferenceEquals(shell.ActiveScreen, lib))
+                    shell.SelectedCount = lib.SelectedItems.Count;
+            };
+            shell.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(ShellViewModel.ActiveScreen))
+                    shell.SelectedCount = ReferenceEquals(shell.ActiveScreen, lib) ? lib.SelectedItems.Count : 0;
+            };
+
+            // AC-8 · top-bar search Enter → apply the text as the library filter and navigate there.
+            shell.SearchHandler = text =>
+            {
+                lib.SearchText = string.IsNullOrWhiteSpace(text) ? null : text;
+                shell.Navigate("library");
+            };
+        }
 
         return shell;
     }

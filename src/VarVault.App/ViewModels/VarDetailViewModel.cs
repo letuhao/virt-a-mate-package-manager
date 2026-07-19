@@ -16,6 +16,20 @@ public sealed partial class VarDetailViewModel(IPackageDetailQuery detail) : Obs
 
     public bool HasDetail => Detail is not null;
 
+    // Per-tab visibility so the tab strip actually switches content. (AC-24)
+    public bool IsOverviewTab => SelectedTabIndex == 0;
+    public bool IsGraphTab => SelectedTabIndex == 1;
+    public bool IsContentTab => SelectedTabIndex == 2;
+    public bool IsCopiesTab => SelectedTabIndex == 3;
+
+    partial void OnSelectedTabIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsOverviewTab));
+        OnPropertyChanged(nameof(IsGraphTab));
+        OnPropertyChanged(nameof(IsContentTab));
+        OnPropertyChanged(nameof(IsCopiesTab));
+    }
+
     [RelayCommand]
     public async Task LoadAsync(long packageId, CancellationToken cancellationToken = default)
     {

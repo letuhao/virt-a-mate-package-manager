@@ -42,10 +42,14 @@ public sealed record PackageListEntry(
     bool IsFavorite,
     string StorageClass,
     bool HasMissingDeps,
-    DateTime? LastUsedAt);
+    DateTime? LastUsedAt,
+    int? Tier = null);
 
 /// <summary>A page of results plus the total match count (for the scrollbar / counts).</summary>
 public sealed record LibraryPage(IReadOnlyList<PackageListEntry> Items, int TotalCount);
+
+/// <summary>A creator and how many packages they own — feeds the searchable creator combo counts. (AC-10)</summary>
+public sealed record CreatorCount(string Creator, int Count);
 
 /// <summary>
 /// Reads the materialized <c>PackageListItem</c> table for the library UI — filtered, sorted, and paged.
@@ -57,6 +61,11 @@ public interface ILibraryQueryService
 
     /// <summary>Distinct creators for the searchable creator combobox. (1.46)</summary>
     Task<IReadOnlyList<string>> GetCreatorsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Distinct creators with owned-package counts, for the searchable creator combo. Default no-op so
+    /// test doubles need not implement it; the real query service overrides it. (AC-10)</summary>
+    Task<IReadOnlyList<CreatorCount>> GetCreatorCountsAsync(CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<CreatorCount>>([]);
 
     /// <summary>
     /// The full ordered package-id list for a (filter, sort) — the backbone of the O(1)-scroll

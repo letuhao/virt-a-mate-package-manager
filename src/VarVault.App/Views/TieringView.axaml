@@ -15,10 +15,25 @@
     </Grid>
     <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
 
-    <WrapPanel DockPanel.Dock="Top" DataContext="{Binding Counts}" x:CompileBindings="False" Margin="0,0,0,12">
-      <c:Card Header="Hot" Width="150" Margin="0,0,10,0"><TextBlock Text="{Binding Hot}" FontSize="24" Foreground="{DynamicResource HotBrush}" /></c:Card>
-      <c:Card Header="Warm" Width="150" Margin="0,0,10,0"><TextBlock Text="{Binding Warm}" FontSize="24" Foreground="{DynamicResource WarmBrush}" /></c:Card>
-      <c:Card Header="Cold" Width="150"><TextBlock Text="{Binding Cold}" FontSize="24" Foreground="{DynamicResource ColdBrush}" /></c:Card>
+    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+      <c:Card Header="Hot" Width="150" Margin="0,0,10,0">
+        <StackPanel Spacing="6">
+          <TextBlock Text="{Binding Counts.Hot}" FontSize="24" Foreground="{DynamicResource HotBrush}" />
+          <c:MeterBar Value="{Binding HotFraction}" Fill="{DynamicResource HotBrush}" Height="6" />
+        </StackPanel>
+      </c:Card>
+      <c:Card Header="Warm" Width="150" Margin="0,0,10,0">
+        <StackPanel Spacing="6">
+          <TextBlock Text="{Binding Counts.Warm}" FontSize="24" Foreground="{DynamicResource WarmBrush}" />
+          <c:MeterBar Value="{Binding WarmFraction}" Fill="{DynamicResource WarmBrush}" Height="6" />
+        </StackPanel>
+      </c:Card>
+      <c:Card Header="Cold" Width="150">
+        <StackPanel Spacing="6">
+          <TextBlock Text="{Binding Counts.Cold}" FontSize="24" Foreground="{DynamicResource ColdBrush}" />
+          <c:MeterBar Value="{Binding ColdFraction}" Fill="{DynamicResource ColdBrush}" Height="6" />
+        </StackPanel>
+      </c:Card>
     </WrapPanel>
 
     <c:Card Header="Misplaced — proposals awaiting approval">
@@ -26,13 +41,14 @@
         <ItemsControl ItemsSource="{Binding Misplaced}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="lib:MisplacedItem">
-              <Grid ColumnDefinitions="*,80,80,80,*,Auto" Height="26">
+              <Grid ColumnDefinitions="*,80,80,80,90,*,Auto" Height="26">
                 <TextBlock Grid.Column="0" Text="{Binding VarName}" VerticalAlignment="Center" />
                 <TextBlock Grid.Column="1" Text="{Binding StorageClass}" VerticalAlignment="Center" Opacity="0.85" />
                 <TextBlock Grid.Column="2" Text="{Binding CurrentTier, StringFormat='T{0}'}" VerticalAlignment="Center" Opacity="0.85" />
                 <TextBlock Grid.Column="3" Text="{Binding DesiredTier, StringFormat='→ T{0}'}" VerticalAlignment="Center" Opacity="0.85" />
-                <TextBlock Grid.Column="4" Text="{Binding Why}" VerticalAlignment="Center" Opacity="0.7" />
-                <Button Grid.Column="5" Content="Plan…"
+                <TextBlock Grid.Column="4" Text="{Binding SizeBytes}" VerticalAlignment="Center" Opacity="0.7" HorizontalAlignment="Right" FontFamily="{DynamicResource MonoFont}" />
+                <TextBlock Grid.Column="5" Text="{Binding Why}" VerticalAlignment="Center" Opacity="0.7" Margin="8,0,0,0" />
+                <Button Grid.Column="6" Content="Plan…"
                         Command="{Binding ((vm:TieringViewModel)DataContext).PlanCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
               </Grid>
             </DataTemplate>

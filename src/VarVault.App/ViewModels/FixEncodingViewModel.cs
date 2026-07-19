@@ -13,6 +13,9 @@ public sealed partial class FixEncodingViewModel(IHealthService health) : Observ
     [ObservableProperty] private string _after = "Custom/衣装/スカート.vam";
     [ObservableProperty] private string? _resultMessage;
 
+    /// <summary>Also slim the rewritten var (drop redundant embedded content) while fixing encoding. (AC-28)</summary>
+    [ObservableProperty] private bool _alsoSlim;
+
     [RelayCommand]
     public async Task FixAsync(CancellationToken cancellationToken = default)
     {

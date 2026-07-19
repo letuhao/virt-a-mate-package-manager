@@ -28,6 +28,19 @@ public sealed partial class TieringViewModel(
     [ObservableProperty] private TierClassCounts? _counts;
     [ObservableProperty] private int _plannedMoves;
 
+    // Class-card bar fractions (0..1 of the largest class), so each card shows a proportional bar. (AC-14)
+    private int MaxClass => Counts is null ? 0 : Math.Max(1, Math.Max(Counts.Hot, Math.Max(Counts.Warm, Counts.Cold)));
+    public double HotFraction => Counts is null ? 0 : Counts.Hot / (double)MaxClass;
+    public double WarmFraction => Counts is null ? 0 : Counts.Warm / (double)MaxClass;
+    public double ColdFraction => Counts is null ? 0 : Counts.Cold / (double)MaxClass;
+
+    partial void OnCountsChanged(TierClassCounts? value)
+    {
+        OnPropertyChanged(nameof(HotFraction));
+        OnPropertyChanged(nameof(WarmFraction));
+        OnPropertyChanged(nameof(ColdFraction));
+    }
+
     [RelayCommand]
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {

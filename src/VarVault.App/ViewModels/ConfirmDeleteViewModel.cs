@@ -18,6 +18,13 @@ public sealed partial class ConfirmDeleteViewModel(ILibraryActionService actions
 
     [ObservableProperty] private string? _resultMessage;
 
+    /// <summary>How many other packages/saves depend on the items being deleted (reverse-dependency note). (AC-4/GE-6)</summary>
+    [ObservableProperty] private int _reverseDepCount;
+
+    public bool HasReverseDeps => ReverseDepCount > 0;
+
+    partial void OnReverseDepCountChanged(int value) => OnPropertyChanged(nameof(HasReverseDeps));
+
     /// <summary>Invoked after a successful delete with the trashed count (drives a shell toast). (GF-1)</summary>
     public System.Action<int>? OnDeleted { get; set; }
 

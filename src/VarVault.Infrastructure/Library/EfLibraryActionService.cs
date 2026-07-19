@@ -18,7 +18,8 @@ public sealed class EfLibraryActionService(
     VarVaultDbContext db,
     IPresetService presets,
     IHealthService health,
-    ITrashService trash) : ILibraryActionService
+    ITrashService trash,
+    VarVault.Sdk.Threading.IWriteQueue writeQueue) : ILibraryActionService
 {
     public async Task<BulkActionResult> AddToPresetAsync(long presetId, IReadOnlyList<long> packageIds, CancellationToken cancellationToken = default)
     {
@@ -109,7 +110,8 @@ public sealed class EfLibraryActionService(
             catch (IOException) { fail++; }
             catch (UnauthorizedAccessException) { fail++; }
         }
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        // Single-writer discipline (CLAUDE.md): route the catalog write through the write queue. (AC-31)
+        await writeQueue.EnqueueAsync(ct => db.SaveChangesAsync(ct), cancellationToken: cancellationToken).ConfigureAwait(false);
         return new BulkActionResult(ok, fail);
     }
 

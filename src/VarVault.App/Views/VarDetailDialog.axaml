@@ -2,13 +2,16 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:VarVault.App.ViewModels"
              xmlns:c="clr-namespace:VarVault.App.Controls"
+             xmlns:lib="clr-namespace:VarVault.Sdk.Library;assembly=VarVault.Sdk"
              x:Class="VarVault.App.Views.VarDetailDialog"
              x:DataType="vm:VarDetailViewModel">
   <StackPanel Spacing="10" MinWidth="460" x:CompileBindings="False">
     <TextBlock Text="{Binding Detail.VarName}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
     <c:Tabs ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" />
-    <StackPanel Spacing="10" DataContext="{Binding Detail}">
-    <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+
+    <!-- Tab 0: Overview -->
+    <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" DataContext="{Binding Detail}"
+          IsVisible="{Binding $parent[UserControl].((vm:VarDetailViewModel)DataContext).IsOverviewTab}">
       <TextBlock Grid.Row="0" Grid.Column="0" Text="Identity" Opacity="0.7" Margin="0,0,0,4" />
       <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding IdentityKey}" Margin="0,0,0,4" />
       <TextBlock Grid.Row="1" Grid.Column="0" Text="License" Opacity="0.7" Margin="0,0,0,4" />
@@ -20,9 +23,37 @@
       <TextBlock Grid.Row="4" Grid.Column="0" Text="Class" Opacity="0.7" />
       <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding StorageClass}" />
     </Grid>
-    <TextBlock Text="{Binding Copies.Count, StringFormat='{}{0} copies'}" Opacity="0.8" />
-    <TextBlock Text="{Binding ContentItems.Count, StringFormat='{}{0} content items'}" Opacity="0.8" />
-    <TextBlock Text="{Binding ForwardClosure.Count, StringFormat='{}{0} dependencies (closure)'}" Opacity="0.8" />
+
+    <!-- Tab 1: Dependency graph (forward closure) -->
+    <StackPanel IsVisible="{Binding IsGraphTab}">
+      <TextBlock Text="{Binding Detail.ForwardClosure.Count, StringFormat='Forward closure: {0} dependencies'}" Opacity="0.8" Margin="0,0,0,4" />
+      <ItemsControl ItemsSource="{Binding Detail.ForwardClosure}">
+        <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding StringFormat='#{0}'}" FontFamily="{DynamicResource MonoFont}" FontSize="12" /></DataTemplate></ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+
+    <!-- Tab 2: Content items -->
+    <StackPanel IsVisible="{Binding IsContentTab}">
+      <TextBlock Text="{Binding Detail.ContentItems.Count, StringFormat='{}{0} content items'}" Opacity="0.8" Margin="0,0,0,4" />
+      <ItemsControl ItemsSource="{Binding Detail.ContentItems}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="lib:ContentItemDto">
+            <Grid ColumnDefinitions="90,*"><TextBlock Grid.Column="0" Text="{Binding Type}" Opacity="0.7" FontSize="12" /><TextBlock Grid.Column="1" Text="{Binding EntryPath}" FontFamily="{DynamicResource MonoFont}" FontSize="11" TextTrimming="CharacterEllipsis" /></Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+
+    <!-- Tab 3: Copies & lineage -->
+    <StackPanel IsVisible="{Binding IsCopiesTab}">
+      <TextBlock Text="{Binding Detail.Copies.Count, StringFormat='{}{0} copies'}" Opacity="0.8" Margin="0,0,0,4" />
+      <ItemsControl ItemsSource="{Binding Detail.Copies}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="lib:CopyDto">
+            <Grid ColumnDefinitions="Auto,*,Auto"><c:Tag Grid.Column="0" Content="{Binding Tier, StringFormat='T{0}'}" /><TextBlock Grid.Column="1" Text="{Binding Path}" FontFamily="{DynamicResource MonoFont}" FontSize="11" Margin="6,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" /><c:StatePill Grid.Column="2" State="Ok" Text="online" IsVisible="{Binding IsOnline}" /></Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
     </StackPanel>
   </StackPanel>
 </UserControl>

@@ -7,7 +7,14 @@
     <TextBlock Text="Resolve missing dependency" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
     <TextBlock Text="{Binding MissingRef, StringFormat='Missing: {0}'}" FontFamily="{DynamicResource MonoFont}" Foreground="{DynamicResource CritBrush}" />
     <TextBlock Text="Map to an owned package" Opacity="0.8" />
-    <TextBox Watermark="search your library…" />
+    <AutoCompleteBox Watermark="search your library…"
+                     Text="{Binding OwnedQuery}"
+                     ItemsSource="{Binding OwnedMatches}"
+                     SelectedItem="{Binding SelectedOwned}"
+                     ValueMemberBinding="{Binding VarName}"
+                     FilterMode="None" MinimumPrefixLength="0" />
+    <TextBlock Text="{Binding SelectedOwned.VarName, StringFormat='→ {0}'}" Opacity="0.7"
+               IsVisible="{Binding CanSave}" Foreground="{DynamicResource GoodBrush}" />
     <TextBlock Text="Save scope" Opacity="0.8" />
     <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding ScopeOptions}" SelectedItem="{Binding Scope}" />
     <TextBlock Text="Saved aliases re-apply automatically on every load &amp; preset switch." Opacity="0.7" TextWrapping="Wrap" />
