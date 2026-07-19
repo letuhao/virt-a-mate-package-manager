@@ -1,6 +1,6 @@
 # VarVault — a tiered VaM var manager
 
-A desktop application for managing [Virt-a-Mate](https://hub.virtamate.com) `.var` packages at scale — **tiered, multi-drive object storage** with first-class dependency management, duplicate reclaim, a visual gallery, and CJK-encoding auto-fix.
+A desktop application for managing Virt-a-Mate `.var` packages at scale — **tiered, multi-drive object storage** with first-class dependency management, duplicate reclaim, a visual gallery, and CJK-encoding auto-fix.
 
 ## The problem it solves
 
