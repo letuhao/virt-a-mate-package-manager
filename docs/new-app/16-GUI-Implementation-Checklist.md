@@ -131,7 +131,10 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
   (`TrashItemDto`/`BackupDto`) + `EfTrashQueryService`; added `ITrashService.PurgeAsync` + `FileTrashService`
   impl (deletes the trash item dir); backup dir derived from the DB path. Registered. T:
   `TrashQueryServiceFlowTests.List_restore_purge_and_backup_round_trip`.
-- [ ] **BE-N7 · `IProfileService`** (IVamProfileService). *Test:* list profiles; switch repoints one symlink (skip where privilege absent).
+- [x] **BE-N7 · `IProfileService`** (IVamProfileService). *Done:* SDK `IProfileService` + `EfProfileService`
+  (VaM root from `SettingKeys.VamPath`; list/create/active/switch delegate to `IVamProfileService`),
+  registered. T: `ProfileServiceFlowTests.Create_list_and_switch_profiles` (switch skips on `symlink.privilege`)
+  + `List_is_empty_without_vam_path`.
 - [ ] **BE-N8 · `IProposalService`** (aggregates N2/N4/N5/stale). *Test:* proposals listed; approve dispatches to the right runner; reject records.
 - [ ] **BE-N9 · `IPackageDetailQuery`** (IDependencyGraph fwd+rev, ContentItem, VarFile lineage, IThumbnailStore). *Test:* detail returns deps closure, content items, copies for a seeded package.
 - [ ] **BE-N10 · `ILibraryActionService`** (activation/move/preset/txt). *Test:* install creates links; delete gated by `DeletionPredicate` → trash; export/import txt round-trips.
