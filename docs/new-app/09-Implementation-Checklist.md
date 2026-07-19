@@ -89,7 +89,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 1.7 Live free/total capacity; refresh on demand · T: `DriveProfilerTests.Capacity_refresh_matches_drive_info` + `RepositoryService.RefreshCapacityAsync` (matches `DriveInfo`)
 - [ ] 1.8 `MinFreeBytes` reserve stored and honored by placement (T) — *field stored; placement engine pending*
 - [x] 1.9 Enable/disable repo; disabled state persists · T: `RepositoryRegistrationFlowTests.Enable_disable_persists` — `RepositoryService.SetEnabledAsync` (*scan-exclusion of disabled repos wires in when the multi-repo scan driver lands*)
-- [ ] 1.10 Offline detection: unplugged repo → `IsOnline=false`, its VarFiles marked unavailable, **not pruned** (⚠ T: offline repo's rows survive a scan)
+- [x] 1.10 Offline detection: unplugged repo → `IsOnline=false`, its VarFiles **not pruned** · ⚠ T: `ReconcileFlowTests.Reconcile_prunes_vanished_online_files_and_marks_offline_repos` (missing-mount repo → offline, its rows survive) + `IndexingFlowTests.Offline_repository_does_not_prune_vanished_files` — `CatalogReconciler`/`IndexingService` (offline ≠ gone)
 
 ### Indexing pipeline (see [06](./06-Feature-Specs-Indexing.md))
 - [x] 1.11 Enumerate `*.var` recursively; exclude link-farm dirs and reparse points; quarantine tagged/omittable · T: `RepositoryEnumeratorTests` (`Finds_live_vars_excludes_link_dirs_tags_quarantine`, `Skips_reparse_point_directories`, `Include_quarantined_false_omits_quarantined_vars`) + real-repo probe — `RepositoryEnumerator` (manual walk, skips `ReparsePoint`, `RepositoryScanRules.IsLinkDirectory`)
@@ -177,7 +177,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] 3.9 🔒 Persistent aliases (global + per-preset) re-apply automatically on every load — no re-setup (T: switch away and back, alias still applied)
 - [x] 3.10 Alias/preset serialized by **var-name string** (portable); import re-resolves with reported diff · T: `PresetImporterTests.Reports_found_substituted_and_unknown` (export→import against a different library shows found/substituted/unknown) — `PresetImporter.Analyze`
 - [x] 3.11 Import/export preset from txt; validate on import, flag unknowns/version mismatches · T: `PresetTextFormatTests` (round-trip, comments/blanks) + `PresetImporterTests` (version-mismatch→substituted, unknown, unparseable flagged) — `PresetTextFormat` + `PresetImporter`
-- [ ] 3.12 Reconcile: links the app created are owned/marked; reconcile never deletes user-made links or real files (⚠ T)
+- [x] 3.12 Reconcile: links the app created are owned (`RequestedByPresetId`); rebuild never deletes user-made links · ⚠ T: `ActivationFlowTests.Rebuild_preserves_user_made_links` (a null-attribution link survives a rebuild) — `EfActivationService` only replaces its own preset's links
 - [ ] 3.13 Rescue baseline: deactivate all → minimal set; game launches (M/D)
 - [ ] 3.14 Temp activation auto-cleaned after use (T)
 - [x] 3.15 Deactivation reference-counts DependencyOf links; drops only unneeded ones · T: `ActivationFlowTests.Deactivation_reference_counts_shared_dependencies` (two looks share a dep; deactivating one keeps the shared dep, still needed by the other) — `EfActivationService.DeactivateAsync`

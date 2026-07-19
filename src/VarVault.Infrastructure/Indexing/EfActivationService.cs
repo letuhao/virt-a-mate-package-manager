@@ -51,8 +51,10 @@ public sealed class EfActivationService(VarVaultDbContext db, IClock clock, IDep
                 full.Add(dep);
         }
 
-        // Replace the profile's links.
-        var existing = await db.ActivationLinks.Where(l => l.ProfileId == profile.Id).ToListAsync(cancellationToken).ConfigureAwait(false);
+        // Replace only the links THIS preset created (owned); never touch user-made links. (3.12)
+        var existing = await db.ActivationLinks
+            .Where(l => l.ProfileId == profile.Id && l.RequestedByPresetId == presetId)
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
         if (existing.Count > 0)
             db.ActivationLinks.RemoveRange(existing);
 

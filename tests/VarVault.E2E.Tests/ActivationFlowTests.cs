@@ -109,6 +109,40 @@ public sealed class ActivationFlowTests
         Assert.True(await db.ActivationLinks.AnyAsync(l => l.VarFileId == sharedVarId)); // ref-counted, not dropped
     }
 
+    [Fact]
+    public async Task Rebuild_preserves_user_made_links()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+        WriteVar(repoDir, "A.Solo.1.var", "A", "Solo");
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IDependencyResolver>().ResolveAllAsync();
+        var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+        var preset = (await scope.ServiceProvider.GetRequiredService<IPresetService>().CreateAsync("P", ["A.Solo.1"])).Value;
+        var activation = scope.ServiceProvider.GetRequiredService<IActivationService>();
+
+        await activation.BuildProfileLinksAsync(preset.Id);
+        var profile = await db.Profiles.FirstAsync();
+        var solo = await db.VarFiles.FirstAsync();
+
+        // A user-made link (no preset attribution) in the same profile.
+        db.ActivationLinks.Add(new ActivationLink
+        {
+            ProfileId = profile.Id, VarFileId = solo.Id, LinkPath = "user/link.var",
+            LinkKind = LinkKind.Install, LinkType = LinkType.Symlink, Reason = ActivationReason.Explicit,
+            RequestedByPresetId = null, // user-made
+        });
+        await db.SaveChangesAsync();
+
+        await activation.BuildProfileLinksAsync(preset.Id); // rebuild
+
+        // The user-made link survives; only the app's own links were replaced. (3.12)
+        Assert.True(await db.ActivationLinks.AnyAsync(l => l.RequestedByPresetId == null));
+    }
+
     private static async Task<Guid> Register(TestHost host, string path)
     {
         using var scope = host.Host.Services.CreateScope();
