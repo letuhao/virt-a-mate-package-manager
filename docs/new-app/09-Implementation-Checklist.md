@@ -45,7 +45,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] TO-7 **Tracing** — `ActivitySource` "VarVault"; write/job activities
 - [x] TO-8 **Health checks** — `write-queue` (liveness) + `database` (readiness) via `HealthCheckService` · T: E2E asserts `Healthy`
 - [x] TO-9 **Log-as-probe** — `CapturingLoggerProvider` asserts structured entries · T: E2E asserts startup line
-- [ ] TO-10 **UI-E2E** — Avalonia.Headless.XUnit harness (added with the app)
+- [x] TO-10 **UI-E2E** — Avalonia.Headless.XUnit harness · T: `MainWindowUiTests.Main_window_shows_library_rows_after_refresh` (`[AvaloniaFact]` under the headless dispatcher: window binds `MainWindowViewModel`, ListBox renders 4 rows after refresh) — `TestAppBuilder` (`[AvaloniaTestApplication]`)
 - *Total suite: 25 tests across 5 test projects, all green.*
 
 ### Database & migrations

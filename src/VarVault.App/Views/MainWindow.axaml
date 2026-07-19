@@ -1,0 +1,41 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+        xmlns:lib="clr-namespace:VarVault.Sdk.Library;assembly=VarVault.Sdk"
+        x:Class="VarVault.App.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Width="1100" Height="720"
+        Title="{Binding Title}">
+
+  <DockPanel LastChildFill="True">
+
+    <Border DockPanel.Dock="Top" Padding="16,12" Background="{StaticResource AccentBrush}">
+      <TextBlock Text="{Binding Title}" Foreground="White" FontSize="18" FontWeight="SemiBold" />
+    </Border>
+
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="16,12,16,4">
+      <TextBox Grid.Column="0"
+               Watermark="Search packages…"
+               Text="{Binding Library.SearchText}" />
+      <Button Grid.Column="1" Margin="8,0,0,0" Content="Refresh"
+              Command="{Binding Library.RefreshCommand}" />
+    </Grid>
+
+    <TextBlock DockPanel.Dock="Bottom" Margin="16,4,16,12" Opacity="0.7"
+               Text="{Binding Library.TotalCount, StringFormat='{}{0} packages'}" />
+
+    <ListBox Margin="16,4" ItemsSource="{Binding Library.Items}">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="lib:PackageListEntry">
+          <Grid ColumnDefinitions="*,120,90,90" Height="28">
+            <TextBlock Grid.Column="0" Text="{Binding VarName}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="{Binding Creator}" VerticalAlignment="Center" Opacity="0.8" />
+            <TextBlock Grid.Column="2" Text="{Binding PrimaryType}" VerticalAlignment="Center" Opacity="0.8" />
+            <TextBlock Grid.Column="3" Text="{Binding StorageClass}" VerticalAlignment="Center" Opacity="0.8" />
+          </Grid>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+
+  </DockPanel>
+</Window>

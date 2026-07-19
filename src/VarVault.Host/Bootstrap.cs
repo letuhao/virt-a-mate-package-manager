@@ -1,3 +1,6 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using VarVault.Infrastructure.Persistence;
 using VarVault.Modules.Indexing;
 using VarVault.Modules.Repositories;
 using VarVault.Sdk.Modularity;
@@ -19,4 +22,21 @@ public static class Bootstrap
 
     public static VarVaultHost BuildDefault(HostOptions? options = null) =>
         VarVaultHost.Build(options ?? HostOptions.Default, [.. BuiltInModules()]);
+
+    /// <summary>
+    /// Full app composition: built-in modules + the catalog DB under <paramref name="dataDirectory"/>,
+    /// migrated and ready. Front-ends call this so they never bind to Infrastructure directly.
+    /// </summary>
+    public static VarVaultHost BuildApp(string dataDirectory)
+    {
+        var dbPath = System.IO.Path.Combine(dataDirectory, "catalog.db");
+        var host = VarVaultHost.Build(
+            new HostOptions("VarVault", dataDirectory),
+            services => services.AddVarVaultPersistence(dbPath),
+            [.. BuiltInModules()]);
+
+        using var scope = host.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<VarVaultDbContext>().Database.Migrate();
+        return host;
+    }
 }
