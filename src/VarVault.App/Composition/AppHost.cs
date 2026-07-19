@@ -2,17 +2,57 @@ using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using VarVault.App.ViewModels;
 using VarVault.Host;
+using VarVault.Sdk.Activation;
 using VarVault.Sdk.Library;
 
 namespace VarVault.App.Composition;
 
 /// <summary>
-/// Composes the backend host for the desktop app (built-in modules + catalog DB under LocalAppData)
-/// and resolves the root view-model. Isolated here so the app shell stays declarative, and depends
-/// only on the Host + SDK (never Infrastructure directly).
+/// Composes the backend host and the shell view-model. Depends only on Host + SDK. Screen view-models are
+/// resolved from SDK services; screens whose views land in later SCR slices get a placeholder so the shell
+/// always resolves with all 13 screens non-null. (16-checklist SH-6.)
 /// </summary>
 public static class AppHost
 {
+    /// <summary>Build the shell + all screen view-models from a composed service provider (app-lifetime scope).</summary>
+    public static ShellViewModel CreateShell(IServiceProvider services)
+    {
+        var screens = new Dictionary<string, object>
+        {
+            ["library"] = new LibraryViewModel(
+                services.GetRequiredService<ILibraryQueryService>(),
+                services.GetService<Sdk.Settings.ISettingsService>()),
+            ["analytics"] = new AnalyticsViewModel(services.GetRequiredService<IAnalyticsService>()),
+            ["history"] = new ActivityViewModel(services.GetRequiredService<IActivityLog>()),
+            ["missing"] = new MissingDepsViewModel(services.GetRequiredService<IMissingDepsQuery>()),
+        };
+
+        // Placeholders for screens whose full views arrive in SCR slices — keeps the shell complete.
+        foreach (var s in ShellViewModel.AllScreens)
+            screens.TryAdd(s.Id, new PlaceholderScreenViewModel(s.Label));
+
+        return new ShellViewModel(screens, initial: "library");
+    }
+
+    /// <summary>Compose the app host under LocalAppData and build the shell; null on composition failure.</summary>
+    public static ShellViewModel? TryCreateShell()
+    {
+        try
+        {
+            var dataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VarVault");
+            Directory.CreateDirectory(dataDir);
+            var host = Bootstrap.BuildApp(dataDir);
+            var scope = host.Services.CreateScope(); // app-lifetime scope backing the shell's read services
+            return CreateShell(scope.ServiceProvider);
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Legacy library-only view-model (kept for the existing MainWindow until screens land).</summary>
     public static MainWindowViewModel? TryCreateMainViewModel()
     {
         try
@@ -20,17 +60,14 @@ public static class AppHost
             var dataDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VarVault");
             Directory.CreateDirectory(dataDir);
-
             var host = Bootstrap.BuildApp(dataDir);
-
-            // A single app-lifetime scope backs the read services the view-models query.
             var scope = host.Services.CreateScope();
             var library = scope.ServiceProvider.GetRequiredService<ILibraryQueryService>();
             return new MainWindowViewModel(new LibraryViewModel(library));
         }
         catch (Exception)
         {
-            return null; // shell still renders; the user sees an empty state
+            return null;
         }
     }
 }

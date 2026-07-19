@@ -191,8 +191,11 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
 - [x] **SH-5 · Log dock.** *Read:* `:576`. *Items:* index status, selected count, tier %. *Done:*
   `Views/LogDockView.axaml` + shell `IndexStatus`/`SelectedCount`/`TierSummary`. T:
   `LogDockViewTests.Binds_index_selected_and_tier_summary`.
-- [ ] **SH-6 · AppHost wiring.** Replace stub: build host, register **all** screen VMs + shell, resolve
-  `ShellViewModel`. *Rule:* no orphaned VMs. *Test:* host resolves shell with all 13 screens non-null.
+- [x] **SH-6 · AppHost wiring.** *Done:* `Composition/AppHost.CreateShell(services)` builds the shell from
+  the DI provider — real VMs for Library/Analytics/Activity/Missing, `PlaceholderScreenViewModel` for
+  screens whose views land in SCR slices; `TryCreateShell()` composes the host. T: `AppHostShellTests`
+  (`Shell_resolves_with_all_screens_non_null` — 13 non-null; `Backend_ready_screens_use_real_view_models`).
+  *(MainWindow→shell-layout swap happens once screen views exist.)*
 
 ---
 
