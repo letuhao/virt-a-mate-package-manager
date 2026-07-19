@@ -104,7 +104,10 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
   `IIndexOrchestrator` + `Modules.Indexing/IndexOrchestrator` (scope-factory pattern, registered singleton).
   T: `IndexOrchestratorFlowTests.Index_all_populates_read_model_resolves_and_recomputes` (missing-dep var →
   `HasMissingDeps=true`) + `Index_all_on_a_real_repo` (D: 277-var corpus; E/F/G reserved as move targets).
-- [ ] **BE-N1 · `IDashboardService`.** *Test:* summary totals/tiers/classes/reclaim/attention from a seeded catalog.
+- [x] **BE-N1 · `IDashboardService`.** *Done:* SDK `IDashboardService`/`DashboardSummary`/`TierUtilization`
+  + `Infrastructure/Library/EfDashboardService` (totals, class counts, active, missing-deps, per-tier
+  storage from repos), registered. T: `EfDashboardServiceTests` (`Summary_aggregates_totals_classes_and_tiers`,
+  `Empty_catalog_returns_zeros`). *(reclaim tiles compose BE-N4/N2 at the Dashboard screen.)*
 - [ ] **BE-N2 · `ITieringService`** (PlacementPolicy/MigrationPlanner/RebalancePlanner/UsageAnalyzer). *Test:* misplaced detection + plan build with a full-tier.
 - [ ] **BE-N3 · `IMigrationService`** (MigrationRunner/DurableFileMover). *Test:* run a plan → copy→verify→rename→delete, source trashed, single-copy excluded.
 - [ ] **BE-N4 · `IReclaimService`** (DedupGrouping/DeletionPredicate/Sha256FileHasher). *Test:* exact groups; keep-one trashes only hash-verified redundant copies; single-copy protected.
