@@ -26,6 +26,34 @@
     </Setter>
   </ControlTheme>
 
+  <!-- SC-11 · RailNavItem -->
+  <ControlTheme x:Key="{x:Type c:RailNavItem}" TargetType="c:RailNavItem">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="PART_Bg" CornerRadius="{DynamicResource RadiusSm}" Padding="9,7" Background="Transparent">
+          <Grid ColumnDefinitions="Auto,*,Auto">
+            <ContentPresenter Grid.Column="0" Content="{TemplateBinding Content}" VerticalAlignment="Center" Margin="0,0,9,0" />
+            <TextBlock Grid.Column="1" Text="{TemplateBinding Label}" VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextBrush}" />
+            <Border Grid.Column="2" Name="PART_Badge" CornerRadius="8" Padding="6,0"
+                    Background="{DynamicResource Bg3Brush}" IsVisible="{TemplateBinding HasBadge}">
+              <TextBlock Text="{TemplateBinding Badge}" FontSize="10" Opacity="0.85" />
+            </Border>
+          </Grid>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^.active /template/ Border#PART_Bg">
+      <Setter Property="Background" Value="{DynamicResource AccentBgBrush}" />
+    </Style>
+    <Style Selector="^.active /template/ TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource AccentHiBrush}" />
+    </Style>
+    <Style Selector="^.warn /template/ Border#PART_Badge">
+      <Setter Property="Background" Value="{DynamicResource WarnBgBrush}" />
+    </Style>
+  </ControlTheme>
+
   <!-- SC-10 · Toast -->
   <ControlTheme x:Key="{x:Type c:Toast}" TargetType="c:Toast">
     <Setter Property="Template">

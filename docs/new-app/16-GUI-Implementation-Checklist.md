@@ -83,7 +83,9 @@ Build once, reused everywhere. Read the CSS token block `prototype.html:1–195`
   *Done:* `Controls/Toast.cs` (`Show`/`Undo`/`Dismiss`, injectable dismiss delay) + ControlTheme. T:
   `ToastControlTests` (message+undo render; no-undo hides button; Undo fires callback+hides; gated
   auto-dismiss hides).
-- [ ] **SC-11 · RailNavItem.** *Read:* `:202–220`. Icon + label + optional badge + active state. *Test:* active toggles; badge count shows.
+- [x] **SC-11 · RailNavItem.** *Read:* `:202–220`. Icon + label + optional badge + active state. *Done:*
+  `Controls/RailNavItem.cs` (icon Content, Label, Badge+BadgeKind, IsActive) + ControlTheme. T:
+  `RailNavItemTests` (`Active_toggles_class`, `Badge_count_renders_when_present`, `No_badge_hides_the_badge`).
 - [ ] **SC-12 · JobRow.** *Read:* `:235–237`. Title + cancel × + progress bar + sub-line. *Test:* binds `JobHandle` progress; cancel invokes `JobContext.Cancellation`.
 
 ---
