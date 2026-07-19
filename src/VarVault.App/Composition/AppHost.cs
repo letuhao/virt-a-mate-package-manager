@@ -24,6 +24,8 @@ public static class AppHost
                 services.GetService<Sdk.Settings.ISettingsService>(),
                 actions: services.GetService<ILibraryActionService>()),
             ["analytics"] = new AnalyticsViewModel(services.GetRequiredService<IAnalyticsService>()),
+            ["dashboard"] = new DashboardViewModel(services.GetRequiredService<IDashboardService>()),
+            ["repos"] = new RepositoriesViewModel(services.GetRequiredService<Sdk.Repositories.IRepositoryService>()),
             ["history"] = new ActivityViewModel(services.GetRequiredService<IActivityLog>()),
             ["missing"] = new MissingDepsViewModel(services.GetRequiredService<IMissingDepsQuery>()),
         };

@@ -1,0 +1,35 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:VarVault.App.Controls"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             xmlns:repo="clr-namespace:VarVault.Sdk.Repositories;assembly=VarVault.Sdk"
+             x:Class="VarVault.App.Views.RepositoriesView"
+             x:DataType="vm:RepositoriesViewModel">
+  <ScrollViewer Padding="18">
+    <StackPanel Spacing="12">
+      <TextBlock Text="Repositories &amp; tiers" FontSize="21" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+      <ItemsControl ItemsSource="{Binding Repositories}">
+        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="repo:RepositoryInfo">
+            <c:Card Width="320" Margin="0,0,14,14">
+              <StackPanel Spacing="6">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Border Background="{DynamicResource AccentBrush}" CornerRadius="4" Padding="6,1">
+                    <TextBlock Text="{Binding Tier, StringFormat='T{0}'}" Foreground="White" FontWeight="SemiBold" />
+                  </Border>
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center" />
+                  <c:Tag Content="online" Kind="Good" IsVisible="{Binding IsOnline}" />
+                  <c:Tag Content="offline" IsVisible="{Binding !IsOnline}" />
+                </StackPanel>
+                <TextBlock Text="{Binding MediaType}" Opacity="0.7" FontSize="11" />
+                <TextBlock Text="{Binding MountPath}" Opacity="0.6" FontSize="11" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </c:Card>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock Text="No repositories yet." Opacity="0.7" IsVisible="{Binding IsEmpty}" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

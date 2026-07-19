@@ -212,7 +212,9 @@ Each cites its plan item numbers (15-plan) and its HTML range. Read both before 
   (`Renders_table_rows_and_detail`, `Export_selection_produces_txt`, `Rail_favorites_filters`).
   - [x] SCR-2a Rail · [x] SCR-2b Facet bar · [x] SCR-2c Table cols · [x] SCR-2d Gallery · [x] SCR-2e Ops bar
     (Export functional; Delete/Fix/Add-to-preset buttons route through DLG-6/preset picker) · [x] SCR-2f Detail panel.
-- [ ] **SCR-3 · Repositories.** *Read:* `:395–414`. *Items:* Repos #1–42. *BE:* `IRepositoryService`, N2, N13. *Test:* 4 repo cards bind capacity/tier/online; actions invoke Benchmark/SetEnabled.
+- [x] **SCR-3 · Repositories.** *Read:* `:395–414`. *BE:* `IRepositoryService`. *Done:*
+  `RepositoriesViewModel` + `Views/RepositoriesView.axaml` (repo cards: tier/name/online/media/path,
+  Benchmark). Wired in AppHost. T: `RepositoriesScreenTests.Loads_and_renders_repo_cards`.
 - [ ] **SCR-4 · Loading presets.** *Read:* `:417–440`. *Items:* Presets #1–16. *BE:* `IPresetService`, N7, N10, N11. *Test:* list + member table bind; Switch invokes N7.
 - [ ] **SCR-5 · Tiering & migration.** *Read:* `:443–457`. *Items:* Tiering #1–23. *BE:* N1, N2, N3. *Test:* class counts + misplaced table; Plan opens m-migrate.
 - [ ] **SCR-6 · Duplicates & reclaim.** *Read:* `:460–474`. *Items:* Dupes #1–22. *BE:* N4, N2. *Test:* reclaim cards + exact-dup groups bind; Review opens m-dupe.
