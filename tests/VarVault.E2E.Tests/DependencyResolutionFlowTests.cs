@@ -170,6 +170,28 @@ public sealed class DependencyResolutionFlowTests
         Assert.True(touched >= 1);
     }
 
+    [Fact]
+    public async Task Missing_deps_query_lists_refs_with_needed_by_counts()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+
+        // Two consumers both need the same missing package; one needs another.
+        WriteVar(repoDir, "A.One.1.var", Meta("A", "One", "Ghost.Common.1"), [("Custom/Hair/h.vam", "1")]);
+        WriteVar(repoDir, "A.Two.1.var", Meta("A", "Two", "Ghost.Common.1", "Ghost.Extra.1"), [("Custom/Hair/h.vam", "2")]);
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IDependencyResolver>().ResolveAllAsync();
+
+        var missing = await scope.ServiceProvider.GetRequiredService<Sdk.Library.IMissingDepsQuery>().GetMissingAsync();
+
+        Assert.Equal("Ghost.Common.1", missing[0].Ref); // most-needed first
+        Assert.Equal(2, missing[0].NeededByCount);
+        Assert.Contains(missing, m => m.Ref == "Ghost.Extra.1" && m.NeededByCount == 1);
+    }
+
     private static void WriteVarWithScene(TempDirectory dir, string fileName, string metaCreator, string metaPackage, string sceneJson)
     {
         var path = Path.Combine(dir.Path, fileName);

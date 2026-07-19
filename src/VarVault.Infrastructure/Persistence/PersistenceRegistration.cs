@@ -41,6 +41,7 @@ public static class PersistenceRegistration
         services.AddSingleton<ITrashService>(sp => new FileTrashService(trashRoot, sp.GetRequiredService<IClock>()));
         services.AddScoped<IRepositoryStore, EfRepositoryStore>();
         services.AddScoped<Sdk.Library.ILibraryQueryService, Library.EfLibraryQueryService>();
+        services.AddScoped<Sdk.Library.IMissingDepsQuery, Library.EfMissingDepsQuery>();
         services.AddScoped<Sdk.Settings.ISettingsService, EfSettingsService>();
         services.AddScoped<Sdk.Presets.IPresetService, Indexing.EfPresetService>();
         services.AddScoped<Sdk.Activation.IActivationService, Indexing.EfActivationService>();
