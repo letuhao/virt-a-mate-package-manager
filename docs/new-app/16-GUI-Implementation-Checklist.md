@@ -113,7 +113,10 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
   `PlacementPolicy.IsMisplaced`, propose-only plan via `MigrationPlanner.Plan` with safe-tier predicate),
   registered. T: `EfTieringServiceTests` (`Class_counts_and_misplaced_from_read_model`,
   `Build_plan_proposes_moves_and_excludes_single_copy`).
-- [ ] **BE-N3 · `IMigrationService`** (MigrationRunner/DurableFileMover). *Test:* run a plan → copy→verify→rename→delete, source trashed, single-copy excluded.
+- [x] **BE-N3 · `IMigrationService`** (MigrationRunner/DurableFileMover). *Done:* SDK `IMigrationService`
+  (`MigrationRequest`/`MigrationRunResult`) + `EfMigrationService` (persists a `MigrationJob` per move, runs
+  the durable state machine), registered. T: `MigrationServiceFlowTests.Run_moves_the_var_to_the_target_and_trashes_the_source`
+  + `Cross_drive_move_between_reserved_repos` (real E:→F: move on the reserved repos, non-destructive scratch file).
 - [ ] **BE-N4 · `IReclaimService`** (DedupGrouping/DeletionPredicate/Sha256FileHasher). *Test:* exact groups; keep-one trashes only hash-verified redundant copies; single-copy protected.
 - [ ] **BE-N5 · `IHealthService`** (EncodingHealthEngine/EncodingFixCoordinator). *Test:* encoding groups; fix writes UTF-8 var, keeps original, validates load.
 - [ ] **BE-N6 · `ITrashQueryService`** (ITrashService/SqliteDatabaseBackup). *Test:* list/restore/purge round-trip; backup+restore.
