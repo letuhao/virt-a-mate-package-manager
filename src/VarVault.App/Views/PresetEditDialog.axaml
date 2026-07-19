@@ -1,0 +1,17 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             x:Class="VarVault.App.Views.PresetEditDialog"
+             x:DataType="vm:PresetEditViewModel">
+  <StackPanel Spacing="10" MinWidth="440">
+    <TextBlock Text="Edit preset" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+    <TextBox Watermark="Preset name" Text="{Binding Name}" MaxWidth="260" HorizontalAlignment="Left" />
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <TextBox Width="260" Watermark="Add member ref (Creator.Package.Version)" Text="{Binding NewMemberRef}" />
+      <Button Content="Add" Command="{Binding AddMemberCommand}" />
+    </StackPanel>
+    <TextBlock Text="{Binding StatusMessage}" Opacity="0.8" />
+    <TextBlock Opacity="0.8" IsVisible="{Binding Preview, Converter={x:Static ObjectConverters.IsNotNull}}"
+               Text="{Binding Preview.TotalWithClosure, StringFormat='{}{0} packages with closure'}" />
+  </StackPanel>
+</UserControl>
