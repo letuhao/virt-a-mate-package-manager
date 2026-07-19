@@ -262,7 +262,7 @@ Each is content inside SC-9. Read its exact modal lines (HR-0).
 - [x] **DLG-6 · m-confirm (delete).** *BE:* N10 + DeletionPredicate. *Done:* `ConfirmDeleteViewModel(ILibraryActionService)` + `Views/ConfirmDeleteDialog.axaml` (single-copy protected/excluded, safe→trash). T: `ConfirmDeleteDialogTests.Single_copy_is_excluded_from_delete`.
 - [ ] **DLG-7 · m-preset (edit).** *Read:* `:638–645`. *Items:* preset #1–12. *BE:* `IPresetService`, N10. *Test:* member table + pin; Save persists.
 - [x] **DLG-8 · m-dupe (review).** *BE:* N4. *Done:* `DupeReviewViewModel(IReclaimService)` + `Views/DupeReviewDialog.axaml` (keep-one, trash rest, full-hash verified). T: `DupeReviewDialogTests.Keep_first_trash_rest`.
-- [ ] **DLG-9 · m-rescue.** *Read:* `:656–660`. *Items:* rescue #1–5. *BE:* `IActivationService.RescueAsync`. *Test:* baseline select; Apply calls rescue.
+- [x] **DLG-9 · m-rescue.** *BE:* `IActivationService.RescueAsync`. *Done:* `RescueViewModel(IActivationService)` + `Views/RescueDialog.axaml` (baseline apply). T: `RescueDialogTests.Apply_calls_rescue`.
 - [x] **DLG-10 · m-vardetail.** *BE:* N9. *Done:* `VarDetailViewModel(IPackageDetailQuery)` + `Views/VarDetailDialog.axaml` (identity/foldkey/license/size/depended-on/class, copies/content/closure counts). T: `VarDetailDialogTests.Loads_and_renders_detail`.
 - [ ] **DLG-11 · Toast/undo.** Covered by SC-10; wire per-action undo (trash restore / activation revert). *Test:* Undo reverses the last action.
 
