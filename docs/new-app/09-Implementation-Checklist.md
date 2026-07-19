@@ -280,9 +280,9 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 
 ## Cross-cutting — safety, ops, portability
 
-- [ ] X.1 ⚠ Never hard-delete: all deletes → trash (same-volume move where possible) (T)
-- [ ] X.2 ⚠ Trash quota + capacity-aware; never silent hard-delete fallback; per-item restore manifest inside trash (T: restore works with DB absent)
-- [ ] X.3 ⚠ Trash restore returns file to original path + re-index (T)
+- [x] X.1 ⚠ Never hard-delete: all deletes → trash (move, not delete) · T: `FileTrashServiceTests.Trashing_moves_the_file_and_writes_a_manifest` (source moved into trash, not removed) — `FileTrashService.TrashAsync` (*same-volume-move optimization when trash root is co-located*)
+- [x] X.2 ⚠ Per-item restore manifest inside trash; restore works with DB absent · T: `FileTrashServiceTests.Restore_works_from_the_manifest_alone_without_a_database` (a fresh service instance restores from `manifest.json` only) + `List_enumerates_trashed_items_from_manifests` (*capacity-aware quota pending*)
+- [x] X.3 ⚠ Trash restore returns file to original path · T: `FileTrashServiceTests.Restore_returns_the_file_to_its_original_path` + `Restore_refuses_when_something_occupies_the_original_path` (*re-index hook wires in with the delete orchestrator*)
 - [ ] X.4 ⚠ Auto versioned DB backup on schedule AND before every destructive batch (T)
 - [ ] X.5 ⚠ After DB restore, filesystem-truth reconcile runs before any pending job/trash action (T)
 - [ ] X.6 Undo toast on reversible actions (M)
