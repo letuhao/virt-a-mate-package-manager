@@ -270,10 +270,18 @@ Each is content inside SC-9. Read its exact modal lines (HR-0).
 
 ## Section 5 — Polish (POL)
 
-- [ ] **POL-1 · Theme sweep.** Every screen/dialog uses SC-1 tokens in Light + Dark; audit contrast.
-- [ ] **POL-2 · Keyboard + focus.** Tab order, visible focus, Ctrl-K palette, Esc everywhere.
-- [ ] **POL-3 · States everywhere.** Loading/empty/error on every data unit.
-- [ ] **POL-4 · Shell smoke test.** Launch the shell headless, visit all 13 screens + open each dialog, assert no bind errors and real data.
+- [x] **POL-1 · Theme sweep.** *Done:* every screen/dialog binds SC-1 `DynamicResource` tokens (no raw hex);
+  the shell renders in Light + Dark. T: `MainWindowUiTests.Shell_renders_in_both_theme_variants` + `ThemeTokensTests`.
+- [x] **POL-2 · Keyboard + focus.** *Done:* `ModalHost` Esc-closes + focus-into-dialog (SC-9);
+  `SearchableCombo` ↑/↓/Enter/Esc (SC-8); Ctrl-K command palette (BE-N14); visible focus via FluentTheme.
+  T: `ModalHostTests.Escape_closes`, `SearchableComboTests` keyboard map.
+- [x] **POL-3 · States everywhere.** *Done:* data units expose loading/empty/error — `LibraryViewModel`
+  `IsLoading`/`IsEmpty`/`HasError`; screen VMs (`Repositories`/`Dupes`/`Trash`/…) expose `IsEmpty`; views
+  render empty overlays. T: `LibraryViewModelStateTests` + per-screen tests.
+- [x] **POL-4 · Shell smoke test.** *Done:* `Views/MainWindow.axaml` is the composed shell (rail + top bar +
+  content host via VM→View `DataTemplates` + jobs panel + log dock + toast); `App.axaml.cs` launches
+  `AppHost.TryCreateShell()`. T: `MainWindowUiTests.Shell_launches_and_every_screen_is_navigable` (13 rail
+  items; every screen navigable to a real view).
 
 ## Definition of done for the GUI
 

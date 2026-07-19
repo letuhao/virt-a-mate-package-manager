@@ -1,122 +1,48 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:VarVault.App.ViewModels"
-        xmlns:lib="clr-namespace:VarVault.Sdk.Library;assembly=VarVault.Sdk"
+        xmlns:views="clr-namespace:VarVault.App.Views"
+        xmlns:c="clr-namespace:VarVault.App.Controls"
         x:Class="VarVault.App.Views.MainWindow"
-        x:DataType="vm:MainWindowViewModel"
-        Width="1200" Height="760"
-        Title="{Binding Title}">
+        x:DataType="vm:ShellViewModel"
+        Width="1280" Height="820" Title="VarVault"
+        Background="{DynamicResource Bg0Brush}">
 
-  <DockPanel LastChildFill="True">
+  <Window.DataTemplates>
+    <!-- Map each screen view-model to its view (POL-4 shell hosting). -->
+    <DataTemplate DataType="vm:DashboardViewModel"><views:DashboardView /></DataTemplate>
+    <DataTemplate DataType="vm:LibraryViewModel"><views:LibraryView /></DataTemplate>
+    <DataTemplate DataType="vm:PresetsViewModel"><views:PresetsView /></DataTemplate>
+    <DataTemplate DataType="vm:TieringViewModel"><views:TieringView /></DataTemplate>
+    <DataTemplate DataType="vm:DupesViewModel"><views:DupesView /></DataTemplate>
+    <DataTemplate DataType="vm:AnalyticsViewModel"><views:AnalyticsView /></DataTemplate>
+    <DataTemplate DataType="vm:ProposalsViewModel"><views:ProposalsView /></DataTemplate>
+    <DataTemplate DataType="vm:HealthViewModel"><views:HealthView /></DataTemplate>
+    <DataTemplate DataType="vm:MissingDepsViewModel"><views:MissingView /></DataTemplate>
+    <DataTemplate DataType="vm:RepositoriesViewModel"><views:RepositoriesView /></DataTemplate>
+    <DataTemplate DataType="vm:TrashViewModel"><views:TrashView /></DataTemplate>
+    <DataTemplate DataType="vm:ActivityViewModel"><views:ActivityView /></DataTemplate>
+    <DataTemplate DataType="vm:SettingsViewModel"><views:SettingsView /></DataTemplate>
+    <DataTemplate DataType="vm:PlaceholderScreenViewModel">
+      <TextBlock Text="{Binding Title, StringFormat='{}{0} — coming soon'}" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.6" />
+    </DataTemplate>
+  </Window.DataTemplates>
 
-    <!-- Header -->
-    <Border DockPanel.Dock="Top" Padding="16,12" Background="{StaticResource AccentBrush}">
-      <DockPanel LastChildFill="False">
-        <TextBlock Text="{Binding Title}" Foreground="White" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
-        <Button DockPanel.Dock="Right" Content="Table / Gallery" Command="{Binding Library.ToggleViewModeCommand}" />
+  <Panel>
+    <Grid ColumnDefinitions="Auto,*">
+      <views:RailView Grid.Column="0" DataContext="{Binding}" />
+      <DockPanel Grid.Column="1" LastChildFill="True">
+        <views:TopBarView DockPanel.Dock="Top" DataContext="{Binding}" />
+        <views:LogDockView DockPanel.Dock="Bottom" DataContext="{Binding}" />
+        <ContentControl Content="{Binding ActiveScreen}" />
       </DockPanel>
-    </Border>
-
-    <!-- Filter bar -->
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto" Margin="16,12,16,4">
-      <!-- Searchable creator combobox (type-to-filter). (1.46) -->
-      <AutoCompleteBox Grid.Column="0" Width="180" Watermark="All creators"
-                       ItemsSource="{Binding Library.Creators}"
-                       Text="{Binding Library.CreatorFilter}"
-                       FilterMode="Contains" />
-      <TextBox Grid.Column="1" Margin="8,0" Watermark="Search packages…" Text="{Binding Library.SearchText}" />
-      <CheckBox Grid.Column="2" Margin="8,0" Content="Favorites" IsChecked="{Binding Library.FavoritesOnly}" />
-      <Button Grid.Column="3" Content="Refresh" Command="{Binding Library.RefreshCommand}" />
     </Grid>
 
-    <!-- Column headers (click to sort) -->
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,160,110,90,90,60" Margin="18,4,18,0">
-      <Button Grid.Column="0" Content="Name"    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-              Command="{Binding Library.SortByCommand}" CommandParameter="{x:Static lib:LibrarySort.Name}" />
-      <Button Grid.Column="1" Content="Creator" Command="{Binding Library.SortByCommand}" CommandParameter="{x:Static lib:LibrarySort.Creator}" />
-      <Button Grid.Column="2" Content="Type" />
-      <Button Grid.Column="3" Content="Size"    Command="{Binding Library.SortByCommand}" CommandParameter="{x:Static lib:LibrarySort.Size}" />
-      <Button Grid.Column="4" Content="Class"   Command="{Binding Library.SortByCommand}" CommandParameter="{x:Static lib:LibrarySort.Class}" />
-      <TextBlock Grid.Column="5" Text="Deps" VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0.7" />
-    </Grid>
+    <!-- Jobs panel overlay (top-right) -->
+    <views:JobsPanelView DataContext="{Binding}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,44,14,0" />
 
-    <!-- Detail panel -->
-    <Border DockPanel.Dock="Right" Width="280" Margin="0,8,16,12" Padding="12"
-            BorderBrush="#22808080" BorderThickness="1" CornerRadius="6"
-            IsVisible="{Binding Library.SelectedEntry, Converter={x:Static ObjectConverters.IsNotNull}}">
-      <StackPanel Spacing="6" DataContext="{Binding Library.SelectedEntry}" x:DataType="lib:PackageListEntry">
-        <TextBlock Text="{Binding VarName}" FontWeight="SemiBold" TextWrapping="Wrap" />
-        <TextBlock Text="{Binding Creator, StringFormat='by {0}'}" Opacity="0.8" />
-        <TextBlock Text="{Binding PrimaryType, StringFormat='Type: {0}'}" Opacity="0.8" />
-        <TextBlock Text="{Binding StorageClass, StringFormat='Class: {0}'}" Opacity="0.8" />
-        <TextBlock Text="{Binding OnlineInstanceCount, StringFormat='Online copies: {0}'}" Opacity="0.8" />
-        <TextBlock Text="Single copy — protected" Opacity="0.8"
-                   IsVisible="{Binding IsSingleCopy}" Foreground="#C46210" />
-        <TextBlock Text="Missing dependencies" Foreground="#B00020"
-                   IsVisible="{Binding HasMissingDeps}" />
-      </StackPanel>
-    </Border>
-
-    <!-- Status line -->
-    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="18,4,18,12" Opacity="0.7">
-      <!-- "~" marks the count as approximate while typing settles (1.41). -->
-      <TextBlock Text="~" IsVisible="{Binding Library.IsCountApproximate}" />
-      <TextBlock Text="{Binding Library.TotalCount, StringFormat='{}{0} packages'}" />
-    </StackPanel>
-
-    <!-- Content area with state overlays -->
-    <Panel Margin="16,4">
-      <!-- Table view: virtualized columned grid. (1.43) -->
-      <ListBox ItemsSource="{Binding Library.Items}" SelectionMode="Multiple"
-               SelectedItem="{Binding Library.SelectedEntry}"
-               IsVisible="{Binding Library.IsTableView}">
-        <ListBox.ItemTemplate>
-          <DataTemplate x:DataType="lib:PackageListEntry">
-            <Grid ColumnDefinitions="*,160,110,90,90,60" Height="26">
-              <TextBlock Grid.Column="0" Text="{Binding VarName}" VerticalAlignment="Center" />
-              <TextBlock Grid.Column="1" Text="{Binding Creator}" VerticalAlignment="Center" Opacity="0.85" />
-              <TextBlock Grid.Column="2" Text="{Binding PrimaryType}" VerticalAlignment="Center" Opacity="0.85" />
-              <TextBlock Grid.Column="3" Text="{Binding TotalSize}" VerticalAlignment="Center" Opacity="0.85" />
-              <TextBlock Grid.Column="4" Text="{Binding StorageClass}" VerticalAlignment="Center" Opacity="0.85" />
-              <!-- Deps state encoded by text, not colour alone (colourblind-safe). -->
-              <TextBlock Grid.Column="5" Text="!" HorizontalAlignment="Center" VerticalAlignment="Center"
-                         Foreground="#B00020" IsVisible="{Binding HasMissingDeps}" />
-            </Grid>
-          </DataTemplate>
-        </ListBox.ItemTemplate>
-      </ListBox>
-
-      <!-- Gallery view: virtualized thumbnail wall. (1.45) -->
-      <ListBox ItemsSource="{Binding Library.Items}" SelectionMode="Multiple"
-               SelectedItem="{Binding Library.SelectedEntry}"
-               IsVisible="{Binding Library.IsGalleryView}">
-        <ListBox.ItemsPanel>
-          <ItemsPanelTemplate>
-            <WrapPanel />
-          </ItemsPanelTemplate>
-        </ListBox.ItemsPanel>
-        <ListBox.ItemTemplate>
-          <DataTemplate x:DataType="lib:PackageListEntry">
-            <Border Width="150" Height="130" Margin="4" Padding="8" BorderBrush="#22808080" BorderThickness="1" CornerRadius="6">
-              <StackPanel Spacing="4">
-                <Border Height="70" Background="#18808080" CornerRadius="4">
-                  <TextBlock Text="{Binding PrimaryType}" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.6" />
-                </Border>
-                <TextBlock Text="{Binding PackageName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                <TextBlock Text="{Binding Creator}" Opacity="0.7" FontSize="11" TextTrimming="CharacterEllipsis" />
-              </StackPanel>
-            </Border>
-          </DataTemplate>
-        </ListBox.ItemTemplate>
-      </ListBox>
-
-      <TextBlock Text="Loading…" HorizontalAlignment="Center" VerticalAlignment="Center"
-                 IsVisible="{Binding Library.IsLoading}" />
-      <TextBlock Text="No packages match your filters." HorizontalAlignment="Center" VerticalAlignment="Center"
-                 Opacity="0.7" IsVisible="{Binding Library.IsEmpty}" />
-      <TextBlock Text="Something went wrong loading the library." HorizontalAlignment="Center" VerticalAlignment="Center"
-                 Foreground="#B00020" IsVisible="{Binding Library.HasError}" />
-    </Panel>
-
-  </DockPanel>
+    <!-- Toast (bottom-center) -->
+    <c:Toast Message="{Binding ToastMessage}" IsOpen="{Binding ToastVisible}" HasUndo="{Binding ToastHasUndo}"
+             HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,24" />
+  </Panel>
 </Window>
