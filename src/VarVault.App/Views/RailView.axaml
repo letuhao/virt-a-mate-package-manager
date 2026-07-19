@@ -1,0 +1,72 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:VarVault.App.Controls"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             x:Class="VarVault.App.Views.RailView"
+             x:DataType="vm:ShellViewModel">
+  <Border Background="{DynamicResource Bg1Brush}" BorderBrush="{DynamicResource BorderBrush}"
+          BorderThickness="0,0,1,0" Width="214" Padding="8,10">
+    <StackPanel Spacing="2">
+
+      <TextBlock Text="Browse" Classes="railgroup" />
+      <ItemsControl ItemsSource="{Binding BrowseItems}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:RailItemViewModel">
+            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                    Background="Transparent" BorderThickness="0" Padding="0"
+                    Command="{Binding ((vm:ShellViewModel)DataContext).NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                    CommandParameter="{Binding Id}">
+              <c:RailNavItem Label="{Binding Label}" Badge="{Binding Badge}" IsActive="{Binding IsActive}" />
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <TextBlock Text="Optimize" Classes="railgroup" />
+      <ItemsControl ItemsSource="{Binding OptimizeItems}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:RailItemViewModel">
+            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0" Padding="0"
+                    Command="{Binding ((vm:ShellViewModel)DataContext).NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Id}">
+              <c:RailNavItem Label="{Binding Label}" Badge="{Binding Badge}" IsActive="{Binding IsActive}" />
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <TextBlock Text="Problems" Classes="railgroup" />
+      <ItemsControl ItemsSource="{Binding ProblemItems}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:RailItemViewModel">
+            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0" Padding="0"
+                    Command="{Binding ((vm:ShellViewModel)DataContext).NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Id}">
+              <c:RailNavItem Label="{Binding Label}" Badge="{Binding Badge}" IsActive="{Binding IsActive}" BadgeKind="Warn" />
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <TextBlock Text="System" Classes="railgroup" />
+      <ItemsControl ItemsSource="{Binding SystemItems}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:RailItemViewModel">
+            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0" Padding="0"
+                    Command="{Binding ((vm:ShellViewModel)DataContext).NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Id}">
+              <c:RailNavItem Label="{Binding Label}" Badge="{Binding Badge}" IsActive="{Binding IsActive}" />
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+    </StackPanel>
+  </Border>
+
+  <UserControl.Styles>
+    <Style Selector="TextBlock.railgroup">
+      <Setter Property="Foreground" Value="{DynamicResource TextLoBrush}" />
+      <Setter Property="FontSize" Value="9" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="Margin" Value="9,13,9,4" />
+    </Style>
+  </UserControl.Styles>
+</UserControl>
