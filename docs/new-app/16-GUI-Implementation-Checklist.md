@@ -79,8 +79,10 @@ Build once, reused everywhere. Read the CSS token block `prototype.html:1–195`
   focus into dialog on open. *Rule:* one host, dialogs are content. *Done:* `Controls/ModalHost.cs` +
   ControlTheme. T: `ModalHostTests` (open shows backdrop/title/content; closed hides; `Escape_closes`;
   `Close_button_closes`; `Backdrop_click_closes` via headless mouse).
-- [ ] **SC-10 · Toast (undo).** *Read:* `:668` + JS `:715–716`. Message + optional Undo + auto-dismiss.
-  *Test:* shows message; Undo fires callback; auto-hides.
+- [x] **SC-10 · Toast (undo).** *Read:* `:668` + JS `:715–716`. Message + optional Undo + auto-dismiss.
+  *Done:* `Controls/Toast.cs` (`Show`/`Undo`/`Dismiss`, injectable dismiss delay) + ControlTheme. T:
+  `ToastControlTests` (message+undo render; no-undo hides button; Undo fires callback+hides; gated
+  auto-dismiss hides).
 - [ ] **SC-11 · RailNavItem.** *Read:* `:202–220`. Icon + label + optional badge + active state. *Test:* active toggles; badge count shows.
 - [ ] **SC-12 · JobRow.** *Read:* `:235–237`. Title + cancel × + progress bar + sub-line. *Test:* binds `JobHandle` progress; cancel invokes `JobContext.Cancellation`.
 

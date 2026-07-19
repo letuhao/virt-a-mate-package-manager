@@ -26,6 +26,25 @@
     </Setter>
   </ControlTheme>
 
+  <!-- SC-10 · Toast -->
+  <ControlTheme x:Key="{x:Type c:Toast}" TargetType="c:Toast">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border IsVisible="{TemplateBinding IsOpen}"
+                Background="{DynamicResource Bg3Brush}" BorderBrush="{DynamicResource BorderHiBrush}"
+                BorderThickness="1" CornerRadius="{DynamicResource RadiusSm}" Padding="12,8"
+                HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,24">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <TextBlock Text="{TemplateBinding Message}" Foreground="{DynamicResource TextHiBrush}"
+                       VerticalAlignment="Center" />
+            <Button Name="PART_Undo" Content="Undo" IsVisible="{TemplateBinding HasUndo}"
+                    Background="Transparent" BorderThickness="0" Foreground="{DynamicResource AccentHiBrush}" />
+          </StackPanel>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
   <!-- SC-9 · ModalHost / dialog base -->
   <ControlTheme x:Key="{x:Type c:ModalHost}" TargetType="c:ModalHost">
     <Setter Property="Template">
