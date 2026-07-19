@@ -149,7 +149,10 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
   (`IHealthService`), Delete (gated by `DeletionPredicate` → `ITrashService`), ExportTxt. Registered. T:
   `LibraryActionServiceFlowTests.Add_to_preset_export_and_predicate_gated_delete` (dup deletes, single-copy
   blocked). *(Install/Uninstall/Move wired at the ops-bar screen SCR-2e via activation/migration.)*
-- [ ] **BE-N11 · `IAliasService`** (VarAlias). *Test:* set alias → resolver substitutes it; missing→owned mapping applied on activation.
+- [x] **BE-N11 · `IAliasService`** (VarAlias). *Done:* SDK `IAliasService`/`AliasDto` + `EfAliasService`
+  (folds `MissingRefKey` via `IdentityFold` to match dep keys; set/list/remove). The resolver already
+  consults `VarAliases`. Registered. T: `AliasServiceFlowTests.Alias_makes_a_missing_dependency_resolve`
+  (missing before → set alias → re-resolve → not missing).
 - [ ] **BE-N12 · Library facets** (`ITagService`/`ICollectionService`; extend `LibraryQuery` with PackageName/InstalledOnly/Types/Tiers; saved views). *Test:* each new filter narrows results; tag add/query.
 - [ ] **BE-N13 · Onboarding/add-repo** (Register/Benchmark + reserveBytes + BE-N0). *Test:* register → benchmark → suggested tier → index.
 - [ ] **BE-N14 · Command palette / search** (action registry + `LibraryQuery.SearchText`). *Test:* query returns package hits + nav actions.

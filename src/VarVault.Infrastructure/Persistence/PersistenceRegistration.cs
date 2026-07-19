@@ -60,6 +60,7 @@ public static class PersistenceRegistration
         services.AddScoped<Sdk.Library.IProposalService, Library.EfProposalService>();
         services.AddScoped<Sdk.Library.IPackageDetailQuery, Library.EfPackageDetailQuery>();
         services.AddScoped<Sdk.Library.ILibraryActionService, Library.EfLibraryActionService>();
+        services.AddScoped<Sdk.Library.IAliasService, Library.EfAliasService>();
         services.AddScoped<Sdk.Settings.ISettingsService, EfSettingsService>();
         services.AddScoped<Sdk.Presets.IPresetService, Indexing.EfPresetService>();
         services.AddScoped<Sdk.Activation.IActivityLog, Indexing.EfActivityLog>();
