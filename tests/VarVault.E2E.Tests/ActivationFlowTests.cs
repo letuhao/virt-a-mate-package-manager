@@ -179,6 +179,42 @@ public sealed class ActivationFlowTests
         Assert.Empty(await db.ActivationLinks.ToListAsync());
     }
 
+    [Fact]
+    public async Task Persistent_alias_reapplies_on_every_build()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+        WriteVar(repoDir, "Real.Target.1.var", "Real", "Target");
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IDependencyResolver>().ResolveAllAsync();
+        var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+        var target = await db.Packages.FirstAsync(p => p.VarName == "Real.Target.1");
+
+        // Preset member references a renamed (missing) package; a global alias maps it to the target.
+        var preset = (await scope.ServiceProvider.GetRequiredService<IPresetService>().CreateAsync("P", ["Renamed.Old.1"])).Value;
+        db.VarAliases.Add(new VarAlias
+        {
+            MissingRefKey = VarVault.Domain.Identity.IdentityFold.Compute("Renamed.Old.1"),
+            MissingRefRaw = "Renamed.Old.1",
+            ResolvedPackageId = target.Id,
+            Scope = AliasScope.Global,
+            CreatedAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        var activation = scope.ServiceProvider.GetRequiredService<IActivationService>();
+        var first = await activation.BuildProfileLinksAsync(preset.Id);
+        Assert.Equal(1, first.LinksCreated); // the alias re-resolved the missing member to the target
+
+        var second = await activation.BuildProfileLinksAsync(preset.Id); // rebuild — alias still applied (3.9)
+        Assert.Equal(1, second.LinksCreated);
+        var targetVarId = (await db.VarFiles.FirstAsync(v => v.PackageId == target.Id)).Id;
+        Assert.True(await db.ActivationLinks.AnyAsync(l => l.VarFileId == targetVarId));
+    }
+
     private static async Task<Guid> Register(TestHost host, string path)
     {
         using var scope = host.Host.Services.CreateScope();

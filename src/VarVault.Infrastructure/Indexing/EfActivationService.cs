@@ -43,11 +43,35 @@ public sealed class EfActivationService(VarVaultDbContext db, IClock clock, IDep
 
     private async Task<HashSet<long>> ResolvedMemberIdsAsync(long presetId, CancellationToken cancellationToken)
     {
-        var ids = await db.PresetMembers.AsNoTracking()
-            .Where(m => m.PresetId == presetId && m.ResolvedPackageId != null)
-            .Select(m => m.ResolvedPackageId!.Value)
+        var members = await db.PresetMembers.AsNoTracking()
+            .Where(m => m.PresetId == presetId)
+            .Select(m => new { m.ResolvedPackageId, m.PackageRefKey })
             .ToListAsync(cancellationToken).ConfigureAwait(false);
-        return ids.ToHashSet();
+
+        var ids = new HashSet<long>();
+        var unresolvedKeys = new List<string>();
+        foreach (var m in members)
+        {
+            if (m.ResolvedPackageId is { } id)
+                ids.Add(id);
+            else
+                unresolvedKeys.Add(m.PackageRefKey);
+        }
+
+        // Persistent aliases (global + per-preset) re-apply automatically every build — no re-setup. (3.9)
+        if (unresolvedKeys.Count > 0)
+        {
+            var aliased = await db.VarAliases.AsNoTracking()
+                .Where(a => a.ResolvedPackageId != null
+                            && unresolvedKeys.Contains(a.MissingRefKey)
+                            && (a.Scope == AliasScope.Global || a.PresetId == presetId))
+                .Select(a => a.ResolvedPackageId!.Value)
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            foreach (var id in aliased)
+                ids.Add(id);
+        }
+
+        return ids;
     }
 
     private async Task<ActivationBuildResult> RecomputeAsync(long presetId, HashSet<long> directSet, CancellationToken cancellationToken)
