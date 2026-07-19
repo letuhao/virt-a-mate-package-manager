@@ -6,12 +6,21 @@ using VarVault.Sdk.Library;
 namespace VarVault.App.ViewModels;
 
 /// <summary>SCR-6 · Duplicates &amp; reclaim: exact duplicate groups. (16-checklist SCR-6.)</summary>
-public sealed partial class DupesViewModel(IReclaimService reclaim) : ObservableObject
+public sealed partial class DupesViewModel(
+    IReclaimService reclaim, Services.IDialogLauncher? launcher = null) : ObservableObject
 {
     /// <summary>Sub-navigation tabs (GC-2).</summary>
     public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =
         [new("Reclaim space"), new("Exact duplicates"), new("Near-duplicates"), new("Download intake")];
     [ObservableProperty] private int _selectedTabIndex;
+
+    /// <summary>Per-group "Review" → dupe-review dialog (keep one, trash rest). (GD-10)</summary>
+    [RelayCommand]
+    private void Review(DuplicateGroup group)
+    {
+        if (group is not null)
+            launcher?.OpenDupeReview(group);
+    }
 
     public ObservableCollection<DuplicateGroup> Groups { get; } = [];
 

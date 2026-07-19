@@ -19,7 +19,9 @@
               <Grid ColumnDefinitions="*,80,Auto" Height="28">
                 <TextBlock Grid.Column="0" Text="{Binding IdentityKey}" VerticalAlignment="Center" />
                 <TextBlock Grid.Column="1" Text="{Binding Copies.Count, StringFormat='{}{0} copies'}" VerticalAlignment="Center" Opacity="0.7" />
-                <Button Grid.Column="2" Content="Review" />
+                <Button Grid.Column="2" Content="Review"
+                        Command="{Binding ((vm:DupesViewModel)DataContext).ReviewCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding}" />
               </Grid>
             </DataTemplate>
           </ItemsControl.ItemTemplate>

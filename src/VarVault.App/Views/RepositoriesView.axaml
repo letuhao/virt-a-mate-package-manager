@@ -7,11 +7,17 @@
              x:DataType="vm:RepositoriesViewModel">
   <ScrollViewer Padding="18">
     <StackPanel Spacing="12">
-      <TextBlock Text="Repositories &amp; tiers" FontSize="21" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <TextBlock Grid.Column="0" Text="Repositories &amp; tiers" FontSize="21" FontWeight="SemiBold"
+                   Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Content="Review rebalance plan" Margin="0,0,8,0" Command="{Binding RebalanceCommand}" />
+        <Button Grid.Column="2" Content="+ Add repository" Command="{Binding AddRepoCommand}"
+                Background="{DynamicResource AccentBrush}" Foreground="White" />
+      </Grid>
       <ItemsControl ItemsSource="{Binding Repositories}">
         <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
         <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="repo:RepositoryInfo">
+          <DataTemplate x:DataType="vm:RepositoryCardViewModel">
             <c:Card Width="320" Margin="0,0,14,14">
               <StackPanel Spacing="6">
                 <StackPanel Orientation="Horizontal" Spacing="8">
@@ -24,6 +30,17 @@
                 </StackPanel>
                 <TextBlock Text="{Binding MediaType}" Opacity="0.7" FontSize="11" />
                 <TextBlock Text="{Binding MountPath}" Opacity="0.6" FontSize="11" TextTrimming="CharacterEllipsis" />
+                <!-- usage bar + capacity line -->
+                <c:MeterBar Height="5" Margin="0,4,0,0" Value="{Binding UsedFraction}" Fill="{DynamicResource AccentBrush}" />
+                <TextBlock Text="{Binding CapacityLabel}" Opacity="0.6" FontSize="11" FontFamily="{DynamicResource MonoFont}" />
+                <!-- per-card actions -->
+                <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,6,0,0">
+                  <Button Content="Re-benchmark"
+                          Command="{Binding ((vm:RepositoriesViewModel)DataContext).BenchmarkCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                          CommandParameter="{Binding}" />
+                  <Button Content="Rebalance…"
+                          Command="{Binding ((vm:RepositoriesViewModel)DataContext).RebalanceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                </StackPanel>
               </StackPanel>
             </c:Card>
           </DataTemplate>

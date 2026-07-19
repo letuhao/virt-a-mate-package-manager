@@ -1,9 +1,27 @@
 using System.Collections.Generic;
+using VarVault.App.Services;
+using VarVault.App.ViewModels;
 using VarVault.Common;
 using VarVault.Sdk.Library;
 using VarVault.Sdk.Settings;
 
 namespace VarVault.App.Tests;
+
+/// <summary>Records which dialog each screen asks to open (18-gap G-D/G-E reachability).</summary>
+public sealed class FakeDialogLauncher : IDialogLauncher
+{
+    public List<string> Opened { get; } = [];
+    public void OpenAddRepo() => Opened.Add("add-repo");
+    public void OpenRescue() => Opened.Add("rescue");
+    public void OpenOnboarding() => Opened.Add("onboarding");
+    public void OpenMigratePlan() => Opened.Add("migrate");
+    public void OpenVarDetail(long packageId) => Opened.Add($"var-detail:{packageId}");
+    public void OpenAlias(string missingRef) => Opened.Add($"alias:{missingRef}");
+    public void OpenConfirmDelete(IReadOnlyList<ConfirmItem> items) => Opened.Add($"confirm:{items.Count}");
+    public void OpenFix(long varFileId, string? codepage) => Opened.Add($"fix:{codepage}");
+    public void OpenDupeReview(DuplicateGroup group) => Opened.Add($"dupe:{group.IdentityKey}");
+    public void OpenPresetEdit(long presetId, string name) => Opened.Add($"preset:{presetId}");
+}
 
 // Shared, reusable public test doubles for the gap screen/tab units (18-gap G-C/G-D).
 // Each returns empty/default data unless a test overrides via the provided seams.
@@ -68,6 +86,46 @@ public sealed class StubTrash(
         Task.FromResult(backups ?? []);
     public Task<Result<BackupDto>> BackupNowAsync(CancellationToken ct = default)
     { BackedUp = true; return Task.FromResult(Result.Success(new BackupDto("catalog.bak", default, 0))); }
+}
+
+public sealed class StubReposEmpty : VarVault.Sdk.Repositories.IRepositoryService
+{
+    public Task<Result<VarVault.Sdk.Repositories.RepositoryInfo>> RegisterAsync(VarVault.Sdk.Repositories.RegisterRepositoryRequest r, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<VarVault.Sdk.Repositories.RepositoryInfo>> ListAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<VarVault.Sdk.Repositories.RepositoryInfo>>([]);
+    public Task<bool> SetEnabledAsync(Guid id, bool e, CancellationToken ct = default) => Task.FromResult(true);
+    public Task<VarVault.Sdk.Repositories.RepositoryInfo?> RefreshCapacityAsync(Guid id, CancellationToken ct = default) => Task.FromResult<VarVault.Sdk.Repositories.RepositoryInfo?>(null);
+    public Task<Result<VarVault.Sdk.Repositories.RepositoryInfo>> RepointAsync(Guid id, string p, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<VarVault.Sdk.Repositories.RepositoryInfo?> BenchmarkAsync(Guid id, CancellationToken ct = default) => Task.FromResult<VarVault.Sdk.Repositories.RepositoryInfo?>(null);
+    public Task<VarVault.Sdk.Repositories.RepositoryInfo?> SetTierAsync(Guid id, int tier, CancellationToken ct = default) => Task.FromResult<VarVault.Sdk.Repositories.RepositoryInfo?>(null);
+}
+
+public sealed class StubMissing(IReadOnlyList<MissingDependency>? items = null) : IMissingDepsQuery
+{
+    public Task<IReadOnlyList<MissingDependency>> GetMissingAsync(CancellationToken ct = default) => Task.FromResult(items ?? []);
+}
+
+public sealed class StubDashboard(DashboardSummary? summary = null) : IDashboardService
+{
+    public Task<DashboardSummary> GetSummaryAsync(CancellationToken ct = default) =>
+        Task.FromResult(summary ?? new DashboardSummary(0, 0, 0, 0, 0, 0, 0, 0, 0, []));
+}
+
+public sealed class StubLibraryQuery(LibraryPage? page = null) : ILibraryQueryService
+{
+    public Task<LibraryPage> GetPageAsync(LibraryQuery q, CancellationToken ct = default) => Task.FromResult(page ?? new LibraryPage([], 0));
+    public Task<IReadOnlyList<string>> GetCreatorsAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>([]);
+    public Task<IReadOnlyList<long>> GetOrderedIdsAsync(LibraryQuery q, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<long>>([]);
+}
+
+public sealed class StubPresetsMin : VarVault.Sdk.Presets.IPresetService
+{
+    public Task<Result<VarVault.Sdk.Presets.PresetInfo>> CreateAsync(string name, IEnumerable<string> refs, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<VarVault.Sdk.Presets.PresetInfo>> ListAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<VarVault.Sdk.Presets.PresetInfo>>([]);
+    public Task<bool> DeleteAsync(long id, CancellationToken ct = default) => Task.FromResult(true);
+    public Task<Result<VarVault.Sdk.Presets.PresetInfo>> AddMemberAsync(long id, string r, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<Result<VarVault.Sdk.Presets.PresetInfo>> RemoveMemberAsync(long id, string r, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<IReadOnlyList<string>> MembersAsync(long id, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>([]);
+    public Task<VarVault.Sdk.Presets.ActivationPreview?> PreviewActivationAsync(long id, CancellationToken ct = default) => Task.FromResult<VarVault.Sdk.Presets.ActivationPreview?>(null);
 }
 
 public sealed class StubSettings : ISettingsService

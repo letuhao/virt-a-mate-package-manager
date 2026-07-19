@@ -46,6 +46,7 @@ public class DashboardScreenTests
         var texts = view.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
         Assert.Contains("69660 packages", texts);
         Assert.Contains("hot 8410", texts);
-        Assert.Contains("1203 missing dependencies", texts);
+        // Attention row is now a clickable navigation button (GD-1) → count + arrow.
+        Assert.Contains(texts, t => t is not null && t.StartsWith("1203 missing dependencies"));
     }
 }

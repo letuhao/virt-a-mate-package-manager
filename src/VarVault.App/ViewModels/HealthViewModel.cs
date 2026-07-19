@@ -6,12 +6,24 @@ using VarVault.Sdk.Library;
 namespace VarVault.App.ViewModels;
 
 /// <summary>SCR-9 · Health &amp; fix: encoding groups + integrity issues; fix into UTF-8. (16-checklist SCR-9.)</summary>
-public sealed partial class HealthViewModel(IHealthService health) : ObservableObject
+public sealed partial class HealthViewModel(
+    IHealthService health, Services.IDialogLauncher? launcher = null) : ObservableObject
 {
     /// <summary>Sub-navigation tabs (GC-2).</summary>
     public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =
         [new("Encoding"), new("Integrity / corrupt"), new("Missing meta")];
     [ObservableProperty] private int _selectedTabIndex;
+
+    /// <summary>Per-group "Fix group…" → fix-encoding dialog for the codepage. (GD-11)</summary>
+    [RelayCommand]
+    private void FixGroup(EncodingGroup group)
+    {
+        if (group is not null)
+            launcher?.OpenFix(0, group.Codepage);
+    }
+
+    /// <summary>Screen-head "Fix all detected…" → fix-encoding dialog. (GD-11)</summary>
+    [RelayCommand] private void FixAll() => launcher?.OpenFix(0, null);
 
     public ObservableCollection<EncodingGroup> EncodingGroups { get; } = [];
     public ObservableCollection<IntegrityIssue> Integrity { get; } = [];

@@ -6,11 +6,20 @@ using VarVault.Sdk.Library;
 namespace VarVault.App.ViewModels;
 
 /// <summary>Missing-deps screen: unresolved refs with needed-by counts. (Checklist 2.14.)</summary>
-public sealed partial class MissingDepsViewModel(IMissingDepsQuery query) : ObservableObject
+public sealed partial class MissingDepsViewModel(
+    IMissingDepsQuery query, Services.IDialogLauncher? launcher = null) : ObservableObject
 {
     public ObservableCollection<MissingDependency> Items { get; } = [];
 
     public bool IsEmpty => Items.Count == 0;
+
+    /// <summary>Resolve/Edit-alias → alias dialog for the missing ref. (GD-12)</summary>
+    [RelayCommand]
+    private void Resolve(MissingDependency dep)
+    {
+        if (dep is not null)
+            launcher?.OpenAlias(dep.Ref);
+    }
 
     [RelayCommand]
     public async Task RefreshAsync(CancellationToken cancellationToken = default)

@@ -16,7 +16,9 @@
               <Grid ColumnDefinitions="*,Auto,Auto" Height="26">
                 <TextBlock Grid.Column="0" Text="{Binding Ref}" VerticalAlignment="Center" FontFamily="{DynamicResource MonoFont}" />
                 <TextBlock Grid.Column="1" Text="{Binding NeededByCount, StringFormat='{}{0} pkgs'}" VerticalAlignment="Center" Opacity="0.7" Margin="0,0,12,0" />
-                <Button Grid.Column="2" Content="Resolve…" />
+                <Button Grid.Column="2" Content="Resolve…"
+                        Command="{Binding ((vm:MissingDepsViewModel)DataContext).ResolveCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding}" />
               </Grid>
             </DataTemplate>
           </ItemsControl.ItemTemplate>

@@ -23,8 +23,26 @@ public sealed partial class LibraryViewModel(
     ILibraryQueryService library,
     ISettingsService? settings = null,
     Func<TimeSpan, CancellationToken, Task>? delay = null,
-    ILibraryActionService? actions = null) : ObservableObject
+    ILibraryActionService? actions = null,
+    Services.IDialogLauncher? launcher = null) : ObservableObject
 {
+    /// <summary>"Detail" / "Open full detail →" → var-detail dialog for the row. (GD-4/GD-6)</summary>
+    [RelayCommand]
+    private void OpenDetail(PackageListEntry entry)
+    {
+        if (entry is not null)
+            launcher?.OpenVarDetail(entry.PackageId);
+    }
+
+    /// <summary>Ops-bar "Add to preset…" is a no-op stub → real add-to-preset needs a preset picker; wired via detail.</summary>
+    [RelayCommand]
+    private async Task InstallFromTxtAsync(string txt, CancellationToken cancellationToken = default)
+    {
+        if (actions is null || string.IsNullOrWhiteSpace(txt))
+            return;
+        var res = await actions.ResolveTxtAsync(txt, cancellationToken).ConfigureAwait(true);
+        LastActionMessage = $"Matched {res.MatchedPackageIds.Count}, {res.Unmatched.Count} not owned";
+    }
     private const int PageSize = 100;
 
     /// <summary>How long typing must settle before the exact faceted count is recomputed. (1.41)</summary>

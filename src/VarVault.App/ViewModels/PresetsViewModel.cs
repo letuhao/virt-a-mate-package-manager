@@ -7,15 +7,33 @@ using VarVault.Sdk.Presets;
 namespace VarVault.App.ViewModels;
 
 /// <summary>SCR-4 · Loading presets: list, activation preview, switch. (16-checklist SCR-4.)</summary>
-public sealed partial class PresetsViewModel(IPresetService presets, IProfileService? profiles = null) : ObservableObject
+public sealed partial class PresetsViewModel(
+    IPresetService presets, IProfileService? profiles = null, Services.IDialogLauncher? launcher = null) : ObservableObject
 {
     public ObservableCollection<PresetInfo> Presets { get; } = [];
+
+    /// <summary>Member refs of the selected preset (member table). (GD-8)</summary>
+    public ObservableCollection<string> Members { get; } = [];
 
     [ObservableProperty] private PresetInfo? _selected;
     [ObservableProperty] private ActivationPreview? _preview;
     [ObservableProperty] private string? _statusMessage;
 
     public bool IsEmpty => Presets.Count == 0;
+
+    /// <summary>Screen-head "+ New preset" → preset-edit dialog on a fresh preset. (GD-8)</summary>
+    [RelayCommand] private void NewPreset() => launcher?.OpenPresetEdit(0, "New preset");
+
+    /// <summary>"Edit" → preset-edit dialog for the selected preset. (GD-8)</summary>
+    [RelayCommand]
+    private void Edit()
+    {
+        if (Selected is not null)
+            launcher?.OpenPresetEdit(Selected.Id, Selected.Name);
+    }
+
+    /// <summary>"Deactivate all" → rescue baseline (drop all active links). (GD-8)</summary>
+    [RelayCommand] private void DeactivateAll() => launcher?.OpenRescue();
 
     [RelayCommand]
     public async Task LoadAsync(CancellationToken cancellationToken = default)
@@ -31,6 +49,10 @@ public sealed partial class PresetsViewModel(IPresetService presets, IProfileSer
     private async Task LoadPreviewAsync(PresetInfo? preset)
     {
         Preview = preset is null ? null : await presets.PreviewActivationAsync(preset.Id).ConfigureAwait(true);
+        Members.Clear();
+        if (preset is not null)
+            foreach (var m in await presets.MembersAsync(preset.Id).ConfigureAwait(true))
+                Members.Add(m);
     }
 
     [RelayCommand]

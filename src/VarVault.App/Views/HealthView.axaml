@@ -6,17 +6,24 @@
              x:Class="VarVault.App.Views.HealthView"
              x:DataType="vm:HealthViewModel">
   <DockPanel Margin="18">
-    <TextBlock DockPanel.Dock="Top" Text="Health &amp; fix" FontSize="21" FontWeight="SemiBold"
-               Foreground="{DynamicResource TextHiBrush}" Margin="0,0,0,12" />
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+      <TextBlock Grid.Column="0" Text="Health &amp; fix" FontSize="21" FontWeight="SemiBold"
+                 Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center" />
+      <Button Grid.Column="1" Content="Fix all detected…" Command="{Binding FixAllCommand}"
+              Background="{DynamicResource AccentBrush}" Foreground="White" />
+    </Grid>
     <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
     <c:Card Header="Encoding — fixable groups">
       <StackPanel Spacing="6">
         <ItemsControl ItemsSource="{Binding EncodingGroups}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="lib:EncodingGroup">
-              <Grid ColumnDefinitions="*,Auto">
+              <Grid ColumnDefinitions="*,Auto,Auto" Height="28">
                 <TextBlock Grid.Column="0" Text="{Binding Codepage}" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Text="{Binding Count}" Opacity="0.7" />
+                <TextBlock Grid.Column="1" Text="{Binding Count}" Opacity="0.7" VerticalAlignment="Center" Margin="0,0,12,0" />
+                <Button Grid.Column="2" Content="Fix group…"
+                        Command="{Binding ((vm:HealthViewModel)DataContext).FixGroupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding}" />
               </Grid>
             </DataTemplate>
           </ItemsControl.ItemTemplate>

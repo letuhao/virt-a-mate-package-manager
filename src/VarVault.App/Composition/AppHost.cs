@@ -17,22 +17,26 @@ public static class AppHost
     /// <summary>Build the shell + all screen view-models from a composed service provider (app-lifetime scope).</summary>
     public static ShellViewModel CreateShell(IServiceProvider services)
     {
+        var dialogs = new Services.DialogService();
+        var launcher = new Services.DialogLauncher(services, dialogs, afterRepoAdded: () => EnqueueIndexAll(services));
+
         var screens = new Dictionary<string, object>
         {
             ["library"] = new LibraryViewModel(
                 services.GetRequiredService<ILibraryQueryService>(),
                 services.GetService<Sdk.Settings.ISettingsService>(),
-                actions: services.GetService<ILibraryActionService>()),
+                actions: services.GetService<ILibraryActionService>(),
+                launcher: launcher),
             ["analytics"] = new AnalyticsViewModel(services.GetRequiredService<IAnalyticsService>()),
-            ["dashboard"] = new DashboardViewModel(services.GetRequiredService<IDashboardService>()),
-            ["repos"] = new RepositoriesViewModel(services.GetRequiredService<Sdk.Repositories.IRepositoryService>()),
-            ["presets"] = new PresetsViewModel(services.GetRequiredService<Sdk.Presets.IPresetService>(), services.GetService<IProfileService>()),
-            ["tiering"] = new TieringViewModel(services.GetRequiredService<ITieringService>()),
-            ["dupes"] = new DupesViewModel(services.GetRequiredService<IReclaimService>()),
+            ["dashboard"] = new DashboardViewModel(services.GetRequiredService<IDashboardService>(), launcher),
+            ["repos"] = new RepositoriesViewModel(services.GetRequiredService<Sdk.Repositories.IRepositoryService>(), launcher),
+            ["presets"] = new PresetsViewModel(services.GetRequiredService<Sdk.Presets.IPresetService>(), services.GetService<IProfileService>(), launcher),
+            ["tiering"] = new TieringViewModel(services.GetRequiredService<ITieringService>(), launcher),
+            ["dupes"] = new DupesViewModel(services.GetRequiredService<IReclaimService>(), launcher),
             ["history"] = new ActivityViewModel(services.GetRequiredService<IActivityLog>()),
-            ["missing"] = new MissingDepsViewModel(services.GetRequiredService<IMissingDepsQuery>()),
+            ["missing"] = new MissingDepsViewModel(services.GetRequiredService<IMissingDepsQuery>(), launcher),
             ["proposals"] = new ProposalsViewModel(services.GetRequiredService<IProposalService>()),
-            ["health"] = new HealthViewModel(services.GetRequiredService<IHealthService>()),
+            ["health"] = new HealthViewModel(services.GetRequiredService<IHealthService>(), launcher),
             ["trash"] = new TrashViewModel(services.GetRequiredService<ITrashQueryService>()),
             ["settings"] = new SettingsViewModel(services.GetRequiredService<Sdk.Settings.ISettingsService>()),
         };
@@ -41,24 +45,17 @@ public static class AppHost
         foreach (var s in ShellViewModel.AllScreens)
             screens.TryAdd(s.Id, new PlaceholderScreenViewModel(s.Label));
 
-        var dialogs = new Services.DialogService();
         var jobQueue = services.GetService<Sdk.Threading.IJobQueue>();
         var feeds = TryBuildFeeds(services, jobQueue);
         var shell = new ShellViewModel(screens, initial: "library", dialogs: dialogs, jobQueue: jobQueue, feeds: feeds);
 
-        // GA-6 · top-bar handlers → open the matching dialog through the dialog service.
-        var repoService = services.GetService<Sdk.Repositories.IRepositoryService>();
-        if (repoService is not null)
-            shell.AddRepoHandler = () => dialogs.Show(new AddRepoViewModel(repoService,
-                onAdded: () => EnqueueIndexAll(services)));
+        // GA-6 · top-bar handlers → open the matching dialog through the launcher.
+        shell.AddRepoHandler = launcher.OpenAddRepo;
+        shell.RescueHandler = () => { launcher.OpenRescue(); return System.Threading.Tasks.Task.CompletedTask; };
 
-        var activation = services.GetService<Sdk.Activation.IActivationService>();
-        if (activation is not null)
-            shell.RescueHandler = () =>
-            {
-                dialogs.Show(new RescueViewModel(activation));
-                return System.Threading.Tasks.Task.CompletedTask;
-            };
+        // GD-1 · let the dashboard navigate the shell (attention rows / quick actions).
+        if (screens["dashboard"] is DashboardViewModel dash)
+            dash.NavigateTo = shell.Navigate;
 
         return shell;
     }

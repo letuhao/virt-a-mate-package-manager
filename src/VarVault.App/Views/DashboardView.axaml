@@ -5,17 +5,24 @@
              x:Class="VarVault.App.Views.DashboardView"
              x:DataType="vm:DashboardViewModel">
   <ScrollViewer Padding="18">
-    <StackPanel Spacing="14" DataContext="{Binding Summary}" x:CompileBindings="False">
-      <TextBlock Text="Dashboard" FontSize="21" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
-      <TextBlock Name="PART_Header" Foreground="{DynamicResource TextLoBrush}"
-                 Text="{Binding TotalPackages, StringFormat='{}{0} packages'}" />
+    <StackPanel Spacing="14">
+      <!-- Screen head + actions (VM-scoped) -->
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <StackPanel Grid.Column="0">
+          <TextBlock Text="Dashboard" FontSize="21" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+          <TextBlock Name="PART_Header" Foreground="{DynamicResource TextLoBrush}"
+                     Text="{Binding Summary.TotalPackages, StringFormat='{}{0} packages'}" />
+        </StackPanel>
+        <Button Grid.Column="1" Content="Setup wizard" Margin="0,0,8,0" Command="{Binding SetupWizardCommand}" />
+        <Button Grid.Column="2" Content="⛑ Rescue" Command="{Binding RescueCommand}" Foreground="{DynamicResource WarnBrush}" />
+      </Grid>
 
       <WrapPanel>
         <c:Card Header="Storage by tier" Width="320" Margin="0,0,14,14">
-          <ItemsControl ItemsSource="{Binding Tiers}">
+          <ItemsControl ItemsSource="{Binding Summary.Tiers}">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
-                <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,3">
+                <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,3" x:CompileBindings="False">
                   <TextBlock Grid.Column="0" Text="{Binding Tier, StringFormat='T{0}'}" />
                   <c:MeterBar Grid.Column="1" Margin="8,0" VerticalAlignment="Center"
                               Value="{Binding UsedBytes}" Fill="{DynamicResource AccentBrush}" />
@@ -26,7 +33,7 @@
           </ItemsControl>
         </c:Card>
 
-        <c:Card Header="Classification" Width="320" Margin="0,0,14,14">
+        <c:Card Header="Classification" Width="320" Margin="0,0,14,14" DataContext="{Binding Summary}" x:CompileBindings="False">
           <StackPanel Spacing="4">
             <TextBlock Text="{Binding HotCount, StringFormat='hot {0}'}" />
             <TextBlock Text="{Binding WarmCount, StringFormat='warm {0}'}" />
@@ -34,10 +41,40 @@
           </StackPanel>
         </c:Card>
 
+        <!-- Needs attention: clickable rows that navigate -->
         <c:Card Header="Needs your attention" Width="320" Margin="0,0,14,14">
-          <StackPanel Spacing="4">
-            <TextBlock Text="{Binding MissingDepsCount, StringFormat='{}{0} missing dependencies'}" />
-            <TextBlock Text="{Binding OfflineRepositoryCount, StringFormat='{}{0} offline repositories'}" />
+          <StackPanel Spacing="6">
+            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding GoCommand}" CommandParameter="missing"
+                    Content="{Binding Summary.MissingDepsCount, StringFormat='{}{0} missing dependencies →'}" />
+            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding GoCommand}" CommandParameter="proposals"
+                    Content="Review proposals →" />
+            <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding GoCommand}" CommandParameter="repos"
+                    Content="{Binding Summary.OfflineRepositoryCount, StringFormat='{}{0} offline repositories →'}" />
+          </StackPanel>
+        </c:Card>
+
+        <!-- Reclaimable space -->
+        <c:Card Header="Reclaimable space" Width="320" Margin="0,0,14,14">
+          <StackPanel Spacing="6">
+            <TextBlock Text="Duplicate copies · cold-on-SSD · orphans" Opacity="0.7" FontSize="12" />
+            <Button Content="Open reclaim wizard →" Command="{Binding GoCommand}" CommandParameter="dupes" HorizontalAlignment="Left" />
+          </StackPanel>
+        </c:Card>
+
+        <!-- Recent activity -->
+        <c:Card Header="Recent activity" Width="320" Margin="0,0,14,14">
+          <Button Content="Full history →" Command="{Binding GoCommand}" CommandParameter="history" HorizontalAlignment="Left" />
+        </c:Card>
+
+        <!-- Quick actions -->
+        <c:Card Header="Quick actions" Width="320" Margin="0,0,14,14">
+          <StackPanel Spacing="7">
+            <Button Content="◨ Switch loading preset" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                    Command="{Binding GoCommand}" CommandParameter="presets" />
+            <Button Content="+ Add repository" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                    Command="{Binding SetupWizardCommand}" />
+            <Button Content="▦ Browse library" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                    Command="{Binding GoCommand}" CommandParameter="library" />
           </StackPanel>
         </c:Card>
       </WrapPanel>
