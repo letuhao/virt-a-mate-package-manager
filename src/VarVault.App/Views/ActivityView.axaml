@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:VarVault.App.Controls"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             xmlns:act="clr-namespace:VarVault.Sdk.Activation;assembly=VarVault.Sdk"
+             x:Class="VarVault.App.Views.ActivityView"
+             x:DataType="vm:ActivityViewModel">
+  <DockPanel Margin="18">
+    <TextBlock DockPanel.Dock="Top" Text="Activity history" FontSize="21" FontWeight="SemiBold"
+               Foreground="{DynamicResource TextHiBrush}" Margin="0,0,0,12" />
+    <c:Card Header="Audit log">
+      <ScrollViewer>
+        <ItemsControl ItemsSource="{Binding Items}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="act:ActivityRecord">
+              <Grid ColumnDefinitions="120,90,*" Height="24">
+                <TextBlock Grid.Column="0" Text="{Binding AtUtc}" VerticalAlignment="Center" Opacity="0.6" FontSize="11" />
+                <TextBlock Grid.Column="1" Text="{Binding Kind}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                <TextBlock Grid.Column="2" Text="{Binding Description}" VerticalAlignment="Center" Opacity="0.85" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </c:Card>
+  </DockPanel>
+</UserControl>

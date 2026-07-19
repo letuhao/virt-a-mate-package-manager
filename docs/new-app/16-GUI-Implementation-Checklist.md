@@ -240,7 +240,9 @@ Each cites its plan item numbers (15-plan) and its HTML range. Read both before 
 - [x] **SCR-11 · Trash & backup.** *Read:* `:541–549`. *BE:* N6. *Done:* `TrashViewModel(ITrashQueryService)`
   + `Views/TrashView.axaml` (trash table restore/purge, backup-now). Wired in AppHost. T:
   `TrashScreenTests.Lists_trash_items`.
-- [ ] **SCR-12 · Activity history.** *Read:* `:552–560`. *Items:* History #1–5. *BE:* `IActivityLog`. *Test:* audit table binds; kind filter narrows.
+- [x] **SCR-12 · Activity history.** *Read:* `:552–560`. *BE:* `IActivityLog`. *Done:* `Views/ActivityView.axaml`
+  bound to existing `ActivityViewModel` (audit table: when/kind/detail). Wired in AppHost. T:
+  `ActivityScreenTests.Lists_audit_records`.
 - [ ] **SCR-13 · Settings.** *Read:* `:563–573`. *Items:* Settings #1–11. *BE:* `ISettingsService`. *Test:* tabs + fields load/save via settings.
 
 ---
