@@ -263,7 +263,7 @@ Each is content inside SC-9. Read its exact modal lines (HR-0).
 - [ ] **DLG-7 · m-preset (edit).** *Read:* `:638–645`. *Items:* preset #1–12. *BE:* `IPresetService`, N10. *Test:* member table + pin; Save persists.
 - [ ] **DLG-8 · m-dupe (review).** *Read:* `:647–654`. *Items:* dupe #1–8. *BE:* N4. *Rule:* keep-one; deletes full-hash verified first. *Test:* keep radio + trash-rest reclaim.
 - [ ] **DLG-9 · m-rescue.** *Read:* `:656–660`. *Items:* rescue #1–5. *BE:* `IActivationService.RescueAsync`. *Test:* baseline select; Apply calls rescue.
-- [ ] **DLG-10 · m-vardetail.** *Read:* `:662–666`. *Items:* vardetail #1–12. *BE:* N9. *Test:* 4 tabs (Overview/Dep-graph/Content/Copies) + kv fields bind detail.
+- [x] **DLG-10 · m-vardetail.** *BE:* N9. *Done:* `VarDetailViewModel(IPackageDetailQuery)` + `Views/VarDetailDialog.axaml` (identity/foldkey/license/size/depended-on/class, copies/content/closure counts). T: `VarDetailDialogTests.Loads_and_renders_detail`.
 - [ ] **DLG-11 · Toast/undo.** Covered by SC-10; wire per-action undo (trash restore / activation revert). *Test:* Undo reverses the last action.
 
 ---

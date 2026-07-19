@@ -1,0 +1,24 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             x:Class="VarVault.App.Views.VarDetailDialog"
+             x:DataType="vm:VarDetailViewModel">
+  <StackPanel Spacing="10" MinWidth="460" DataContext="{Binding Detail}" x:CompileBindings="False">
+    <TextBlock Text="{Binding VarName}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+    <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+      <TextBlock Grid.Row="0" Grid.Column="0" Text="Identity" Opacity="0.7" Margin="0,0,0,4" />
+      <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding IdentityKey}" Margin="0,0,0,4" />
+      <TextBlock Grid.Row="1" Grid.Column="0" Text="License" Opacity="0.7" Margin="0,0,0,4" />
+      <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding License}" Margin="0,0,0,4" />
+      <TextBlock Grid.Row="2" Grid.Column="0" Text="Size" Opacity="0.7" Margin="0,0,0,4" />
+      <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding TotalSize}" Margin="0,0,0,4" />
+      <TextBlock Grid.Row="3" Grid.Column="0" Text="Depended on by" Opacity="0.7" Margin="0,0,0,4" />
+      <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding DependedOnByCount}" Margin="0,0,0,4" />
+      <TextBlock Grid.Row="4" Grid.Column="0" Text="Class" Opacity="0.7" />
+      <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding StorageClass}" />
+    </Grid>
+    <TextBlock Text="{Binding Copies.Count, StringFormat='{}{0} copies'}" Opacity="0.8" />
+    <TextBlock Text="{Binding ContentItems.Count, StringFormat='{}{0} content items'}" Opacity="0.8" />
+    <TextBlock Text="{Binding ForwardClosure.Count, StringFormat='{}{0} dependencies (closure)'}" Opacity="0.8" />
+  </StackPanel>
+</UserControl>
