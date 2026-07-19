@@ -25,6 +25,7 @@ public static class PersistenceRegistration
         services.AddScoped<IDependencyResolver, EfDependencyResolver>();
         services.AddScoped<IRepositoryStore, EfRepositoryStore>();
         services.AddSingleton<CatalogDatabaseInitializer>();
+        services.AddScoped<SqliteDatabaseBackup>();
 
         services.AddHealthChecks()
             .AddCheck<DatabaseHealthCheck>("database", tags: ["ready"]);

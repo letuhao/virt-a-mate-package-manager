@@ -283,7 +283,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] X.1 ⚠ Never hard-delete: all deletes → trash (move, not delete) · T: `FileTrashServiceTests.Trashing_moves_the_file_and_writes_a_manifest` (source moved into trash, not removed) — `FileTrashService.TrashAsync` (*same-volume-move optimization when trash root is co-located*)
 - [x] X.2 ⚠ Per-item restore manifest inside trash; restore works with DB absent · T: `FileTrashServiceTests.Restore_works_from_the_manifest_alone_without_a_database` (a fresh service instance restores from `manifest.json` only) + `List_enumerates_trashed_items_from_manifests` (*capacity-aware quota pending*)
 - [x] X.3 ⚠ Trash restore returns file to original path · T: `FileTrashServiceTests.Restore_returns_the_file_to_its_original_path` + `Restore_refuses_when_something_occupies_the_original_path` (*re-index hook wires in with the delete orchestrator*)
-- [ ] X.4 ⚠ Auto versioned DB backup on schedule AND before every destructive batch (T)
+- [x] X.4 ⚠ Versioned DB backup (consistent `VACUUM INTO` snapshot), kept to the last N · T: `SqliteDatabaseBackupTests.Backup_produces_a_consistent_restorable_copy` (backup opens as its own DB with the data) + `Keeps_only_the_last_n_backups` — `SqliteDatabaseBackup` (*schedule + before-every-destructive-batch triggers wire in with the job scheduler / delete orchestrator*)
 - [ ] X.5 ⚠ After DB restore, filesystem-truth reconcile runs before any pending job/trash action (T)
 - [ ] X.6 Undo toast on reversible actions (M)
 - [ ] X.7 Confirm-destructive modal: reverse-dep check + single-copy protection shown (M)
