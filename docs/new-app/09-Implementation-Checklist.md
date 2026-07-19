@@ -123,7 +123,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 ### Read model & search
 - [x] 1.36 `PackageListItem` populated/refreshed after indexing · T: `IndexingFlowTests.Indexes_a_repository_into_the_catalog` (row appears with `PrimaryType`=Scene, aggregates) — `EfCatalogStore.RefreshReadModelAsync`
 - [x] 1.37 `OnlineInstanceCount` vs `TotalInstanceCount` distinct; `IsSingleCopy` derived from online count · ⚠ T: `IndexingFlowTests` (OnlineInstanceCount=1, IsSingleCopy=true) + `Offline_repository_does_not_prune...` (online count reflects repo online state)
-- [ ] 1.38 Composite index per sort order; sort query uses index (no temp B-tree) (T: EXPLAIN)
+- [x] 1.38 Composite index per sort order; sort query uses index (no temp B-tree) · T: `SchemaIndexTests.Gallery_class_sort_uses_composite_index_without_temp_btree` (EXPLAIN QUERY PLAN) + `LibraryQueryFlowTests` (filter/sort/page over the read model) — `ILibraryQueryService`/`EfLibraryQueryService` maps each `LibrarySort` to a §6 composite index
 - [ ] 1.39 `OrderedSnapshot` built per (filter,sort); random `rows[i]` is O(1) (B: matches spike ~0.08 ms)
 - [ ] 1.40 FTS search returns ranked results incl. CJK (T: search "刘亦菲" hits)
 - [ ] 1.41 Faceted count debounced + approximate during typing, exact on settle (M)
