@@ -284,7 +284,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] X.2 ⚠ Per-item restore manifest inside trash; restore works with DB absent · T: `FileTrashServiceTests.Restore_works_from_the_manifest_alone_without_a_database` (a fresh service instance restores from `manifest.json` only) + `List_enumerates_trashed_items_from_manifests` (*capacity-aware quota pending*)
 - [x] X.3 ⚠ Trash restore returns file to original path · T: `FileTrashServiceTests.Restore_returns_the_file_to_its_original_path` + `Restore_refuses_when_something_occupies_the_original_path` (*re-index hook wires in with the delete orchestrator*)
 - [x] X.4 ⚠ Versioned DB backup (consistent `VACUUM INTO` snapshot), kept to the last N · T: `SqliteDatabaseBackupTests.Backup_produces_a_consistent_restorable_copy` (backup opens as its own DB with the data) + `Keeps_only_the_last_n_backups` — `SqliteDatabaseBackup` (*schedule + before-every-destructive-batch triggers wire in with the job scheduler / delete orchestrator*)
-- [ ] X.5 ⚠ After DB restore, filesystem-truth reconcile runs before any pending job/trash action (T)
+- [x] X.5 ⚠ Filesystem-truth reconcile (run after a DB restore, before pending jobs) · T: `ReconcileFlowTests.Reconcile_prunes_vanished_online_files_and_marks_offline_repos` (online repo's vanished file pruned; missing-mount repo → offline, its rows survive) — `CatalogReconciler.ReconcileAsync`
 - [ ] X.6 Undo toast on reversible actions (M)
 - [ ] X.7 Confirm-destructive modal: reverse-dep check + single-copy protection shown (M)
 - [ ] X.8 Onboarding wizard: add drives → benchmark → index → rescue (M/D end-to-end)

@@ -27,6 +27,7 @@ public static class PersistenceRegistration
         services.AddScoped<IDependencyGraph, EfDependencyGraph>();
         services.AddScoped<IReferenceQuery, EfReferenceQuery>();
         services.AddScoped<UserSaveScanner>();
+        services.AddScoped<CatalogReconciler>();
         services.AddScoped<IRepositoryStore, EfRepositoryStore>();
         services.AddScoped<Sdk.Library.ILibraryQueryService, Library.EfLibraryQueryService>();
         services.AddScoped<Sdk.Settings.ISettingsService, EfSettingsService>();
