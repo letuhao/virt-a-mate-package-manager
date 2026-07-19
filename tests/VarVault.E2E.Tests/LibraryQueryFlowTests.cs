@@ -106,6 +106,29 @@ public sealed class LibraryQueryFlowTests
         Assert.Equal("刘亦菲.衣装.1", hits.Items[0].VarName);
     }
 
+    [Fact]
+    public async Task Ordered_ids_back_an_o1_scroll_snapshot()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+        WriteVar(repoDir, "Bob.Z.1.var", "Bob", "Z", [("Custom/Hair/h.vam", "z")]);
+        WriteVar(repoDir, "Alice.A.1.var", "Alice", "A", [("Custom/Hair/h.vam", "a")]);
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        var library = scope.ServiceProvider.GetRequiredService<ILibraryQueryService>();
+
+        var ids = await library.GetOrderedIdsAsync(new LibraryQuery(Sort: LibrarySort.Name));
+        var snapshot = new VarVault.Domain.Indexing.OrderedSnapshot(ids);
+
+        Assert.Equal(2, snapshot.Count);
+        // Alice.A.1 sorts before Bob.Z.1; the first row's package is Alice's.
+        var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+        var alice = await db.Packages.FirstAsync(p => p.VarName == "Alice.A.1");
+        Assert.Equal(alice.Id, snapshot[0]); // O(1) access
+    }
+
     private static async Task<Guid> Register(TestHost host, string path)
     {
         using var scope = host.Host.Services.CreateScope();

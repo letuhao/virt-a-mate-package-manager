@@ -16,6 +16,34 @@ public sealed class EfLibraryQueryService(VarVaultDbContext db) : ILibraryQueryS
     {
         Guard.NotNull(query);
 
+        var q = await BuildFilteredAsync(query, cancellationToken).ConfigureAwait(false);
+        var total = await q.CountAsync(cancellationToken).ConfigureAwait(false);
+
+        q = ApplySort(q, query.Sort, query.Descending);
+
+        var rows = await q
+            .Skip(Math.Max(0, query.Skip))
+            .Take(Math.Clamp(query.Take, 1, 1000))
+            .Select(x => new PackageListEntry(
+                x.PackageId, x.VarName, x.Creator, x.PackageName, x.VersionToken,
+                x.PrimaryType.ToString(), x.TotalSize, x.OnlineInstanceCount, x.TotalInstanceCount,
+                x.IsSingleCopy, x.IsFavorite, x.Class.ToString(), x.HasMissingDeps, x.LastUsedAt))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        return new LibraryPage(rows, total);
+    }
+
+    public async Task<IReadOnlyList<long>> GetOrderedIdsAsync(LibraryQuery query, CancellationToken cancellationToken = default)
+    {
+        Guard.NotNull(query);
+        var q = await BuildFilteredAsync(query, cancellationToken).ConfigureAwait(false);
+        return await ApplySort(q, query.Sort, query.Descending)
+            .Select(x => x.PackageId)
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<IQueryable<PackageListItem>> BuildFilteredAsync(LibraryQuery query, CancellationToken cancellationToken)
+    {
         var q = db.PackageListItems.AsNoTracking();
 
         if (!string.IsNullOrWhiteSpace(query.Creator))
@@ -39,20 +67,7 @@ public sealed class EfLibraryQueryService(VarVaultDbContext db) : ILibraryQueryS
             }
         }
 
-        var total = await q.CountAsync(cancellationToken).ConfigureAwait(false);
-
-        q = ApplySort(q, query.Sort, query.Descending);
-
-        var rows = await q
-            .Skip(Math.Max(0, query.Skip))
-            .Take(Math.Clamp(query.Take, 1, 1000))
-            .Select(x => new PackageListEntry(
-                x.PackageId, x.VarName, x.Creator, x.PackageName, x.VersionToken,
-                x.PrimaryType.ToString(), x.TotalSize, x.OnlineInstanceCount, x.TotalInstanceCount,
-                x.IsSingleCopy, x.IsFavorite, x.Class.ToString(), x.HasMissingDeps, x.LastUsedAt))
-            .ToListAsync(cancellationToken).ConfigureAwait(false);
-
-        return new LibraryPage(rows, total);
+        return q;
     }
 
     public async Task<IReadOnlyList<string>> GetCreatorsAsync(CancellationToken cancellationToken = default) =>

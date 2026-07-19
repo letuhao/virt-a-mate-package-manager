@@ -51,4 +51,10 @@ public interface ILibraryQueryService
 
     /// <summary>Distinct creators for the searchable creator combobox. (1.46)</summary>
     Task<IReadOnlyList<string>> GetCreatorsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The full ordered package-id list for a (filter, sort) — the backbone of the O(1)-scroll
+    /// OrderedSnapshot. Ignores <see cref="LibraryQuery.Skip"/>/<see cref="LibraryQuery.Take"/>. (1.39)
+    /// </summary>
+    Task<IReadOnlyList<long>> GetOrderedIdsAsync(LibraryQuery query, CancellationToken cancellationToken = default);
 }

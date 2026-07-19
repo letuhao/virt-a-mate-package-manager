@@ -45,5 +45,8 @@ public class MainWindowUiTests
 
         public Task<IReadOnlyList<string>> GetCreatorsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<string>>(["C"]);
+
+        public Task<IReadOnlyList<long>> GetOrderedIdsAsync(LibraryQuery query, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<long>>(Enumerable.Range(0, count).Select(i => (long)i).ToList());
     }
 }
