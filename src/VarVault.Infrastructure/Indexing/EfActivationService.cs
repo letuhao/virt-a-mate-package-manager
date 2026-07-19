@@ -15,19 +15,34 @@ public sealed class EfActivationService(VarVaultDbContext db, IClock clock, IDep
 {
     public async Task<ActivationBuildResult> BuildProfileLinksAsync(long presetId, CancellationToken cancellationToken = default)
     {
+        var active = await ResolvedMemberIdsAsync(presetId, cancellationToken).ConfigureAwait(false);
+        return await RecomputeAsync(presetId, active, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<ActivationBuildResult> DeactivateAsync(long presetId, long packageId, CancellationToken cancellationToken = default)
+    {
+        var active = await ResolvedMemberIdsAsync(presetId, cancellationToken).ConfigureAwait(false);
+        active.Remove(packageId); // ref-counting: deps stay if another active member still needs them
+        return await RecomputeAsync(presetId, active, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<HashSet<long>> ResolvedMemberIdsAsync(long presetId, CancellationToken cancellationToken)
+    {
+        var ids = await db.PresetMembers.AsNoTracking()
+            .Where(m => m.PresetId == presetId && m.ResolvedPackageId != null)
+            .Select(m => m.ResolvedPackageId!.Value)
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        return ids.ToHashSet();
+    }
+
+    private async Task<ActivationBuildResult> RecomputeAsync(long presetId, HashSet<long> directSet, CancellationToken cancellationToken)
+    {
         var preset = await db.LoadingPresets.FirstOrDefaultAsync(p => p.Id == presetId, cancellationToken).ConfigureAwait(false);
         if (preset is null)
             return new ActivationBuildResult(0, 0);
 
         var now = clock.UtcNow.UtcDateTime;
         var profile = await EnsureProfileAsync(preset, now, cancellationToken).ConfigureAwait(false);
-
-        // Direct members + their forward-dependency closure.
-        var direct = await db.PresetMembers.AsNoTracking()
-            .Where(m => m.PresetId == presetId && m.ResolvedPackageId != null)
-            .Select(m => m.ResolvedPackageId!.Value)
-            .ToListAsync(cancellationToken).ConfigureAwait(false);
-        var directSet = direct.ToHashSet();
 
         var full = new HashSet<long>(directSet);
         foreach (var id in directSet)

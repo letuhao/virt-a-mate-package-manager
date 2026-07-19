@@ -12,4 +12,11 @@ public sealed record ActivationBuildResult(int LinksCreated, int MissingPackages
 public interface IActivationService
 {
     Task<ActivationBuildResult> BuildProfileLinksAsync(long presetId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deactivate an explicit member package: rebuild links from the remaining active members, so its
+    /// pulled-in dependency links are dropped only when no other active member still needs them
+    /// (reference-counted). Returns the resulting link set. (Checklist 3.15.)
+    /// </summary>
+    Task<ActivationBuildResult> DeactivateAsync(long presetId, long packageId, CancellationToken cancellationToken = default);
 }

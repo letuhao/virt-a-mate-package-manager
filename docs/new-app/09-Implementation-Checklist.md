@@ -180,7 +180,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] 3.12 Reconcile: links the app created are owned/marked; reconcile never deletes user-made links or real files (⚠ T)
 - [ ] 3.13 Rescue baseline: deactivate all → minimal set; game launches (M/D)
 - [ ] 3.14 Temp activation auto-cleaned after use (T)
-- [ ] 3.15 Deactivation reference-counts DependencyOf links; drops only unneeded ones (T)
+- [x] 3.15 Deactivation reference-counts DependencyOf links; drops only unneeded ones · T: `ActivationFlowTests.Deactivation_reference_counts_shared_dependencies` (two looks share a dep; deactivating one keeps the shared dep, still needed by the other) — `EfActivationService.DeactivateAsync`
 
 ---
 
