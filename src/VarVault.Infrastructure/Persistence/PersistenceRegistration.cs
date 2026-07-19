@@ -58,6 +58,7 @@ public static class PersistenceRegistration
         services.AddScoped<Sdk.Library.ITrashQueryService, Library.EfTrashQueryService>();
         services.AddScoped<Sdk.Library.IProfileService, Library.EfProfileService>();
         services.AddScoped<Sdk.Library.IProposalService, Library.EfProposalService>();
+        services.AddScoped<Sdk.Library.IPackageDetailQuery, Library.EfPackageDetailQuery>();
         services.AddScoped<Sdk.Settings.ISettingsService, EfSettingsService>();
         services.AddScoped<Sdk.Presets.IPresetService, Indexing.EfPresetService>();
         services.AddScoped<Sdk.Activation.IActivityLog, Indexing.EfActivityLog>();

@@ -140,7 +140,10 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
   EncodingFix/RetireStale; Approve dispatches to migration/reclaim/health/trash; Reject records. Registered.
   T: `ProposalServiceFlowTests.Lists_proposals_and_approve_dispatches` (dedup approve trashes redundant;
   stale approve retires old version; reject ok).
-- [ ] **BE-N9 · `IPackageDetailQuery`** (IDependencyGraph fwd+rev, ContentItem, VarFile lineage, IThumbnailStore). *Test:* detail returns deps closure, content items, copies for a seeded package.
+- [x] **BE-N9 · `IPackageDetailQuery`** (IDependencyGraph fwd, ContentItem, VarFile lineage). *Done:* SDK
+  `IPackageDetailQuery`/`PackageDetail`/`ContentItemDto`/`CopyDto` + `EfPackageDetailQuery` (identity/license/
+  class, `ReverseDependentCount`, `ForwardClosureAsync`, canonical content items, copies+lineage). Registered.
+  T: `EfPackageDetailQueryTests` (`Returns_copies_content_items_and_forward_closure`, `Missing_package_returns_null`).
 - [ ] **BE-N10 · `ILibraryActionService`** (activation/move/preset/txt). *Test:* install creates links; delete gated by `DeletionPredicate` → trash; export/import txt round-trips.
 - [ ] **BE-N11 · `IAliasService`** (VarAlias). *Test:* set alias → resolver substitutes it; missing→owned mapping applied on activation.
 - [ ] **BE-N12 · Library facets** (`ITagService`/`ICollectionService`; extend `LibraryQuery` with PackageName/InstalledOnly/Types/Tiers; saved views). *Test:* each new filter narrows results; tag add/query.
