@@ -47,10 +47,13 @@ Build once, reused everywhere. Read the CSS token block `prototype.html:1–195`
 - [x] **SC-2 · Card.** *Read:* any `.card` (e.g. `:244`). Padded container + `<h3>` title slot. *Done:*
   `Controls/Card.cs` + `Themes/Controls.axaml` ControlTheme (bg-1/border/radius/14px, optional header). T:
   `CardControlTests` (`Card_renders_header_and_content`, `Card_without_header_hides_the_title`).
-- [ ] **SC-3 · DataTable.** *Read:* `:335–343` (thead) + JS `:673–693` (row template).
-  *Items:* checkbox column, sortable header (asc/desc caret, single active col), virtualized rows,
-  numeric/right-align cells, per-row action slot. *Rule:* **must virtualize** (70k rows); sort toggles like
-  `LibraryViewModel.SortByAsync`. *Test:* headers toggle sort; only visible rows realized; checkbox selects.
+- [x] **SC-3 · DataTable.** *Read:* `:335–343` (thead) + JS `:673–693` (row template).
+  *Items:* checkbox/multi-select, sortable header (asc/desc caret, single active col), virtualized rows,
+  numeric/right-align cells, per-row action slot (consumer RowTemplate). *Rule:* server-paged — header
+  click raises `SortCommand` (not client sort); `VirtualizingStackPanel` body. *Done:* `Controls/DataTable.cs`
+  + `DataTableColumn.cs` + ControlTheme. T: `DataTableControlTests`
+  (`Header_click_raises_sort_command_with_the_column_key`, `Active_caret_reflects_sort_key_and_direction`,
+  `Body_virtualizes_a_large_list` (realized<200 of 5000), `Multi_select_populates_selected_items`).
 - [ ] **SC-4 · Tabs.** *Read:* `:445,462,479,505,543,565`. Single active tab, count badges. *Test:* click switches active; content swaps.
 - [ ] **SC-5 · Chip / Tag / StatePill.** *Read:* `.chip`(`:323`), `.tag`(`:362`), `.st`(`:381` ok/sub/miss).
   *Rule:* state via text+shape (HR-5). *Test:* ok/sub/miss render distinct text, not colour-only.

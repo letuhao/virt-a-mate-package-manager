@@ -26,4 +26,29 @@
     </Setter>
   </ControlTheme>
 
+  <!-- SC-3 · DataTable (sortable header band + virtualized multi-select body) -->
+  <ControlTheme x:Key="{x:Type c:DataTable}" TargetType="c:DataTable">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <DockPanel LastChildFill="True">
+          <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="4,2">
+            <Grid Name="PART_Header" />
+          </Border>
+          <ListBox Name="PART_Rows"
+                   ItemsSource="{TemplateBinding ItemsSource}"
+                   ItemTemplate="{TemplateBinding RowTemplate}"
+                   SelectedItems="{Binding SelectedItems, RelativeSource={RelativeSource TemplatedParent}}"
+                   SelectionMode="Multiple"
+                   Background="Transparent" BorderThickness="0">
+            <ListBox.ItemsPanel>
+              <ItemsPanelTemplate>
+                <VirtualizingStackPanel />
+              </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+          </ListBox>
+        </DockPanel>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
 </ResourceDictionary>
