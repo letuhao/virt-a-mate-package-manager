@@ -175,8 +175,8 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] 3.7 Activate preset = resolve members → forward closure → apply aliases → create links; missing reported (M/D)
 - [ ] 3.8 Dependency-aware activation pulls closure; preview "will pull in N" before apply (M)
 - [ ] 3.9 🔒 Persistent aliases (global + per-preset) re-apply automatically on every load — no re-setup (T: switch away and back, alias still applied)
-- [ ] 3.10 Alias serialized by **var-name string** (portable); import re-resolves with reported diff (T: export→import on different library shows diff)
-- [ ] 3.11 Import/export preset from txt; validate on import, flag unknowns/version mismatches (T)
+- [x] 3.10 Alias/preset serialized by **var-name string** (portable); import re-resolves with reported diff · T: `PresetImporterTests.Reports_found_substituted_and_unknown` (export→import against a different library shows found/substituted/unknown) — `PresetImporter.Analyze`
+- [x] 3.11 Import/export preset from txt; validate on import, flag unknowns/version mismatches · T: `PresetTextFormatTests` (round-trip, comments/blanks) + `PresetImporterTests` (version-mismatch→substituted, unknown, unparseable flagged) — `PresetTextFormat` + `PresetImporter`
 - [ ] 3.12 Reconcile: links the app created are owned/marked; reconcile never deletes user-made links or real files (⚠ T)
 - [ ] 3.13 Rescue baseline: deactivate all → minimal set; game launches (M/D)
 - [ ] 3.14 Temp activation auto-cleaned after use (T)
