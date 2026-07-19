@@ -162,7 +162,10 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
   `IOnboardingService`/`OnboardingResult` + `EfOnboardingService` (register → set reserve → orchestrator
   index). Registered. T: `OnboardingServiceFlowTests.Add_and_index_registers_detects_and_populates` (tier
   assigned, catalog populated) + `Add_and_index_a_real_repo` (D: corpus).
-- [ ] **BE-N14 · Command palette / search** (action registry + `LibraryQuery.SearchText`). *Test:* query returns package hits + nav actions.
+- [x] **BE-N14 · Command palette / search** (action registry + `LibraryQuery.SearchText`). *Done:* SDK
+  `ICommandPaletteService`/`CommandHit` + `EfCommandPaletteService` (built-in nav/action registry filtered
+  by substring + package search via `ILibraryQueryService`). Registered. T:
+  `EfCommandPaletteServiceTests.Search_returns_nav_action_and_package_hits`.
 
 ---
 
