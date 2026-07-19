@@ -1,10 +1,14 @@
+using System.IO;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using VarVault.Common;
 using VarVault.Domain.Dependencies;
 using VarVault.Domain.Indexing;
 using VarVault.Domain.Repositories;
+using VarVault.Domain.Safety;
 using VarVault.Infrastructure.Indexing;
 using VarVault.Infrastructure.Repositories;
+using VarVault.Infrastructure.Safety;
 using VarVault.Sdk.Persistence;
 
 namespace VarVault.Infrastructure.Persistence;
@@ -28,6 +32,11 @@ public static class PersistenceRegistration
         services.AddScoped<IReferenceQuery, EfReferenceQuery>();
         services.AddScoped<UserSaveScanner>();
         services.AddScoped<CatalogReconciler>();
+        services.AddScoped<MigrationRunner>();
+
+        // Trash lives alongside the DB so restore survives DB loss (per-item manifests).
+        var trashRoot = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(databasePath)) ?? ".", "trash");
+        services.AddSingleton<ITrashService>(sp => new FileTrashService(trashRoot, sp.GetRequiredService<IClock>()));
         services.AddScoped<IRepositoryStore, EfRepositoryStore>();
         services.AddScoped<Sdk.Library.ILibraryQueryService, Library.EfLibraryQueryService>();
         services.AddScoped<Sdk.Settings.ISettingsService, EfSettingsService>();
