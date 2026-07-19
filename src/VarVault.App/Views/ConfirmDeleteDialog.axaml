@@ -1,0 +1,28 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:VarVault.App.Controls"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             x:Class="VarVault.App.Views.ConfirmDeleteDialog"
+             x:DataType="vm:ConfirmDeleteViewModel">
+  <StackPanel Spacing="10" MinWidth="440">
+    <TextBlock Text="Delete packages?" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+    <Border Background="{DynamicResource WarnBgBrush}" CornerRadius="4" Padding="8" IsVisible="{Binding HasProtected}">
+      <TextBlock Foreground="{DynamicResource WarnBrush}" TextWrapping="Wrap"
+                 Text="{Binding ProtectedCount, StringFormat='⚠ {0} single-copy (irreplaceable) — excluded by default.'}" />
+    </Border>
+    <ItemsControl ItemsSource="{Binding Items}">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate x:DataType="vm:ConfirmItem">
+          <Grid ColumnDefinitions="*,Auto" Height="24">
+            <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" />
+            <c:StatePill Grid.Column="1" State="Miss" Text="protected" IsVisible="{Binding IsSingleCopy}" />
+          </Grid>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <Button Content="Move safe items to trash" Command="{Binding DeleteCommand}" Foreground="{DynamicResource CritBrush}" />
+      <TextBlock Text="{Binding ResultMessage}" Opacity="0.8" VerticalAlignment="Center" />
+    </StackPanel>
+  </StackPanel>
+</UserControl>
