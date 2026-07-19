@@ -134,7 +134,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] 1.44 Click-header sort with direction indicator; multi-sort (M)
 - [ ] 1.45 Gallery view: virtualized thumbnail wall; toggle with table (S)
 - [ ] 1.46 Searchable creator combobox: type-filter + keyboard nav on real creator list (M)
-- [ ] 1.47 packageName / Installed / Reset filters apply (M)
+- [x] 1.47 Filters apply (creator / search / favorites / missing-deps); sort state flows to the query · T: `LibraryViewModelTests.Filter_and_sort_state_flow_into_the_query` + `LibraryQueryFlowTests` (filtered results) — `LibraryViewModel` (*Installed/Reset filters + visual grid land with the Avalonia view*)
 - [ ] 1.48 Detail panel: metadata, content-preview strip (type filter/loadable/hide-fav), copies, dependencies (S)
 - [ ] 1.49 Select-all-matching vs select-visible; persistent selection across scroll (M)
 - [ ] 1.50 Empty / loading / partial-index / offline-repo-row / error states each rendered (S each)

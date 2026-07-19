@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/VarVault.App/VarVault.App.csproj" />
     <Project Path="src/VarVault.Cli/VarVault.Cli.csproj" />
     <Project Path="src/VarVault.Common/VarVault.Common.csproj" />
     <Project Path="src/VarVault.Domain/VarVault.Domain.csproj" />
@@ -10,6 +11,7 @@
     <Project Path="src/VarVault.Sdk/VarVault.Sdk.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/VarVault.App.Tests/VarVault.App.Tests.csproj" />
     <Project Path="tests/VarVault.Architecture.Tests/VarVault.Architecture.Tests.csproj" />
     <Project Path="tests/VarVault.Common.Tests/VarVault.Common.Tests.csproj" />
     <Project Path="tests/VarVault.E2E.Tests/VarVault.E2E.Tests.csproj" />
