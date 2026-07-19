@@ -98,13 +98,21 @@ public class LibraryViewModelStateTests
     [Fact]
     public async Task Typing_flags_count_approximate_then_exact_after_settle()
     {
-        // A yielding delay lets the setter return before the refresh completes, so the interim state is observable.
-        var vm = new LibraryViewModel(new StubLibrary(7), delay: async (_, _) => await Task.Yield());
+        // A gate delay holds the debounced refresh open so the interim (approximate) state is observed
+        // deterministically — a yielding delay would let the pooled refresh clear the flag before the
+        // assert under load (a race).
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var vm = new LibraryViewModel(new StubLibrary(7), delay: (_, ct) =>
+        {
+            ct.Register(() => gate.TrySetCanceled());
+            return gate.Task;
+        });
 
         vm.SearchText = "sce";
-        Assert.True(vm.IsCountApproximate);          // in-flight: shown count is stale/approximate
+        Assert.True(vm.IsCountApproximate);          // in-flight (delay still pending): count is approximate
 
-        await vm.PendingRefresh!;                     // let the debounced refresh settle
+        gate.SetResult();                            // let the debounce settle → refresh runs
+        await vm.PendingRefresh!;
         Assert.False(vm.IsCountApproximate);          // now exact
         Assert.Equal(7, vm.TotalCount);
     }

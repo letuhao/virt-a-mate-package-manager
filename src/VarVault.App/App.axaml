@@ -7,21 +7,133 @@
     <FluentTheme />
   </Application.Styles>
 
+  <!--
+    SC-1 · Theme tokens & palette. Mirrors prototype.html :root vars (light + dark).
+    Colours live in per-variant ThemeDictionaries; Brushes reference them via DynamicResource
+    so they switch with the viewer's theme. Later units bind these tokens — never raw hex.
+  -->
   <Application.Resources>
     <ResourceDictionary>
-      <!-- Accent token tuned per theme variant so it reads well on both grounds. (X.15) -->
       <ResourceDictionary.ThemeDictionaries>
-        <ResourceDictionary x:Key="Light">
-          <Color x:Key="AccentColor">#2F5E8F</Color>
-        </ResourceDictionary>
+
+        <!-- DARK (prototype default: color-scheme:dark) -->
         <ResourceDictionary x:Key="Dark">
-          <Color x:Key="AccentColor">#6AA0DC</Color>
+          <Color x:Key="Bg0Color">#0d0f13</Color>
+          <Color x:Key="Bg1Color">#15181f</Color>
+          <Color x:Key="Bg2Color">#1c2029</Color>
+          <Color x:Key="Bg3Color">#232833</Color>
+          <Color x:Key="BgHoverColor">#262c38</Color>
+          <Color x:Key="BorderColor">#2b313d</Color>
+          <Color x:Key="BorderHiColor">#3a414f</Color>
+          <Color x:Key="TextHiColor">#e7ebf2</Color>
+          <Color x:Key="TextColor">#aab3c2</Color>
+          <Color x:Key="TextLoColor">#6b7484</Color>
+          <Color x:Key="AccentColor">#7c86f0</Color>
+          <Color x:Key="AccentHiColor">#9aa2f6</Color>
+          <Color x:Key="AccentBgColor">#297c86f0</Color>
+          <Color x:Key="AccentLineColor">#807c86f0</Color>
+          <Color x:Key="GoodColor">#3ddc97</Color>
+          <Color x:Key="GoodBgColor">#243ddc97</Color>
+          <Color x:Key="WarnColor">#f4b740</Color>
+          <Color x:Key="WarnBgColor">#24f4b740</Color>
+          <Color x:Key="CritColor">#fb6f84</Color>
+          <Color x:Key="CritBgColor">#24fb6f84</Color>
+          <Color x:Key="HotColor">#f2924e</Color>
+          <Color x:Key="WarmColor">#d9b16a</Color>
+          <Color x:Key="ColdColor">#6aa2c8</Color>
         </ResourceDictionary>
+
+        <!-- LIGHT (prototype :root[data-theme=light]) -->
+        <ResourceDictionary x:Key="Light">
+          <Color x:Key="Bg0Color">#eef0f4</Color>
+          <Color x:Key="Bg1Color">#f7f8fb</Color>
+          <Color x:Key="Bg2Color">#ffffff</Color>
+          <Color x:Key="Bg3Color">#f0f2f6</Color>
+          <Color x:Key="BgHoverColor">#eaecf2</Color>
+          <Color x:Key="BorderColor">#dde1e9</Color>
+          <Color x:Key="BorderHiColor">#c7ccd8</Color>
+          <Color x:Key="TextHiColor">#161a22</Color>
+          <Color x:Key="TextColor">#4a5265</Color>
+          <Color x:Key="TextLoColor">#8a93a4</Color>
+          <Color x:Key="AccentColor">#5a63d8</Color>
+          <Color x:Key="AccentHiColor">#464fc4</Color>
+          <Color x:Key="AccentBgColor">#1f5a63d8</Color>
+          <Color x:Key="AccentLineColor">#735a63d8</Color>
+          <Color x:Key="GoodColor">#0f9d63</Color>
+          <Color x:Key="GoodBgColor">#1f0f9d63</Color>
+          <Color x:Key="WarnColor">#b9791a</Color>
+          <Color x:Key="WarnBgColor">#24b9791a</Color>
+          <Color x:Key="CritColor">#d63d55</Color>
+          <Color x:Key="CritBgColor">#1fd63d55</Color>
+          <Color x:Key="HotColor">#d1732e</Color>
+          <Color x:Key="WarmColor">#a5833f</Color>
+          <Color x:Key="ColdColor">#4d7ea6</Color>
+        </ResourceDictionary>
+
+        <!-- DEFAULT mirrors dark (prototype default) -->
         <ResourceDictionary x:Key="Default">
-          <Color x:Key="AccentColor">#3B6EA5</Color>
+          <Color x:Key="Bg0Color">#0d0f13</Color>
+          <Color x:Key="Bg1Color">#15181f</Color>
+          <Color x:Key="Bg2Color">#1c2029</Color>
+          <Color x:Key="Bg3Color">#232833</Color>
+          <Color x:Key="BgHoverColor">#262c38</Color>
+          <Color x:Key="BorderColor">#2b313d</Color>
+          <Color x:Key="BorderHiColor">#3a414f</Color>
+          <Color x:Key="TextHiColor">#e7ebf2</Color>
+          <Color x:Key="TextColor">#aab3c2</Color>
+          <Color x:Key="TextLoColor">#6b7484</Color>
+          <Color x:Key="AccentColor">#7c86f0</Color>
+          <Color x:Key="AccentHiColor">#9aa2f6</Color>
+          <Color x:Key="AccentBgColor">#297c86f0</Color>
+          <Color x:Key="AccentLineColor">#807c86f0</Color>
+          <Color x:Key="GoodColor">#3ddc97</Color>
+          <Color x:Key="GoodBgColor">#243ddc97</Color>
+          <Color x:Key="WarnColor">#f4b740</Color>
+          <Color x:Key="WarnBgColor">#24f4b740</Color>
+          <Color x:Key="CritColor">#fb6f84</Color>
+          <Color x:Key="CritBgColor">#24fb6f84</Color>
+          <Color x:Key="HotColor">#f2924e</Color>
+          <Color x:Key="WarmColor">#d9b16a</Color>
+          <Color x:Key="ColdColor">#6aa2c8</Color>
         </ResourceDictionary>
+
       </ResourceDictionary.ThemeDictionaries>
+
+      <!-- Brushes (theme-switching via DynamicResource colours) -->
+      <SolidColorBrush x:Key="Bg0Brush" Color="{DynamicResource Bg0Color}" />
+      <SolidColorBrush x:Key="Bg1Brush" Color="{DynamicResource Bg1Color}" />
+      <SolidColorBrush x:Key="Bg2Brush" Color="{DynamicResource Bg2Color}" />
+      <SolidColorBrush x:Key="Bg3Brush" Color="{DynamicResource Bg3Color}" />
+      <SolidColorBrush x:Key="BgHoverBrush" Color="{DynamicResource BgHoverColor}" />
+      <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource BorderColor}" />
+      <SolidColorBrush x:Key="BorderHiBrush" Color="{DynamicResource BorderHiColor}" />
+      <SolidColorBrush x:Key="TextHiBrush" Color="{DynamicResource TextHiColor}" />
+      <SolidColorBrush x:Key="TextBrush" Color="{DynamicResource TextColor}" />
+      <SolidColorBrush x:Key="TextLoBrush" Color="{DynamicResource TextLoColor}" />
       <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}" />
+      <SolidColorBrush x:Key="AccentHiBrush" Color="{DynamicResource AccentHiColor}" />
+      <SolidColorBrush x:Key="AccentBgBrush" Color="{DynamicResource AccentBgColor}" />
+      <SolidColorBrush x:Key="AccentLineBrush" Color="{DynamicResource AccentLineColor}" />
+      <SolidColorBrush x:Key="GoodBrush" Color="{DynamicResource GoodColor}" />
+      <SolidColorBrush x:Key="GoodBgBrush" Color="{DynamicResource GoodBgColor}" />
+      <SolidColorBrush x:Key="WarnBrush" Color="{DynamicResource WarnColor}" />
+      <SolidColorBrush x:Key="WarnBgBrush" Color="{DynamicResource WarnBgColor}" />
+      <SolidColorBrush x:Key="CritBrush" Color="{DynamicResource CritColor}" />
+      <SolidColorBrush x:Key="CritBgBrush" Color="{DynamicResource CritBgColor}" />
+      <SolidColorBrush x:Key="HotBrush" Color="{DynamicResource HotColor}" />
+      <SolidColorBrush x:Key="WarmBrush" Color="{DynamicResource WarmColor}" />
+      <SolidColorBrush x:Key="ColdBrush" Color="{DynamicResource ColdColor}" />
+
+      <!-- Non-colour tokens: radius, font sizes, mono family -->
+      <CornerRadius x:Key="RadiusMd">7</CornerRadius>
+      <CornerRadius x:Key="RadiusSm">5</CornerRadius>
+      <x:Double x:Key="FsXs">11</x:Double>
+      <x:Double x:Key="FsSm">12</x:Double>
+      <x:Double x:Key="FsBase">13</x:Double>
+      <x:Double x:Key="FsMd">14</x:Double>
+      <x:Double x:Key="FsLg">16</x:Double>
+      <x:Double x:Key="FsXl">21</x:Double>
+      <FontFamily x:Key="MonoFont">Cascadia Code,Consolas,monospace</FontFamily>
     </ResourceDictionary>
   </Application.Resources>
 
