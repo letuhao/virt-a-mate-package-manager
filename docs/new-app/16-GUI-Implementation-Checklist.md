@@ -257,7 +257,7 @@ Each is content inside SC-9. Read its exact modal lines (HR-0).
   folder input, add&index). T: `OnboardingDialogTests.Add_and_index_reports_result_and_completes`.
 - [x] **DLG-2 · m-addrepo.** *Done:* `AddRepoViewModel(IRepositoryService)` + `Views/AddRepoDialog.axaml` (folder, detected media/tier, reserve, add). T: `AddRepoDialogTests.Add_registers_and_reports_detected_tier`.
 - [x] **DLG-3 · m-migrate.** *BE:* N2/N3. *Done:* `MigrateViewModel(ITieringService)` + `Views/MigrateDialog.axaml` (plan summary, copy→verify→rename→delete flow, single-copy exclusion warning). T: `MigrateDialogTests.Loads_plan_and_flags_exclusions`.
-- [ ] **DLG-4 · m-fix.** *Read:* `:609–617`. *Items:* fix #1–7. *BE:* N5. *Test:* before/after preview; apply-to-group.
+- [x] **DLG-4 · m-fix.** *BE:* N5. *Done:* `FixEncodingViewModel(IHealthService)` + `Views/FixDialog.axaml` (before/after mojibake→UTF-8, fix+apply-to-group). T: `FixDialogTests.Fix_reports_success`.
 - [x] **DLG-5 · m-alias.** *BE:* N11. *Done:* `AliasViewModel(IAliasService)` + `Views/AliasDialog.axaml` (map-to-owned, scope, save). T: `AliasDialogTests.Save_calls_set_and_reports`.
 - [x] **DLG-6 · m-confirm (delete).** *BE:* N10 + DeletionPredicate. *Done:* `ConfirmDeleteViewModel(ILibraryActionService)` + `Views/ConfirmDeleteDialog.axaml` (single-copy protected/excluded, safe→trash). T: `ConfirmDeleteDialogTests.Single_copy_is_excluded_from_delete`.
 - [ ] **DLG-7 · m-preset (edit).** *Read:* `:638–645`. *Items:* preset #1–12. *BE:* `IPresetService`, N10. *Test:* member table + pin; Save persists.
