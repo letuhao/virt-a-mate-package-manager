@@ -56,6 +56,31 @@ public sealed class EfPresetService(VarVaultDbContext db, IClock clock, IDepende
         return await InfoAsync(presetId, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<Result<PresetInfo>> RemoveMemberAsync(long presetId, string memberRef, CancellationToken cancellationToken = default)
+    {
+        var preset = await db.LoadingPresets.FirstOrDefaultAsync(p => p.Id == presetId, cancellationToken).ConfigureAwait(false);
+        if (preset is null)
+            return Result.Failure<PresetInfo>("preset.missing", "Preset not found.");
+
+        var key = IdentityFold.Compute(memberRef);
+        var member = await db.PresetMembers
+            .FirstOrDefaultAsync(m => m.PresetId == presetId && m.PackageRefKey == key, cancellationToken).ConfigureAwait(false);
+        if (member is null)
+            return Result.Failure<PresetInfo>("preset.member.missing", $"'{memberRef}' is not a member.");
+
+        db.PresetMembers.Remove(member);
+        preset.UpdatedAt = clock.UtcNow.UtcDateTime;
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return await InfoAsync(presetId, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<string>> MembersAsync(long presetId, CancellationToken cancellationToken = default) =>
+        await db.PresetMembers.AsNoTracking()
+            .Where(m => m.PresetId == presetId)
+            .OrderBy(m => m.SortOrder)
+            .Select(m => m.PackageRefRaw)
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
     public async Task<IReadOnlyList<PresetInfo>> ListAsync(CancellationToken cancellationToken = default) =>
         await db.LoadingPresets.AsNoTracking()
             .Select(p => new PresetInfo(p.Id, p.Name, p.Members.Count))

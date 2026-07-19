@@ -21,6 +21,12 @@ public interface IPresetService
     Task<bool> DeleteAsync(long presetId, CancellationToken cancellationToken = default);
     Task<Result<PresetInfo>> AddMemberAsync(long presetId, string memberRef, CancellationToken cancellationToken = default);
 
+    /// <summary>Remove a member ref from a preset (edit-preset dialog). Returns the updated info. (BE-G3)</summary>
+    Task<Result<PresetInfo>> RemoveMemberAsync(long presetId, string memberRef, CancellationToken cancellationToken = default);
+
+    /// <summary>The member refs of a preset, in order (edit-preset dialog member table). (BE-G3)</summary>
+    Task<IReadOnlyList<string>> MembersAsync(long presetId, CancellationToken cancellationToken = default);
+
     /// <summary>Resolve members + pull the forward-dependency closure → "will pull in N" preview. (3.8)</summary>
     Task<ActivationPreview?> PreviewActivationAsync(long presetId, CancellationToken cancellationToken = default);
 }

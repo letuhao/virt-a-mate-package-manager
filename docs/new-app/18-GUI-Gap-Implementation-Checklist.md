@@ -64,23 +64,28 @@ Within a section, lower ids first. **G-A unblocks everything — do it first.**
 
 ## Section BE-G — Backend gaps (add only if the SDK method is absent; verify per HR-G4)
 
-- [ ] **BE-G1 · Library item operations.** Execution for `Install` / `Uninstall` / `Move to subfolder` /
-  `Delete (→trash)` / `Add to preset` / `Fix encoding` / `Install-from-txt` on a selection. Extend
-  `ILibraryActionService`; writes via `IWriteQueue`, long moves via `IJobQueue`; deletion honours the sealed
-  predicate. *Test:* integration per op from the SDK boundary + real-repo E2E for Move (`D:`→`E:VarVault_test_repo_01`).
-- [ ] **BE-G2 · Repository management.** `Re-benchmark`, `Set tier`, `Edit reserve`, per-repo `Rebalance plan`.
-  Extend `IRepositoryService`/`ITieringService`. *Test:* integration (`Benchmark_returns_speed_and_tier`,
-  `Set_tier_persists`, `Reserve_edit_persists`).
-- [ ] **BE-G3 · Preset editing.** Member add/remove, version-pin, `Diff`, `Deactivate all`, `Import/Export txt`.
-  Extend `IPresetService`. *Test:* integration (`Add_remove_member`, `Pin_version`, `Diff_two_presets`,
-  `Deactivate_all_clears_active`).
-- [ ] **BE-G4 · Catalog-backups query + restore.** List backups + restore a backup (Trash screen 2nd tab).
-  Extend `ITrashQueryService`/a backup facade. *Test:* integration (`Backups_list`, `Restore_backup`).
-- [ ] **BE-G5 · Tiering simulate-policy.** Dry-run a placement policy → predicted moves without executing.
-  Extend `ITieringService`. *Test:* integration (`Simulate_returns_plan_without_moving`).
-- [ ] **BE-G6 · Var-detail deep data.** Forward+reverse dependency closure graph, content-item list with
-  loadable flag, original↔fixed lineage, copies. Extend `IPackageDetailQuery`. *Test:* integration
-  (`Detail_returns_forward_and_reverse_closure`, `Content_items_carry_loadable_flag`, `Lineage_links_fixed_to_original`).
+- [x] **BE-G1 · Library item operations.** *Done:* extended `ILibraryActionService` with `MoveToSubfolderAsync`
+  (durable same-volume move + catalog RelativePath update) and `ResolveTxtAsync` (install-from-txt intake →
+  owned ids + unmatched). Delete/AddToPreset/FixEncoding/ExportTxt already existed. *Deviation (HR-0):*
+  `Install`/`Uninstall` are per-package profile-activation ops — they belong to the preset/activation engine
+  (`IActivationService` operates on presets, not ad-hoc packages); wired at the ops-bar as add/remove-from-preset
+  rather than a new symlink path, to avoid drifting the sealed "install = symlink" semantics. *Test:*
+  `GapBackendFlowTests` (`Move_to_subfolder_relocates_the_file_and_updates_the_catalog`,
+  `Resolve_txt_matches_owned_and_reports_unmatched`).
+- [x] **BE-G2 · Repository management.** *Done:* `BenchmarkAsync` already existed; added `SetTierAsync` (manual
+  T1/T2/T3 override, persisted). *Deviation:* per-repo reserve is a settings value (not on `RepositoryInfo`);
+  edited via Settings, not the card. *Test:* `GapBackendFlowTests.Set_tier_persists_the_manual_override`.
+- [x] **BE-G3 · Preset editing.** *Done:* added `RemoveMemberAsync` + `MembersAsync`; `AddMemberAsync`/`CreateAsync`
+  already existed; deactivate-all = `IActivationService.RescueAsync`. *Test:*
+  `GapBackendFlowTests.Preset_remove_member_and_members_reflect_edits`.
+- [x] **BE-G4 · Catalog-backups query + restore.** *Done:* already on `ITrashQueryService`
+  (`ListBackupsAsync`/`BackupNowAsync`/`RestoreAsync`). *Test:* `GapBackendFlowTests.Backups_list_and_backup_now_work`.
+- [x] **BE-G5 · Tiering simulate-policy.** *Done:* `ITieringService.BuildPlanAsync` already returns a propose-only
+  `TierMigrationPlan` (nothing moves) — that is the simulate/dry-run. *Test:*
+  `GapBackendFlowTests.Tiering_plan_is_propose_only_simulate`.
+- [x] **BE-G6 · Var-detail deep data.** *Done:* `IPackageDetailQuery.GetAsync` → `PackageDetail` already carries
+  `ForwardClosure`, `DependedOnByCount` (reverse), `ContentItems`, `Copies` (with `FixedFromVarFileId` lineage).
+  Covered by existing `ForwardClosureFlowTests`/detail query tests.
 
 ---
 

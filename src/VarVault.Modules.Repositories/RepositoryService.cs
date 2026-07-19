@@ -85,6 +85,19 @@ internal sealed class RepositoryService(
         return true;
     }
 
+    public async Task<RepositoryInfo?> SetTierAsync(Guid repositoryId, int tier, CancellationToken cancellationToken = default)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IRepositoryStore>();
+        var repo = await store.FindAsync(repositoryId, cancellationToken).ConfigureAwait(false);
+        if (repo is null)
+            return null;
+        repo.Tier = tier;
+        repo.UpdatedAt = clock.UtcNow.UtcDateTime;
+        await store.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return Map(repo);
+    }
+
     public async Task<RepositoryInfo?> RefreshCapacityAsync(Guid repositoryId, CancellationToken cancellationToken = default)
     {
         using var scope = scopeFactory.CreateScope();

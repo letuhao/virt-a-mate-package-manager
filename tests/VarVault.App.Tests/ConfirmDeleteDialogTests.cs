@@ -15,6 +15,8 @@ public class ConfirmDeleteDialogTests
         public Task<BulkActionResult> AddToPresetAsync(long p, IReadOnlyList<long> ids, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<BulkActionResult> FixEncodingAsync(IReadOnlyList<long> ids, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<string> ExportTxtAsync(IReadOnlyList<long> ids, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<BulkActionResult> MoveToSubfolderAsync(IReadOnlyList<long> v, string s, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<TxtResolveResult> ResolveTxtAsync(string t, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
     [Fact]

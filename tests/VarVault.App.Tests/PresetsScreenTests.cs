@@ -23,6 +23,8 @@ public class PresetsScreenTests
         public Task<Result<PresetInfo>> CreateAsync(string n, IEnumerable<string> m, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> DeleteAsync(long id, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<Result<PresetInfo>> AddMemberAsync(long id, string r, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Result<PresetInfo>> RemoveMemberAsync(long id, string r, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<string>> MembersAsync(long id, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>([]);
     }
 
     [AvaloniaFact]

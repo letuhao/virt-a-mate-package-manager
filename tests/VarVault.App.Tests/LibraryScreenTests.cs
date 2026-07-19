@@ -32,6 +32,8 @@ public class LibraryScreenTests
         public Task<BulkActionResult> FixEncodingAsync(IReadOnlyList<long> ids, CancellationToken ct = default) => Task.FromResult(new BulkActionResult(0, 0));
         public Task<BulkActionResult> DeleteAsync(IReadOnlyList<long> ids, CancellationToken ct = default) => Task.FromResult(new BulkActionResult(0, 0));
         public Task<string> ExportTxtAsync(IReadOnlyList<long> ids, CancellationToken ct = default) => Task.FromResult(string.Join('\n', ids));
+        public Task<BulkActionResult> MoveToSubfolderAsync(IReadOnlyList<long> v, string s, CancellationToken ct = default) => Task.FromResult(new BulkActionResult(v.Count, 0));
+        public Task<TxtResolveResult> ResolveTxtAsync(string t, CancellationToken ct = default) => Task.FromResult(new TxtResolveResult([], []));
     }
 
     [AvaloniaFact]

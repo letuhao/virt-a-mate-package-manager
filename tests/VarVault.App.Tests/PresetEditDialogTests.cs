@@ -14,6 +14,8 @@ public class PresetEditDialogTests
         public bool Added;
         public Task<Result<PresetInfo>> AddMemberAsync(long id, string r, CancellationToken ct = default) { Added = true; return Task.FromResult(Result.Success(new PresetInfo(id, "p", 1))); }
         public Task<ActivationPreview?> PreviewActivationAsync(long id, CancellationToken ct = default) => Task.FromResult<ActivationPreview?>(new ActivationPreview(1, 3, []));
+        public Task<Result<PresetInfo>> RemoveMemberAsync(long id, string r, CancellationToken ct = default) => Task.FromResult(Result.Success(new PresetInfo(id, "p", 0)));
+        public Task<IReadOnlyList<string>> MembersAsync(long id, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>([]);
         public Task<IReadOnlyList<PresetInfo>> ListAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<PresetInfo>>([]);
         public Task<Result<PresetInfo>> CreateAsync(string n, IEnumerable<string> m, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> DeleteAsync(long id, CancellationToken ct = default) => throw new NotSupportedException();

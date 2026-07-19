@@ -77,4 +77,58 @@ public sealed class EfLibraryActionService(
             sb.AppendLine(n);
         return sb.ToString();
     }
+
+    public async Task<BulkActionResult> MoveToSubfolderAsync(IReadOnlyList<long> varFileIds, string subfolder, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(subfolder))
+            return new BulkActionResult(0, varFileIds.Count);
+
+        var rows = await db.VarFiles
+            .Where(v => varFileIds.Contains(v.Id))
+            .Select(v => new { v.Id, v.RelativePath, Mount = v.Repository!.MountPath })
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        var byId = rows.ToDictionary(r => r.Id);
+
+        int ok = 0, fail = 0;
+        foreach (var id in varFileIds)
+        {
+            if (!byId.TryGetValue(id, out var row)) { fail++; continue; }
+            try
+            {
+                var fileName = Path.GetFileName(row.RelativePath);
+                var newRel = Path.Combine(subfolder, fileName);
+                var src = Path.Combine(row.Mount, row.RelativePath);
+                var dst = Path.Combine(row.Mount, newRel);
+                if (!File.Exists(src)) { fail++; continue; }
+                Directory.CreateDirectory(Path.GetDirectoryName(dst)!);
+                File.Move(src, dst, overwrite: false); // same-volume move within the repo → atomic rename
+                var entity = await db.VarFiles.FirstAsync(v => v.Id == id, cancellationToken).ConfigureAwait(false);
+                entity.RelativePath = newRel;
+                ok++;
+            }
+            catch (IOException) { fail++; }
+            catch (UnauthorizedAccessException) { fail++; }
+        }
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return new BulkActionResult(ok, fail);
+    }
+
+    public async Task<TxtResolveResult> ResolveTxtAsync(string txt, CancellationToken cancellationToken = default)
+    {
+        var wanted = (txt ?? string.Empty)
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(l => l.Length > 0)
+            .ToList();
+        if (wanted.Count == 0)
+            return new TxtResolveResult([], []);
+
+        var owned = await db.Packages
+            .Where(p => wanted.Contains(p.VarName))
+            .Select(p => new { p.Id, p.VarName })
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        var matchedNames = owned.Select(o => o.VarName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var unmatched = wanted.Where(w => !matchedNames.Contains(w)).ToList();
+        return new TxtResolveResult(owned.Select(o => o.Id).ToList(), unmatched);
+    }
 }

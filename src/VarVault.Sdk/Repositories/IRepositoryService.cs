@@ -39,4 +39,7 @@ public interface IRepositoryService
 
     /// <summary>Benchmark the repo's drive, store the speeds, and re-assign its tier from them. (BE-R1/1.5/1.6.)</summary>
     Task<RepositoryInfo?> BenchmarkAsync(Guid repositoryId, CancellationToken cancellationToken = default);
+
+    /// <summary>Manually override a repository's tier (user picks T1/T2/T3 from the card). (BE-G2)</summary>
+    Task<RepositoryInfo?> SetTierAsync(Guid repositoryId, int tier, CancellationToken cancellationToken = default);
 }
