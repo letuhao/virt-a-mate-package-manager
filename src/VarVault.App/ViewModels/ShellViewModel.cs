@@ -44,13 +44,50 @@ public sealed partial class ShellViewModel : ObservableObject
         new("settings", "Settings", "System"),
     ];
 
-    public ShellViewModel(IReadOnlyDictionary<string, object> screens, string initial = "library")
+    private readonly Sdk.Threading.IJobQueue? _jobQueue;
+
+    public ShellViewModel(IReadOnlyDictionary<string, object> screens, string initial = "library",
+        Services.IDialogService? dialogs = null, Sdk.Threading.IJobQueue? jobQueue = null,
+        Services.IShellLiveFeeds? feeds = null)
     {
         _screens = screens;
+        Dialogs = dialogs ?? new Services.DialogService();
+        _jobQueue = jobQueue;
+        _feeds = feeds;
         Screens = AllScreens;
         RailItems = AllScreens.Select(s => new RailItemViewModel(s.Id, s.Label, s.Group)).ToList();
         Navigate(initial);
     }
+
+    private readonly Services.IShellLiveFeeds? _feeds;
+
+    /// <summary>
+    /// Pull all live state (jobs, badges, log-dock) from the injected sources. Called by the shell's poll
+    /// timer and after actions. (GA-2/GA-3/GA-4.)
+    /// </summary>
+    public async System.Threading.Tasks.Task RefreshLiveStateAsync(
+        System.Threading.CancellationToken cancellationToken = default)
+    {
+        RefreshJobsFromQueue();
+        if (_feeds is null)
+            return;
+        var snap = await _feeds.SnapshotAsync(cancellationToken).ConfigureAwait(true);
+        SetBadge("proposals", snap.ProposalCount == 0 ? null : snap.ProposalCount);
+        SetBadge("health", snap.HealthCount == 0 ? null : snap.HealthCount);
+        SetBadge("missing", snap.MissingCount == 0 ? null : snap.MissingCount);
+        TierSummary = snap.TierSummary;
+        IndexStatus = snap.IndexStatus;
+    }
+
+    /// <summary>Refresh the jobs panel from the live <see cref="Sdk.Threading.IJobQueue"/>. (GA-2)</summary>
+    public void RefreshJobsFromQueue()
+    {
+        if (_jobQueue is not null)
+            RefreshJobs(_jobQueue.Active);
+    }
+
+    /// <summary>The shell's single dialog host (bound by the ModalHost in MainWindow). (GA-1)</summary>
+    public Services.IDialogService Dialogs { get; }
 
     public IReadOnlyList<ShellScreen> Screens { get; }
 

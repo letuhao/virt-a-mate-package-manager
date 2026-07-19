@@ -8,7 +8,11 @@
     <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto">
       <!-- 1. Global search → command palette -->
       <TextBox Grid.Column="0" Name="PART_Search" MaxWidth="380" HorizontalAlignment="Left"
-               Watermark="Search everything…  (Ctrl K)" Text="{Binding SearchText}" />
+               Watermark="Search everything…  (Ctrl K)" Text="{Binding SearchText}">
+        <TextBox.KeyBindings>
+          <KeyBinding Gesture="Enter" Command="{Binding OpenPaletteCommand}" />
+        </TextBox.KeyBindings>
+      </TextBox>
       <!-- 2. Rescue -->
       <Button Grid.Column="1" Margin="8,0,0,0" Content="⛑ Rescue" Command="{Binding RescueCommand}"
               Foreground="{DynamicResource WarnBrush}" />

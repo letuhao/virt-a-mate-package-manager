@@ -26,6 +26,18 @@
     <DataTemplate DataType="vm:PlaceholderScreenViewModel">
       <TextBlock Text="{Binding Title, StringFormat='{}{0} — coming soon'}" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.6" />
     </DataTemplate>
+
+    <!-- Dialog view-model → view map (GA-1 ModalHost hosting). -->
+    <DataTemplate DataType="vm:OnboardingViewModel"><views:OnboardingDialog /></DataTemplate>
+    <DataTemplate DataType="vm:AddRepoViewModel"><views:AddRepoDialog /></DataTemplate>
+    <DataTemplate DataType="vm:MigrateViewModel"><views:MigrateDialog /></DataTemplate>
+    <DataTemplate DataType="vm:FixEncodingViewModel"><views:FixDialog /></DataTemplate>
+    <DataTemplate DataType="vm:AliasViewModel"><views:AliasDialog /></DataTemplate>
+    <DataTemplate DataType="vm:ConfirmDeleteViewModel"><views:ConfirmDeleteDialog /></DataTemplate>
+    <DataTemplate DataType="vm:PresetEditViewModel"><views:PresetEditDialog /></DataTemplate>
+    <DataTemplate DataType="vm:DupeReviewViewModel"><views:DupeReviewDialog /></DataTemplate>
+    <DataTemplate DataType="vm:RescueViewModel"><views:RescueDialog /></DataTemplate>
+    <DataTemplate DataType="vm:VarDetailViewModel"><views:VarDetailDialog /></DataTemplate>
   </Window.DataTemplates>
 
   <Panel>
@@ -40,6 +52,9 @@
 
     <!-- Jobs panel overlay (top-right) -->
     <views:JobsPanelView DataContext="{Binding}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,44,14,0" />
+
+    <!-- Modal dialog host (GA-1) — hosts whatever the dialog service currently shows -->
+    <c:ModalHost Content="{Binding Dialogs.Current}" IsOpen="{Binding Dialogs.IsOpen}" />
 
     <!-- Toast (bottom-center) -->
     <c:Toast Message="{Binding ToastMessage}" IsOpen="{Binding ToastVisible}" HasUndo="{Binding ToastHasUndo}"

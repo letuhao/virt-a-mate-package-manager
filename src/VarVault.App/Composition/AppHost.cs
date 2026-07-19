@@ -41,7 +41,57 @@ public static class AppHost
         foreach (var s in ShellViewModel.AllScreens)
             screens.TryAdd(s.Id, new PlaceholderScreenViewModel(s.Label));
 
-        return new ShellViewModel(screens, initial: "library");
+        var dialogs = new Services.DialogService();
+        var jobQueue = services.GetService<Sdk.Threading.IJobQueue>();
+        var feeds = TryBuildFeeds(services, jobQueue);
+        var shell = new ShellViewModel(screens, initial: "library", dialogs: dialogs, jobQueue: jobQueue, feeds: feeds);
+
+        // GA-6 · top-bar handlers → open the matching dialog through the dialog service.
+        var repoService = services.GetService<Sdk.Repositories.IRepositoryService>();
+        if (repoService is not null)
+            shell.AddRepoHandler = () => dialogs.Show(new AddRepoViewModel(repoService,
+                onAdded: () => EnqueueIndexAll(services)));
+
+        var activation = services.GetService<Sdk.Activation.IActivationService>();
+        if (activation is not null)
+            shell.RescueHandler = () =>
+            {
+                dialogs.Show(new RescueViewModel(activation));
+                return System.Threading.Tasks.Task.CompletedTask;
+            };
+
+        return shell;
+    }
+
+    /// <summary>
+    /// GA-5 · Enqueue a full index run on the job queue (BE-N0 orchestrator). Called at startup and after a
+    /// repository is added, so the catalog actually populates — the runtime trigger the GUI was missing.
+    /// Returns null when indexing isn't composed (minimal test hosts). (18-gap GA-5.)
+    /// </summary>
+    public static Sdk.Threading.JobHandle? EnqueueIndexAll(IServiceProvider services)
+    {
+        var queue = services.GetService<Sdk.Threading.IJobQueue>();
+        var orchestrator = services.GetService<Sdk.Indexing.IIndexOrchestrator>();
+        if (queue is null || orchestrator is null)
+            return null;
+        return queue.Enqueue("Indexing library", async ctx =>
+        {
+            var summary = await orchestrator.IndexAllAsync(ctx.Cancellation).ConfigureAwait(false);
+            ctx.Progress.Report(new Common.ProgressReport(summary.Indexed, summary.Indexed,
+                $"Indexed {summary.Indexed} vars across {summary.Repositories} repos"));
+        });
+    }
+
+    /// <summary>Build the live-feeds source if all its read services are present (null in minimal test hosts).</summary>
+    private static Services.IShellLiveFeeds? TryBuildFeeds(IServiceProvider services, Sdk.Threading.IJobQueue? jobQueue)
+    {
+        var proposals = services.GetService<IProposalService>();
+        var health = services.GetService<IHealthService>();
+        var missing = services.GetService<IMissingDepsQuery>();
+        var dashboard = services.GetService<IDashboardService>();
+        if (proposals is null || health is null || missing is null || dashboard is null || jobQueue is null)
+            return null;
+        return new Services.ShellLiveFeeds(proposals, health, missing, dashboard, jobQueue);
     }
 
     /// <summary>Compose the app host under LocalAppData and build the shell; null on composition failure.</summary>
@@ -54,7 +104,9 @@ public static class AppHost
             Directory.CreateDirectory(dataDir);
             var host = Bootstrap.BuildApp(dataDir);
             var scope = host.Services.CreateScope(); // app-lifetime scope backing the shell's read services
-            return CreateShell(scope.ServiceProvider);
+            var shell = CreateShell(scope.ServiceProvider);
+            EnqueueIndexAll(scope.ServiceProvider); // GA-5: populate the catalog in the background on launch
+            return shell;
         }
         catch (Exception)
         {
