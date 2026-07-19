@@ -8,6 +8,7 @@
   <DockPanel Margin="18">
     <TextBlock DockPanel.Dock="Top" Text="Health &amp; fix" FontSize="21" FontWeight="SemiBold"
                Foreground="{DynamicResource TextHiBrush}" Margin="0,0,0,12" />
+    <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
     <c:Card Header="Encoding — fixable groups">
       <StackPanel Spacing="6">
         <ItemsControl ItemsSource="{Binding EncodingGroups}">

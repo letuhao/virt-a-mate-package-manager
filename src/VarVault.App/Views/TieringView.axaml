@@ -8,6 +8,7 @@
   <DockPanel Margin="18">
     <TextBlock DockPanel.Dock="Top" Text="Tiering &amp; migration" FontSize="21" FontWeight="SemiBold"
                Foreground="{DynamicResource TextHiBrush}" Margin="0,0,0,12" />
+    <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
 
     <WrapPanel DockPanel.Dock="Top" DataContext="{Binding Counts}" x:CompileBindings="False" Margin="0,0,0,12">
       <c:Card Header="Hot" Width="150" Margin="0,0,10,0"><TextBlock Text="{Binding Hot}" FontSize="24" Foreground="{DynamicResource HotBrush}" /></c:Card>

@@ -8,6 +8,11 @@ namespace VarVault.App.ViewModels;
 /// <summary>SCR-9 · Health &amp; fix: encoding groups + integrity issues; fix into UTF-8. (16-checklist SCR-9.)</summary>
 public sealed partial class HealthViewModel(IHealthService health) : ObservableObject
 {
+    /// <summary>Sub-navigation tabs (GC-2).</summary>
+    public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =
+        [new("Encoding"), new("Integrity / corrupt"), new("Missing meta")];
+    [ObservableProperty] private int _selectedTabIndex;
+
     public ObservableCollection<EncodingGroup> EncodingGroups { get; } = [];
     public ObservableCollection<IntegrityIssue> Integrity { get; } = [];
 

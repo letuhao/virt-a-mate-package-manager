@@ -8,7 +8,8 @@ public sealed record ShellLiveSnapshot(
     int HealthCount,
     int MissingCount,
     string? TierSummary,
-    string? IndexStatus);
+    string? IndexStatus,
+    int TotalPackages = 0);
 
 /// <summary>
 /// GA-3/GA-4 · Supplies the shell's rail badges (proposals/health/missing) and log-dock status
@@ -54,6 +55,7 @@ public sealed class ShellLiveFeeds(
             HealthCount: encoding.Sum(g => g.Count),
             MissingCount: miss.Count,
             TierSummary: tierSummary,
-            IndexStatus: indexStatus);
+            IndexStatus: indexStatus,
+            TotalPackages: summary.TotalPackages);
     }
 }

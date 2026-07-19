@@ -12,6 +12,11 @@ namespace VarVault.App.ViewModels;
 /// </summary>
 public sealed partial class ProposalsViewModel(IProposalService proposals) : ObservableObject
 {
+    /// <summary>Sub-navigation tabs (GC-2).</summary>
+    public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =
+        [new("All"), new("Migrations"), new("Duplicates"), new("Encoding fixes"), new("Stale")];
+    [ObservableProperty] private int _selectedTabIndex;
+
     public ObservableCollection<Proposal> Pending { get; } = [];
 
     [ObservableProperty] private string? _statusMessage;

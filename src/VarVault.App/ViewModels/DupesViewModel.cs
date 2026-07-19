@@ -8,6 +8,11 @@ namespace VarVault.App.ViewModels;
 /// <summary>SCR-6 · Duplicates &amp; reclaim: exact duplicate groups. (16-checklist SCR-6.)</summary>
 public sealed partial class DupesViewModel(IReclaimService reclaim) : ObservableObject
 {
+    /// <summary>Sub-navigation tabs (GC-2).</summary>
+    public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =
+        [new("Reclaim space"), new("Exact duplicates"), new("Near-duplicates"), new("Download intake")];
+    [ObservableProperty] private int _selectedTabIndex;
+
     public ObservableCollection<DuplicateGroup> Groups { get; } = [];
 
     [ObservableProperty] private long _reclaimableBytes;

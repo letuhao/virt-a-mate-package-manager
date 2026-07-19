@@ -8,6 +8,11 @@ namespace VarVault.App.ViewModels;
 /// <summary>SCR-11 · Trash &amp; backup: restore/purge trashed items; backups. (16-checklist SCR-11.)</summary>
 public sealed partial class TrashViewModel(ITrashQueryService trash) : ObservableObject
 {
+    /// <summary>Sub-navigation tabs (GC-2).</summary>
+    public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =
+        [new("Trash (recoverable)"), new("Catalog backups")];
+    [ObservableProperty] private int _selectedTabIndex;
+
     public ObservableCollection<TrashItemDto> Items { get; } = [];
     public ObservableCollection<BackupDto> Backups { get; } = [];
 

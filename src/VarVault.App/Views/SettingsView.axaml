@@ -6,6 +6,7 @@
              x:DataType="vm:SettingsViewModel">
   <StackPanel Margin="18" Spacing="12" MaxWidth="640" HorizontalAlignment="Left">
     <TextBlock Text="Settings" FontSize="21" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+    <c:Tabs ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" />
     <c:Card Header="General">
       <Grid ColumnDefinitions="200,*" RowDefinitions="Auto,Auto">
         <TextBlock Grid.Row="0" Grid.Column="0" Text="VaM install path" VerticalAlignment="Center" Opacity="0.8" Margin="0,0,14,10" />

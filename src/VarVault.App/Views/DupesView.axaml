@@ -10,6 +10,7 @@
                Foreground="{DynamicResource TextHiBrush}" Margin="0,0,0,12" />
     <TextBlock DockPanel.Dock="Top" Foreground="{DynamicResource TextLoBrush}" Margin="0,0,0,12"
                Text="{Binding ReclaimableBytes, StringFormat='{}{0} bytes reclaimable'}" />
+    <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
     <c:Card Header="Exact duplicate groups">
       <ScrollViewer>
         <ItemsControl ItemsSource="{Binding Groups}">

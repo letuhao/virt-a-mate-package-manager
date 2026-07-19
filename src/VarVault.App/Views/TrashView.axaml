@@ -10,6 +10,7 @@
                Foreground="{DynamicResource TextHiBrush}" Margin="0,0,0,4" />
     <TextBlock DockPanel.Dock="Top" Text="Nothing is hard-deleted · catalog auto-backed-up"
                Foreground="{DynamicResource TextLoBrush}" Margin="0,0,0,12" />
+    <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
       <Button Content="Back up now" Command="{Binding BackupNowCommand}" />
       <TextBlock Text="{Binding StatusMessage}" Opacity="0.7" VerticalAlignment="Center" />

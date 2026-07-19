@@ -7,6 +7,11 @@ namespace VarVault.App.ViewModels;
 /// <summary>SCR-13 · Settings: VaM path, fix-on-import policy, etc. (16-checklist SCR-13.)</summary>
 public sealed partial class SettingsViewModel(ISettingsService settings) : ObservableObject
 {
+    /// <summary>Sub-navigation tabs (GC-2).</summary>
+    public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =
+        [new("General"), new("Tiers & policy"), new("Automation"), new("Import"), new("Advanced")];
+    [ObservableProperty] private int _selectedTabIndex;
+
     [ObservableProperty] private string? _vamPath;
     [ObservableProperty] private string? _fixOnImport;
     [ObservableProperty] private string? _statusMessage;

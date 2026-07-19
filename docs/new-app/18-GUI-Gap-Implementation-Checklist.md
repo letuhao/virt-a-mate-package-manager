@@ -91,10 +91,10 @@ Within a section, lower ids first. **G-A unblocks everything — do it first.**
 
 ## Section G-C — Shell chrome · fixes `17` §A.4/§A.5
 
-- [ ] **GC-1 · Rail branding + icons.** *Read:* `:198–220`. *Items:* logo block ("V" gradient tile) + "VarVault"
+- [x] **GC-1 · Rail branding + icons.** *Read:* `:198–220`. *Items:* logo block ("V" gradient tile) + "VarVault"
   + live package-count subtitle; per-item SVG icon (13). *Test:* `RailChromeTests`
   (`Logo_and_package_count_render`, `Every_nav_item_has_an_icon`).
-- [ ] **GC-2 · Tab adoption sweep.** *Read:* `:445,462,479,505,543,565,663`. *Items:* place `SC-4 Tabs` on
+- [x] **GC-2 · Tab adoption sweep.** *Read:* `:445,462,479,505,543,565,663`. *Items:* place `SC-4 Tabs` on
   Tiering(4)/Dupes(4)/Health(3)/Proposals(5)/Trash(2)/Settings(5)/Var-detail(4) with the exact tab labels;
   each tab switches the sub-content. (Per-tab *content* lands in the screen units below.) *Test:*
   `TabAdoptionTests` (`Each_surface_shows_its_named_tabs`, `Tab_click_swaps_content`).

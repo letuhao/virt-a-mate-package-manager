@@ -8,6 +8,25 @@
           BorderThickness="0,0,1,0" Width="214" Padding="8,10">
     <StackPanel Spacing="2">
 
+      <!-- GC-1 · Logo block: gradient tile + wordmark + live package count -->
+      <StackPanel Orientation="Horizontal" Spacing="9" Margin="6,4,6,10">
+        <Border Width="26" Height="26" CornerRadius="8">
+          <Border.Background>
+            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+              <GradientStop Color="{DynamicResource AccentColor}" Offset="0" />
+              <GradientStop Color="{DynamicResource ColdColor}" Offset="1" />
+            </LinearGradientBrush>
+          </Border.Background>
+          <TextBlock Text="V" Foreground="White" FontWeight="Bold" FontSize="13"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Border>
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Text="VarVault" FontWeight="SemiBold" FontSize="14" Foreground="{DynamicResource TextHiBrush}" />
+          <TextBlock Text="{Binding PackageCountLabel}" FontSize="10" Foreground="{DynamicResource TextLoBrush}"
+                     FontFamily="{DynamicResource MonoFont}" />
+        </StackPanel>
+      </StackPanel>
+
       <TextBlock Text="Browse" Classes="railgroup" />
       <ItemsControl ItemsSource="{Binding BrowseItems}">
         <ItemsControl.ItemTemplate>
@@ -16,7 +35,10 @@
                     Background="Transparent" BorderThickness="0" Padding="0"
                     Command="{Binding ((vm:ShellViewModel)DataContext).NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                     CommandParameter="{Binding Id}">
-              <c:RailNavItem Label="{Binding Label}" Badge="{Binding Badge}" IsActive="{Binding IsActive}" />
+              <c:RailNavItem Label="{Binding Label}" Badge="{Binding Badge}" IsActive="{Binding IsActive}">
+                <Path Data="{Binding Icon}" Stroke="{DynamicResource TextLoBrush}" StrokeThickness="1.6"
+                      Width="16" Height="16" Stretch="Uniform" />
+              </c:RailNavItem>
             </Button>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
@@ -28,7 +50,10 @@
           <DataTemplate x:DataType="vm:RailItemViewModel">
             <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0" Padding="0"
                     Command="{Binding ((vm:ShellViewModel)DataContext).NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Id}">
-              <c:RailNavItem Label="{Binding Label}" Badge="{Binding Badge}" IsActive="{Binding IsActive}" />
+              <c:RailNavItem Label="{Binding Label}" Badge="{Binding Badge}" IsActive="{Binding IsActive}">
+                <Path Data="{Binding Icon}" Stroke="{DynamicResource TextLoBrush}" StrokeThickness="1.6"
+                      Width="16" Height="16" Stretch="Uniform" />
+              </c:RailNavItem>
             </Button>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
@@ -40,7 +65,10 @@
           <DataTemplate x:DataType="vm:RailItemViewModel">
             <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0" Padding="0"
                     Command="{Binding ((vm:ShellViewModel)DataContext).NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Id}">
-              <c:RailNavItem Label="{Binding Label}" Badge="{Binding Badge}" IsActive="{Binding IsActive}" BadgeKind="Warn" />
+              <c:RailNavItem Label="{Binding Label}" Badge="{Binding Badge}" IsActive="{Binding IsActive}" BadgeKind="Warn">
+                <Path Data="{Binding Icon}" Stroke="{DynamicResource TextLoBrush}" StrokeThickness="1.6"
+                      Width="16" Height="16" Stretch="Uniform" />
+              </c:RailNavItem>
             </Button>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
@@ -52,7 +80,10 @@
           <DataTemplate x:DataType="vm:RailItemViewModel">
             <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0" Padding="0"
                     Command="{Binding ((vm:ShellViewModel)DataContext).NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding Id}">
-              <c:RailNavItem Label="{Binding Label}" Badge="{Binding Badge}" IsActive="{Binding IsActive}" />
+              <c:RailNavItem Label="{Binding Label}" Badge="{Binding Badge}" IsActive="{Binding IsActive}">
+                <Path Data="{Binding Icon}" Stroke="{DynamicResource TextLoBrush}" StrokeThickness="1.6"
+                      Width="16" Height="16" Stretch="Uniform" />
+              </c:RailNavItem>
             </Button>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
