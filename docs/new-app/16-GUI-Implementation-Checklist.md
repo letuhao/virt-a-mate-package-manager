@@ -234,7 +234,9 @@ Each cites its plan item numbers (15-plan) and its HTML range. Read both before 
 - [x] **SCR-9 · Health & fix.** *Read:* `:477–490`. *BE:* N5. *Done:* `HealthViewModel(IHealthService)` +
   `Views/HealthView.axaml` (encoding groups by codepage, integrity list, fix). Wired in AppHost. T:
   `HealthScreenTests.Lists_encoding_groups`.
-- [ ] **SCR-10 · Missing deps.** *Read:* `:493–500`. *Items:* Missing #1–8. *BE:* `IMissingDepsQuery`, N11. *Test:* table binds; Resolve opens m-alias.
+- [x] **SCR-10 · Missing deps.** *Read:* `:493–500`. *BE:* `IMissingDepsQuery`. *Done:* `Views/MissingView.axaml`
+  bound to existing `MissingDepsViewModel` (missing-ref table, resolve). Wired in AppHost. T:
+  `MissingScreenTests.Lists_missing_refs`.
 - [ ] **SCR-11 · Trash & backup.** *Read:* `:541–549`. *Items:* Trash #1–12. *BE:* N6. *Test:* trash table restore/purge; backups tab.
 - [ ] **SCR-12 · Activity history.** *Read:* `:552–560`. *Items:* History #1–5. *BE:* `IActivityLog`. *Test:* audit table binds; kind filter narrows.
 - [ ] **SCR-13 · Settings.** *Read:* `:563–573`. *Items:* Settings #1–11. *BE:* `ISettingsService`. *Test:* tabs + fields load/save via settings.

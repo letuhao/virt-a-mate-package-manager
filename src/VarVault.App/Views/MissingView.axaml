@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:VarVault.App.Controls"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             xmlns:lib="clr-namespace:VarVault.Sdk.Library;assembly=VarVault.Sdk"
+             x:Class="VarVault.App.Views.MissingView"
+             x:DataType="vm:MissingDepsViewModel">
+  <DockPanel Margin="18">
+    <TextBlock DockPanel.Dock="Top" Text="Missing dependencies" FontSize="21" FontWeight="SemiBold"
+               Foreground="{DynamicResource TextHiBrush}" Margin="0,0,0,12" />
+    <c:Card Header="Referenced packages not in your library">
+      <ScrollViewer>
+        <ItemsControl ItemsSource="{Binding Items}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="lib:MissingDependency">
+              <Grid ColumnDefinitions="*,Auto,Auto" Height="26">
+                <TextBlock Grid.Column="0" Text="{Binding Ref}" VerticalAlignment="Center" FontFamily="{DynamicResource MonoFont}" />
+                <TextBlock Grid.Column="1" Text="{Binding NeededByCount, StringFormat='{}{0} pkgs'}" VerticalAlignment="Center" Opacity="0.7" Margin="0,0,12,0" />
+                <Button Grid.Column="2" Content="Resolve…" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </c:Card>
+  </DockPanel>
+</UserControl>
