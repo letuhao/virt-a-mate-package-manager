@@ -1,0 +1,21 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             xmlns:lib="clr-namespace:VarVault.Sdk.Library;assembly=VarVault.Sdk"
+             x:Class="VarVault.App.Views.MigrateDialog"
+             x:DataType="vm:MigrateViewModel">
+  <StackPanel Spacing="10" MinWidth="440">
+    <TextBlock Text="Migration plan — review before it runs" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+    <TextBlock Text="Nothing moves until you approve." Opacity="0.8" />
+    <TextBlock Text="{Binding Flow}" FontFamily="{DynamicResource MonoFont}" Opacity="0.8" />
+    <TextBlock Text="{Binding Moves.Count, StringFormat='{}{0} files to move'}" />
+    <Border Background="{DynamicResource WarnBgBrush}" CornerRadius="4" Padding="8" IsVisible="{Binding HasExclusions}">
+      <TextBlock Foreground="{DynamicResource WarnBrush}" TextWrapping="Wrap"
+                 Text="{Binding ExcludedCount, StringFormat='⚠ {0} single-copy vars excluded — no backup, not moved automatically.'}" />
+    </Border>
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <Button Content="Dry run" />
+      <Button Content="Approve &amp; run" Background="{DynamicResource AccentBrush}" Foreground="White" />
+    </StackPanel>
+  </StackPanel>
+</UserControl>

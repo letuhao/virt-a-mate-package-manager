@@ -256,7 +256,7 @@ Each is content inside SC-9. Read its exact modal lines (HR-0).
   (FolderPath, `AddAndIndexCommand` via `IOnboardingService`) + `Views/OnboardingDialog.axaml` (stepper,
   folder input, add&index). T: `OnboardingDialogTests.Add_and_index_reports_result_and_completes`.
 - [x] **DLG-2 · m-addrepo.** *Done:* `AddRepoViewModel(IRepositoryService)` + `Views/AddRepoDialog.axaml` (folder, detected media/tier, reserve, add). T: `AddRepoDialogTests.Add_registers_and_reports_detected_tier`.
-- [ ] **DLG-3 · m-migrate.** *Read:* `:598–607`. *Items:* migrate #1–14. *BE:* N3. *Rule:* show copy→verify→rename→delete flow + single-copy exclusion warning. *Test:* plan summary + Approve runs job (stub).
+- [x] **DLG-3 · m-migrate.** *BE:* N2/N3. *Done:* `MigrateViewModel(ITieringService)` + `Views/MigrateDialog.axaml` (plan summary, copy→verify→rename→delete flow, single-copy exclusion warning). T: `MigrateDialogTests.Loads_plan_and_flags_exclusions`.
 - [ ] **DLG-4 · m-fix.** *Read:* `:609–617`. *Items:* fix #1–7. *BE:* N5. *Test:* before/after preview; apply-to-group.
 - [ ] **DLG-5 · m-alias.** *Read:* `:619–626`. *Items:* alias #1–6. *BE:* N11. *Test:* map+scope; Save persists alias.
 - [ ] **DLG-6 · m-confirm (delete).** *Read:* `:628–636`. *Items:* confirm #1–7. *BE:* N10, `DeletionPredicate`, N9 reverse. *Rule:* single-copy **protected/excluded**; reverse-dep count shown; → trash. *Test:* protected row cannot be deleted; safe items go to trash.
