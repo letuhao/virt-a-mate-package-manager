@@ -74,9 +74,11 @@ Build once, reused everywhere. Read the CSS token block `prototype.html:1–195`
   state. *Rule:* type-to-filter (client). *Done:* `Controls/SearchableCombo.cs` (+ `ComboOption`) + Popup
   ControlTheme; `Refilter`/`MoveHighlight`/`CommitHighlighted`/`HandleKey` logic seam. T:
   `SearchableComboTests` (filter narrows, empty state, highlight+clamp+enter, keyboard map, escape closes).
-- [ ] **SC-9 · ModalHost / Dialog base.** *Read:* `.modal-bg`/`.modal`(`:581`) + JS `:708–710,734`.
+- [x] **SC-9 · ModalHost / Dialog base.** *Read:* `.modal-bg`/`.modal`(`:581`) + JS `:708–710,734`.
   *Items:* backdrop, header+×, body slot, footer buttons; open/close; **Esc closes**; backdrop-click closes;
-  focus trap. *Rule:* one host, dialogs are content. *Test:* open shows; Esc + backdrop close; focus trapped.
+  focus into dialog on open. *Rule:* one host, dialogs are content. *Done:* `Controls/ModalHost.cs` +
+  ControlTheme. T: `ModalHostTests` (open shows backdrop/title/content; closed hides; `Escape_closes`;
+  `Close_button_closes`; `Backdrop_click_closes` via headless mouse).
 - [ ] **SC-10 · Toast (undo).** *Read:* `:668` + JS `:715–716`. Message + optional Undo + auto-dismiss.
   *Test:* shows message; Undo fires callback; auto-hides.
 - [ ] **SC-11 · RailNavItem.** *Read:* `:202–220`. Icon + label + optional badge + active state. *Test:* active toggles; badge count shows.

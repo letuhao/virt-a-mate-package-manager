@@ -26,6 +26,31 @@
     </Setter>
   </ControlTheme>
 
+  <!-- SC-9 · ModalHost / dialog base -->
+  <ControlTheme x:Key="{x:Type c:ModalHost}" TargetType="c:ModalHost">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="PART_Backdrop" Background="#99000000" IsVisible="{TemplateBinding IsOpen}">
+          <Border Name="PART_Dialog" Focusable="True"
+                  Background="{DynamicResource Bg1Brush}" BorderBrush="{DynamicResource BorderHiBrush}"
+                  BorderThickness="1" CornerRadius="{DynamicResource RadiusMd}"
+                  MinWidth="420" MaxWidth="680" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <DockPanel>
+              <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="16,12">
+                <TextBlock Grid.Column="0" Text="{TemplateBinding Title}" FontWeight="SemiBold" FontSize="16"
+                           Foreground="{DynamicResource TextHiBrush}" />
+                <Button Grid.Column="1" Name="PART_Close" Content="✕" Background="Transparent" BorderThickness="0" />
+              </Grid>
+              <ContentControl DockPanel.Dock="Bottom" Content="{TemplateBinding Footer}" Margin="16,10"
+                              HorizontalAlignment="Right" />
+              <ContentPresenter Content="{TemplateBinding Content}" Margin="16,4,16,4" />
+            </DockPanel>
+          </Border>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
   <!-- SC-8 · SearchableCombo -->
   <ControlTheme x:Key="{x:Type c:SearchableCombo}" TargetType="c:SearchableCombo">
     <Setter Property="Template">
