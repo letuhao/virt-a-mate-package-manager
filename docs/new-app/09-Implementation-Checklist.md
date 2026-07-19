@@ -292,7 +292,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] X.10 Portable catalog: move DB + shuffle drive letters → app re-finds vars by hash/volume-serial (⚠ D)
 - [ ] X.11 Jobs tray: multiple concurrent jobs, per-job progress + pause/cancel (M)
 - [ ] X.12 Activity history: every move/install/delete/fix/alias audited (M)
-- [ ] X.13 Settings persist (VaM path, tiers, policies, fix-on-import, preset-extraction defaults) (M)
+- [x] X.13 Settings persist (VaM path, policies, fix-on-import, …) · T: `EfSettingsServiceTests` (set/get/overwrite upsert, bool fallback, get-all) — `ISettingsService`/`EfSettingsService` over the `Setting` table
 - [ ] X.14 Command palette (Ctrl-K) global search/actions (M)
 - [ ] X.15 Light/dark theme correct on both; WCAG AA contrast on muted text (M: contrast check)
 - [ ] X.16 Colorblind-safe: temperature/state encoded by shape/text, not color alone (M)
