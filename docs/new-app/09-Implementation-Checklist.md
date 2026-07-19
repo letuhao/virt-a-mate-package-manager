@@ -215,7 +215,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 
 - [x] 5.1 UsageEvent appended on every app-performed activate/load; recompute updates class · T: `UsageAnalyzerFlowTests.Records_events_and_recomputes_classification` (12 loads → UsageStat Use30d=12, Class=Hot, read-model class updated) — `EfUsageAnalyzer`
 - [x] 5.2 UsageStat windowed counts computed time-relative (correct the day after) · T: `WindowedUsageTests` (`Windows_are_time_relative_as_the_clock_advances` — same event drops out of the 30d window 10 days later with no new events) — `WindowedUsage.Compute`
-- [ ] 5.3 UsageEvent compaction of >90d into rollups (T)
+- [x] 5.3 UsageEvent compaction of >90d into rollups · T: `UsageCompactionTests.Compacts_old_events_into_a_rollup_preserving_total` (3 old events → RolledUpUseCount=3, deleted; UseCountTotal=5 preserved) — `EfUsageAnalyzer.CompactAsync` (transactional)
 - [x] 5.4 Hot/warm/cold scoring blends recency+frequency+centrality+overrides with hysteresis; `Class` reproducible from stored state · T: `UsageScoringTests` (hot/cold cases, pin/force overrides, 7-day cooldown blocks flip, deadband stability, reproducible from same inputs) — `UsageScoring.Score` (BE-A3/A4/A5/A8)
 - [x] 5.5 Placement policy maps Class→tier; misplaced set computed · T: `PlacementPolicyTests` (Hot→1/Warm→2/Cold→3; misplaced when actual≠desired) — `PlacementPolicy` (BE-P1)
 - [x] 5.6 Migration planner diffs actual vs target → proposals; single-copy & offline & unsafe-target excluded · ⚠ T: `MigrationPlannerTests` (hot-on-cold → propose to tier 1; correctly-placed → none; excludes offline/single-copy/unsafe-target) — `MigrationPlanner.Plan` (propose-only)
@@ -260,7 +260,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] BE-A4 Score formula = documented weighted blend (recency + frequency + centrality + overrides); known inputs → expected class · T: `UsageScoringTests` (`Recently_used_and_central_scores_hot`, `Never_used_scores_cold`, overrides) — `UsageScoring` (weights in `ScoringConfig`)
 - [x] BE-A5 Hysteresis: `Class` flips only past the sealed deadband + cooldown; `LastFlipAt` carried · T: `UsageScoringTests.Hysteresis_cooldown_blocks_an_early_flip` + `Hysteresis_deadband_keeps_class_stable_near_the_boundary`
 - [x] BE-A6 Recompute scope = only packages that have usage events · T: `UsageAnalyzerFlowTests` (recompute returns 1 — only the used package) — `EfUsageAnalyzer.RecomputeAsync` iterates distinct event package ids (*strict since-`ComputedAt` delta is a later optimization*)
-- [ ] BE-A7 Event rollup compaction of >90d events (T)
+- [x] BE-A7 Event rollup compaction of >90d events · T: `UsageCompactionTests` — `EfUsageAnalyzer.CompactAsync` (atomic rollup + delete; `UsageStat.RolledUpUseCount` added via migration `AddUsageRollupCount`)
 - [x] BE-A8 🔒 Classification reproducible from stored state after DB restore / on a second machine · T: `UsageScoringTests.Score_is_reproducible_from_the_same_inputs` (pure function of persisted inputs: LastUsedAt/Use30d/ReverseDependentCount/pins/LastFlipAt)
 
 ### Placement & migration planner

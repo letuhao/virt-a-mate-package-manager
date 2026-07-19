@@ -15,4 +15,11 @@ public interface IUsageAnalyzer
 
     /// <summary>Recompute classifications for packages that have usage events. Returns the count recomputed.</summary>
     Task<int> RecomputeAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Compact usage events older than <paramref name="olderThanDays"/> into per-package rollup counts
+    /// (preserving <c>UseCountTotal</c>) and delete the raw events. Returns the number compacted.
+    /// (5.3, BE-A7.)
+    /// </summary>
+    Task<int> CompactAsync(int olderThanDays = 90, CancellationToken cancellationToken = default);
 }

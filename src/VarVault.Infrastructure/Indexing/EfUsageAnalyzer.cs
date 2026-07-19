@@ -59,7 +59,8 @@ public sealed class EfUsageAnalyzer(VarVaultDbContext db, IClock clock) : IUsage
             var result = UsageScoring.Score(inputs, stat.Class, stat.LastFlipAt, now);
 
             stat.LastUsedAt = windows.LastUsedAt;
-            stat.UseCountTotal = windows.UseCountTotal;
+            // Total includes counts already compacted away (5.3) plus the live events.
+            stat.UseCountTotal = stat.RolledUpUseCount + windows.UseCountTotal;
             stat.Use30d = windows.Use30d;
             stat.Use90d = windows.Use90d;
             stat.CentralityScore = centrality;
@@ -78,5 +79,42 @@ public sealed class EfUsageAnalyzer(VarVaultDbContext db, IClock clock) : IUsage
 
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return packageIds.Count;
+    }
+
+    public async Task<int> CompactAsync(int olderThanDays = 90, CancellationToken cancellationToken = default)
+    {
+        var cutoff = clock.UtcNow.AddDays(-olderThanDays).ToUnixTimeMilliseconds();
+
+        // Count old events per package, add to the rollup, then delete them.
+        var oldCounts = await db.UsageEvents
+            .Where(e => e.TimestampUnixMs < cutoff)
+            .GroupBy(e => e.PackageId)
+            .Select(g => new { PackageId = g.Key, Count = g.LongCount() })
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        if (oldCounts.Count == 0)
+            return 0;
+
+        // Atomic: persist the rollups and delete the raw events together, so a count is never lost or doubled.
+        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+
+        foreach (var group in oldCounts)
+        {
+            var stat = await db.UsageStats.FirstOrDefaultAsync(s => s.PackageId == group.PackageId, cancellationToken).ConfigureAwait(false);
+            if (stat is null)
+            {
+                stat = new UsageStat { PackageId = group.PackageId, Class = ContentClass.Cold };
+                db.UsageStats.Add(stat);
+            }
+            stat.RolledUpUseCount += group.Count;
+        }
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        var compacted = await db.UsageEvents
+            .Where(e => e.TimestampUnixMs < cutoff)
+            .ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+
+        await tx.CommitAsync(cancellationToken).ConfigureAwait(false);
+        return compacted;
     }
 }

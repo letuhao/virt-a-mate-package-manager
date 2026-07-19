@@ -24,6 +24,9 @@ public sealed class UsageStat
     public DateTime? LastUsedAt { get; set; }
     public long UseCountTotal { get; set; }
 
+    /// <summary>Count of events already compacted away (older than the largest window). (5.3/BE-A7.)</summary>
+    public long RolledUpUseCount { get; set; }
+
     /// <summary>Windowed counts computed time-relative (recomputed as the clock advances).</summary>
     public int Use30d { get; set; }
     public int Use90d { get; set; }
