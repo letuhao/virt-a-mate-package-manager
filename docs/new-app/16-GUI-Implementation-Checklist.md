@@ -215,7 +215,9 @@ Each cites its plan item numbers (15-plan) and its HTML range. Read both before 
 - [x] **SCR-3 · Repositories.** *Read:* `:395–414`. *BE:* `IRepositoryService`. *Done:*
   `RepositoriesViewModel` + `Views/RepositoriesView.axaml` (repo cards: tier/name/online/media/path,
   Benchmark). Wired in AppHost. T: `RepositoriesScreenTests.Loads_and_renders_repo_cards`.
-- [ ] **SCR-4 · Loading presets.** *Read:* `:417–440`. *Items:* Presets #1–16. *BE:* `IPresetService`, N7, N10, N11. *Test:* list + member table bind; Switch invokes N7.
+- [x] **SCR-4 · Loading presets.** *Read:* `:417–440`. *BE:* `IPresetService`, N7. *Done:* `PresetsViewModel`
+  + `Views/PresetsView.axaml` (preset list, activation preview via `PreviewActivationAsync`, Switch via
+  `IProfileService`). Wired in AppHost. T: `PresetsScreenTests.Lists_presets_and_previews_selection`.
 - [ ] **SCR-5 · Tiering & migration.** *Read:* `:443–457`. *Items:* Tiering #1–23. *BE:* N1, N2, N3. *Test:* class counts + misplaced table; Plan opens m-migrate.
 - [ ] **SCR-6 · Duplicates & reclaim.** *Read:* `:460–474`. *Items:* Dupes #1–22. *BE:* N4, N2. *Test:* reclaim cards + exact-dup groups bind; Review opens m-dupe.
 - [ ] **SCR-7 · Analytics.** *Read:* `:521–538`. *Items:* Analytics #1–15. *BE:* `IAnalyticsService`, N2, `IUsageAnalyzer`. *Test:* space-by-type/creator bars + usage chart bind.
