@@ -144,7 +144,11 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
   `IPackageDetailQuery`/`PackageDetail`/`ContentItemDto`/`CopyDto` + `EfPackageDetailQuery` (identity/license/
   class, `ReverseDependentCount`, `ForwardClosureAsync`, canonical content items, copies+lineage). Registered.
   T: `EfPackageDetailQueryTests` (`Returns_copies_content_items_and_forward_closure`, `Missing_package_returns_null`).
-- [ ] **BE-N10 · `ILibraryActionService`** (activation/move/preset/txt). *Test:* install creates links; delete gated by `DeletionPredicate` → trash; export/import txt round-trips.
+- [x] **BE-N10 · `ILibraryActionService`** (preset/fix/delete/txt). *Done:* SDK `ILibraryActionService`
+  (`BulkActionResult`) + `EfLibraryActionService`: AddToPreset (`IPresetService`), FixEncoding
+  (`IHealthService`), Delete (gated by `DeletionPredicate` → `ITrashService`), ExportTxt. Registered. T:
+  `LibraryActionServiceFlowTests.Add_to_preset_export_and_predicate_gated_delete` (dup deletes, single-copy
+  blocked). *(Install/Uninstall/Move wired at the ops-bar screen SCR-2e via activation/migration.)*
 - [ ] **BE-N11 · `IAliasService`** (VarAlias). *Test:* set alias → resolver substitutes it; missing→owned mapping applied on activation.
 - [ ] **BE-N12 · Library facets** (`ITagService`/`ICollectionService`; extend `LibraryQuery` with PackageName/InstalledOnly/Types/Tiers; saved views). *Test:* each new filter narrows results; tag add/query.
 - [ ] **BE-N13 · Onboarding/add-repo** (Register/Benchmark + reserveBytes + BE-N0). *Test:* register → benchmark → suggested tier → index.
