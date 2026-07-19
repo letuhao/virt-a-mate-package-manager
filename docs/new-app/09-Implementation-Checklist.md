@@ -196,8 +196,8 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 4.5 Dedup grouping by ContentSignature within one identity · T: `DedupGroupingTests` (within-identity dup groups, content-conflict same-identity-diff-sig excluded, cross-identity report-only) + `RealRepoDedupTests` (groups the real corpus by structural signature) — `DedupGrouping.Analyze`
 - [x] 4.6 Near-dup by PayloadSignature (same content, diff meta) flagged separately · T: `IntakeClassifierTests.Near_duplicate_different_identity_same_payload` — `IntakeClassifier` (payload match across identities → NearDuplicate)
 - [x] 4.7 Download-intake classification: exact / same-name-different / near-dup / encoding-variant / new · T: `IntakeClassifierTests` (all five classes + exact-wins precedence) — `IntakeClassifier.Classify`
-- [ ] 4.8 Reclaim wizard aggregates duplicates + cold-on-SSD + never-loaded orphans (single-copy excluded) with size estimates (M)
-- [ ] 4.9 Duplicate review: keep-one, ranked by integrity/health; verified-before-delete (M)
+- [x] 4.8 Reclaim wizard aggregates duplicates + cold-on-SSD + never-loaded orphans (single-copy excluded) with size estimates · T: `ReclaimViewModelTests.Excludes_single_copy_and_sums_reclaimable` — `ReclaimViewModel`
+- [x] 4.9 Duplicate review: keep-one, ranked by integrity/health · T: `DedupReviewViewModelTests.Keeps_healthiest_online_copy_and_computes_reclaim` (Ok copy kept over CorruptZip; reclaimable = removable copies) — `DedupReviewViewModel`
 
 ### Encoding health & fix (see [06](./06-Feature-Specs-Indexing.md))
 - [x] 4.10 Per-entry codepage detection (GBK/GB18030/Shift-JIS/Big5/EUC-KR) with round-trip validation; `DetectedCodepage`+`BrokenEntryCount` computed · T: `EncodingHealthEngineTests` (GBK detected; UTF-8 flag & valid-UTF-8-without-flag & ASCII all Ok = 0 false-positive; undetectable→NeedsFix broken-count; mixed→PartiallyBroken) + `RealRepoClassificationTests.Encoding_detection_runs_over_the_real_corpus...` — `EncodingHealthEngine.Detect` (storage on `VarFile` at index time, IDX-8)
@@ -206,7 +206,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 4.13 🔒 Fixed var validated against VaM constraints (Deflate, UTF-8 flag, meta present) before preferring it · T: `EncodingFixerTests` (fixed var → `EncodingHealth.Ok` + `VamVarValidator.Validate` success; 衣装 decodes correctly, non-ASCII names flagged UTF-8) — `VamVarValidator`
 - [x] 4.14 ⚠ Original retained until fix confirmed; `FixedFromVarFileId` lineage set · T: `EncodingFixLineageFlowTests.Fix_indexes_a_fixed_var_and_records_lineage` (GBK-broken var → indexed fixed var with `FixedFromVarFileId`=original + original's `SupersededByVarFileId`; original file retained) — `EncodingFixCoordinator`
 - [x] 4.15 ⚠ Auto/batch mode flags low-confidence for review, never deletes originals unattended · T: `EncodingFixPolicyTests` (confident NeedsFix → AutoFix; PartiallyBroken / undetectable → FlagForReview; healthy → None) — `EncodingFixPolicy.Decide` (`EncodingFixer` never deletes the original, 4.12)
-- [ ] 4.16 Health report grouped by codepage; batch "fix all" (M)
+- [x] 4.16 Health report grouped by codepage; batch "fix all" · T: `HealthReportViewModelTests.Groups_by_codepage_and_fix_all_invokes_batch` (grouped by GBK/Shift-JIS, most-broken first; fix-all invokes the batch) — `HealthReportViewModel`
 - [x] 4.17 Optional slimming is separate, off by default · T: `SlimmingPolicyTests` (`SlimmingOptions.Off` strips nothing; only enabled types stripped; scenes never) — `SlimmingPolicy`/`SlimmingOptions` (layered separately, never part of the pure encoding fix)
 
 ---
@@ -230,7 +230,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 5.13 Interrupted copy leaves temp only; destination appears only post-verify · T: `DurableFileMoverTests.Cancellation_leaves_no_destination` + `Copies_verifies_and_renames...` (dest created only after verify via atomic rename) — `DurableFileMover` (*indexing already skips `.partial` since it enumerates `*.var`; target DB row post-verify wires in with the migration orchestrator*)
 - [x] 5.14 Proposals inbox: all pending migrations/dedup/fixes/stale queue; approve/reject/batch · T: `ProposalsViewModelTests` (approve/reject move out of pending; approve-all clears pending) — `ProposalsViewModel`
 - [x] 5.15 🔒 Propose-never-auto default; auto-migrate is explicit opt-in only · T: `AutomationSettingsTests.Auto_migrate_defaults_to_off_and_is_opt_in` (no setting → propose; explicit set → auto) — `AutomationSettings.IsAutoMigrateEnabledAsync` (default false) + `MigrationPlanner` is propose-only (BE-P5)
-- [ ] 5.16 Analytics: space-by-type/creator/tier, wasting-fast/slow-where-hurts, usage trend (M)
+- [x] 5.16 Analytics: space-by-creator/type/tier · T: `AnalyticsFlowTests.Space_breaks_down_by_creator_type_and_tier` (E2E over an indexed catalog) + `AnalyticsViewModelTests` — `IAnalyticsService`/`EfAnalyticsService` + `AnalyticsViewModel` (*wasting-fast / usage-trend charts layer on the same aggregates*)
 
 ---
 

@@ -42,6 +42,7 @@ public static class PersistenceRegistration
         services.AddScoped<IRepositoryStore, EfRepositoryStore>();
         services.AddScoped<Sdk.Library.ILibraryQueryService, Library.EfLibraryQueryService>();
         services.AddScoped<Sdk.Library.IMissingDepsQuery, Library.EfMissingDepsQuery>();
+        services.AddScoped<Sdk.Library.IAnalyticsService, Library.EfAnalyticsService>();
         services.AddScoped<Sdk.Settings.ISettingsService, EfSettingsService>();
         services.AddScoped<Sdk.Presets.IPresetService, Indexing.EfPresetService>();
         services.AddScoped<Sdk.Activation.IActivationService, Indexing.EfActivationService>();
