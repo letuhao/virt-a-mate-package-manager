@@ -255,7 +255,7 @@ Each is content inside SC-9. Read its exact modal lines (HR-0).
 - [x] **DLG-1 · m-onboard.** *Read:* `:581–589`. *BE:* N13. *Done:* `OnboardingViewModel` extended
   (FolderPath, `AddAndIndexCommand` via `IOnboardingService`) + `Views/OnboardingDialog.axaml` (stepper,
   folder input, add&index). T: `OnboardingDialogTests.Add_and_index_reports_result_and_completes`.
-- [ ] **DLG-2 · m-addrepo.** *Read:* `:591–596`. *Items:* addrepo #1–8. *BE:* Register/Benchmark, N2. *Test:* detected media/tier bind; Add&index registers.
+- [x] **DLG-2 · m-addrepo.** *Done:* `AddRepoViewModel(IRepositoryService)` + `Views/AddRepoDialog.axaml` (folder, detected media/tier, reserve, add). T: `AddRepoDialogTests.Add_registers_and_reports_detected_tier`.
 - [ ] **DLG-3 · m-migrate.** *Read:* `:598–607`. *Items:* migrate #1–14. *BE:* N3. *Rule:* show copy→verify→rename→delete flow + single-copy exclusion warning. *Test:* plan summary + Approve runs job (stub).
 - [ ] **DLG-4 · m-fix.** *Read:* `:609–617`. *Items:* fix #1–7. *BE:* N5. *Test:* before/after preview; apply-to-group.
 - [ ] **DLG-5 · m-alias.** *Read:* `:619–626`. *Items:* alias #1–6. *BE:* N11. *Test:* map+scope; Save persists alias.

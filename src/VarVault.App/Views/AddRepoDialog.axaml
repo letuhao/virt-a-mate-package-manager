@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             x:Class="VarVault.App.Views.AddRepoDialog"
+             x:DataType="vm:AddRepoViewModel">
+  <StackPanel Spacing="10" MinWidth="420">
+    <TextBlock Text="Add repository" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+    <TextBox Watermark="G:\more_vars" Text="{Binding FolderPath}" />
+    <TextBlock Text="{Binding Message}" Opacity="0.8" Foreground="{DynamicResource GoodBrush}" />
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <TextBlock Text="Reserve free space" VerticalAlignment="Center" Opacity="0.8" />
+      <TextBox Width="120" Text="{Binding Reserve}" />
+    </StackPanel>
+    <Button Content="Add &amp; index" Command="{Binding AddCommand}" Background="{DynamicResource AccentBrush}" Foreground="White" HorizontalAlignment="Left" />
+  </StackPanel>
+</UserControl>
