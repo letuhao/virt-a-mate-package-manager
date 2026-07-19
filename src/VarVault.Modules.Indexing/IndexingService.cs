@@ -35,7 +35,7 @@ internal sealed class IndexingService(
             .ToDictionary(v => v.RelativePath, StringComparer.OrdinalIgnoreCase);
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var affectedPackages = new HashSet<long>();
+        var dirty = new ReadModelDirtySet(); // base-table writes mark packages; drained into one refresh (0.26)
         int indexed = 0, skipped = 0, corrupt = 0, unrecognized = 0;
 
         foreach (var scanned in enumerator.Enumerate(repositoryMountPath, includeQuarantined: true, cancellationToken))
@@ -62,8 +62,7 @@ internal sealed class IndexingService(
             if (wasCorrupt) corrupt++;
 
             var packageId = await store.ApplyAsync(upsert, cancellationToken).ConfigureAwait(false);
-            if (packageId is { } id)
-                affectedPackages.Add(id);
+            dirty.MarkPackage(packageId);
             indexed++;
         }
 
@@ -75,16 +74,12 @@ internal sealed class IndexingService(
             if (vanished.Count > 0)
             {
                 foreach (var v in vanished)
-                {
-                    if (v.PackageId is { } pid)
-                        affectedPackages.Add(pid);
-                }
+                    dirty.MarkPackage(v.PackageId);
                 pruned = await store.RemoveVarFilesAsync(vanished.Select(v => v.Id).ToList(), cancellationToken).ConfigureAwait(false);
             }
         }
 
-        if (affectedPackages.Count > 0)
-            await store.RefreshReadModelAsync(affectedPackages, cancellationToken).ConfigureAwait(false);
+        await dirty.FlushAsync(store, cancellationToken).ConfigureAwait(false);
 
         logger.LogInformation(
             "Indexed repository {RepositoryId}: {Indexed} indexed, {Skipped} skipped, {Pruned} pruned, {Corrupt} corrupt, {Unrecognized} unrecognized",

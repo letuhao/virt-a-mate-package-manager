@@ -72,8 +72,8 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 0.24 Indexes from data-arch §6 created; `EXPLAIN QUERY PLAN` uses them · T: `SchemaIndexTests` (identity unique, (repo,path) unique, ContentSignature, gallery composite with no temp B-tree). *`ANALYZE` runs post-bulk during indexing (1.25).*
 
 ### Recompute pipeline (single writer)
-- [ ] 0.25 Single-writer queue: all writes serialize through one connection; interactive writes prioritized over bulk (T: concurrent favorite-toggle completes while bulk batch runs)
-- [ ] 0.26 Dirty-set mechanism: a base-table write enqueues affected derived rows (T: insert VarFile → its Package's PackageListItem row refresh scheduled)
+- [x] 0.25 Single-writer queue: all writes serialize through one connection; interactive writes prioritized over bulk · T: `ThreadingTests.WriteQueue_serves_interactive_before_pending_bulk` (in-flight bulk write finishes, then an interactive favorite-toggle jumps ahead of 8 pending bulk writes) + `WriteQueue_runs_writes_one_at_a_time` (max concurrency = 1) — `WriteQueue` single consumer drains Interactive→Normal→Bulk
+- [x] 0.26 Dirty-set mechanism: a base-table write enqueues affected derived rows · T: `DirtySetRefreshTests.Var_file_insert_then_flush_materializes_and_updates_the_read_model_row` (VarFile insert → mark → flush creates the `PackageListItem`; a second copy → re-mark → flush bumps `OnlineInstanceCount` 1→2) + `ReadModelDirtySetTests` (dedup/drain/null-safe/flush) — `ReadModelDirtySet` (thread-safe, drains into `ICatalogStore.RefreshReadModelAsync`); `IndexingService` now marks packages via it and flushes once
 
 ---
 

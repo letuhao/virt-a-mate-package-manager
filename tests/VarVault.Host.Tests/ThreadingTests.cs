@@ -37,6 +37,40 @@ public class ThreadingTests
     }
 
     [Fact]
+    public async Task WriteQueue_serves_interactive_before_pending_bulk()
+    {
+        await using var host = Bootstrap.BuildDefault();
+        var queue = host.Services.GetRequiredService<IWriteQueue>();
+
+        var order = new ConcurrentQueue<string>();
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var firstStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // A bulk write occupies the single writer until we release the gate, so everything else queues up.
+        var first = queue.EnqueueAsync(async ct =>
+        {
+            firstStarted.SetResult();
+            await gate.Task;
+            order.Enqueue("bulk-first");
+        }, WritePriority.Bulk);
+
+        await firstStarted.Task; // the writer is now busy
+
+        // Queue a batch of bulk writes, then a single interactive write (a favorite toggle) behind them.
+        var bulk = Enumerable.Range(0, 8).Select(i =>
+            queue.EnqueueAsync(_ => { order.Enqueue($"bulk-{i}"); return Task.CompletedTask; }, WritePriority.Bulk)).ToArray();
+        var interactive = queue.EnqueueAsync(
+            _ => { order.Enqueue("interactive"); return Task.CompletedTask; }, WritePriority.Interactive);
+
+        gate.SetResult(); // release the writer; it now drains the queued work by priority
+        await Task.WhenAll(bulk.Append(interactive).Append(first));
+
+        var completed = order.ToArray();
+        Assert.Equal("bulk-first", completed[0]);   // the in-flight write finishes first
+        Assert.Equal("interactive", completed[1]);  // then the toggle jumps ahead of all 8 pending bulk writes
+    }
+
+    [Fact]
     public async Task WriteQueue_returns_result()
     {
         await using var host = Bootstrap.BuildDefault();
