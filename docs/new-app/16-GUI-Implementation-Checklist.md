@@ -117,7 +117,11 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
   (`MigrationRequest`/`MigrationRunResult`) + `EfMigrationService` (persists a `MigrationJob` per move, runs
   the durable state machine), registered. T: `MigrationServiceFlowTests.Run_moves_the_var_to_the_target_and_trashes_the_source`
   + `Cross_drive_move_between_reserved_repos` (real E:→F: move on the reserved repos, non-destructive scratch file).
-- [ ] **BE-N4 · `IReclaimService`** (DedupGrouping/DeletionPredicate/Sha256FileHasher). *Test:* exact groups; keep-one trashes only hash-verified redundant copies; single-copy protected.
+- [x] **BE-N4 · `IReclaimService`** (DedupGrouping/DeletionPredicate/IFileHasher). *Done:* SDK
+  `IReclaimService` (`DuplicateGroup`/`DuplicateCopy`/`ReclaimResult`) + `EfReclaimService` (exact groups;
+  lazy hash then `DeletionPredicate.Evaluate` gates each trash via `ITrashService`), registered. T:
+  `ReclaimServiceFlowTests.Groups_exact_duplicates_and_trashes_only_redundant_verified_copies` (3 dups →
+  trash 2, keep 1; single-copy blocked).
 - [ ] **BE-N5 · `IHealthService`** (EncodingHealthEngine/EncodingFixCoordinator). *Test:* encoding groups; fix writes UTF-8 var, keeps original, validates load.
 - [ ] **BE-N6 · `ITrashQueryService`** (ITrashService/SqliteDatabaseBackup). *Test:* list/restore/purge round-trip; backup+restore.
 - [ ] **BE-N7 · `IProfileService`** (IVamProfileService). *Test:* list profiles; switch repoints one symlink (skip where privilege absent).
