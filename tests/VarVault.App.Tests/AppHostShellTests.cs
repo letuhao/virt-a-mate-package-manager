@@ -39,7 +39,7 @@ public class AppHostShellTests
         Assert.IsType<LibraryViewModel>(shell.ActiveScreen);
         shell.NavigateCommand.Execute("analytics");
         Assert.IsType<AnalyticsViewModel>(shell.ActiveScreen);
-        shell.NavigateCommand.Execute("tiering"); // no view yet → placeholder
+        shell.NavigateCommand.Execute("dupes"); // no view yet → placeholder
         Assert.IsType<PlaceholderScreenViewModel>(shell.ActiveScreen);
     }
 }

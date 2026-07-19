@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:VarVault.App.Controls"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             xmlns:lib="clr-namespace:VarVault.Sdk.Library;assembly=VarVault.Sdk"
+             x:Class="VarVault.App.Views.TieringView"
+             x:DataType="vm:TieringViewModel">
+  <DockPanel Margin="18">
+    <TextBlock DockPanel.Dock="Top" Text="Tiering &amp; migration" FontSize="21" FontWeight="SemiBold"
+               Foreground="{DynamicResource TextHiBrush}" Margin="0,0,0,12" />
+
+    <WrapPanel DockPanel.Dock="Top" DataContext="{Binding Counts}" x:CompileBindings="False" Margin="0,0,0,12">
+      <c:Card Header="Hot" Width="150" Margin="0,0,10,0"><TextBlock Text="{Binding Hot}" FontSize="24" Foreground="{DynamicResource HotBrush}" /></c:Card>
+      <c:Card Header="Warm" Width="150" Margin="0,0,10,0"><TextBlock Text="{Binding Warm}" FontSize="24" Foreground="{DynamicResource WarmBrush}" /></c:Card>
+      <c:Card Header="Cold" Width="150"><TextBlock Text="{Binding Cold}" FontSize="24" Foreground="{DynamicResource ColdBrush}" /></c:Card>
+    </WrapPanel>
+
+    <c:Card Header="Misplaced — proposals awaiting approval">
+      <ScrollViewer>
+        <ItemsControl ItemsSource="{Binding Misplaced}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="lib:MisplacedItem">
+              <Grid ColumnDefinitions="*,80,80,80,*" Height="26">
+                <TextBlock Grid.Column="0" Text="{Binding VarName}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding StorageClass}" VerticalAlignment="Center" Opacity="0.85" />
+                <TextBlock Grid.Column="2" Text="{Binding CurrentTier, StringFormat='T{0}'}" VerticalAlignment="Center" Opacity="0.85" />
+                <TextBlock Grid.Column="3" Text="{Binding DesiredTier, StringFormat='→ T{0}'}" VerticalAlignment="Center" Opacity="0.85" />
+                <TextBlock Grid.Column="4" Text="{Binding Why}" VerticalAlignment="Center" Opacity="0.7" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </c:Card>
+  </DockPanel>
+</UserControl>

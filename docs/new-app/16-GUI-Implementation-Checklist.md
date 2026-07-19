@@ -218,7 +218,9 @@ Each cites its plan item numbers (15-plan) and its HTML range. Read both before 
 - [x] **SCR-4 · Loading presets.** *Read:* `:417–440`. *BE:* `IPresetService`, N7. *Done:* `PresetsViewModel`
   + `Views/PresetsView.axaml` (preset list, activation preview via `PreviewActivationAsync`, Switch via
   `IProfileService`). Wired in AppHost. T: `PresetsScreenTests.Lists_presets_and_previews_selection`.
-- [ ] **SCR-5 · Tiering & migration.** *Read:* `:443–457`. *Items:* Tiering #1–23. *BE:* N1, N2, N3. *Test:* class counts + misplaced table; Plan opens m-migrate.
+- [x] **SCR-5 · Tiering & migration.** *Read:* `:443–457`. *BE:* N2. *Done:* `TieringViewModel` +
+  `Views/TieringView.axaml` (class-count cards, misplaced table, build-plan). Wired in AppHost. T:
+  `TieringScreenTests.Shows_counts_and_misplaced`.
 - [ ] **SCR-6 · Duplicates & reclaim.** *Read:* `:460–474`. *Items:* Dupes #1–22. *BE:* N4, N2. *Test:* reclaim cards + exact-dup groups bind; Review opens m-dupe.
 - [ ] **SCR-7 · Analytics.** *Read:* `:521–538`. *Items:* Analytics #1–15. *BE:* `IAnalyticsService`, N2, `IUsageAnalyzer`. *Test:* space-by-type/creator bars + usage chart bind.
 - [ ] **SCR-8 · Proposals & review.** *Read:* `:503–518`. *Items:* Proposals #1–39. *BE:* N8. *Test:* tabs + 4 proposal cards; Approve dispatches, Reject records.
