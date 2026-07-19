@@ -111,7 +111,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 1.27 Corrupt zip → `IntegrityStatus=CorruptZip`, not indexed as content · T: `VarInspectorTests.Corrupt_zip_is_flagged_without_throwing` (empty entries, no signatures) + `ZipCentralDirectoryReaderTests.Corrupt_zip_is_rejected`
 - [x] 1.28 Prune: VarFile whose file vanished (repo confirmed online) removed; offline → kept unavailable · ⚠ T: `IndexingFlowTests.Reindex_is_incremental_and_prunes_vanished_files` (online: Pruned=1, row gone) + `Offline_repository_does_not_prune_vanished_files` (offline: Pruned=0, row survives)
 - [x] 1.29 Quarantine-dir recognition (`___VarRedundant___` etc.) → `QuarantineKind` set, not treated as live · T: `RepositoryScanRulesTests.Classifies_quarantine_directories_by_prefix` (incl. legacy suffix) + `RepositoryEnumeratorTests` (tagged Redundant, `IsLive`=false) + real-repo probe
-- [ ] 1.30 Filesystem watch triggers incremental re-index of changed files (M: drop a var → appears)
+- [x] 1.30 Filesystem watch triggers incremental re-index of changed files · T: `RepositoryWatcherTests.Dropping_a_var_raises_a_change_event` (dropping a .var raises `VarChanged` within the bound) — `RepositoryWatcher` (create/modify/delete/rename; caller debounces + schedules the incremental scan)
 - [x] 1.31 D: full index of a real var repo completes; reports counts + flagged files · T/D: `IndexingFlowTests.Indexes_the_real_repository_corpus` (indexes `D:\VarVault_test_repo` — 277 vars incl. quarantine dirs — into SQLite in ~9 s; asserts packages/varfiles/read-model rows created, quarantined tagged). *Note: current writer does per-var SaveChanges; transaction batching (1.25) is the pending throughput optimization.*
 
 ### Preview extraction & thumbnails
