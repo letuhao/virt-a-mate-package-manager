@@ -116,7 +116,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 
 ### Preview extraction & thumbnails
 - [ ] 1.32 Sibling `.jpg` extracted for previewable content items (T)
-- [ ] 1.33 Thumbnails in a **packed store** (not 700k loose files) keyed by PackageId on fastest tier (M: store is N blob files)
+- [x] 1.33 Thumbnails in a **packed store** (not 700k loose files) keyed by PackageId · T: `SqliteThumbnailStoreTests` (put/get/overwrite by PackageId; 50 thumbs = one packed DB, zero loose .jpg) — `IThumbnailStore`/`SqliteThumbnailStore` (dedicated `thumbs.db`, D2)
 - [ ] 1.34 Representative preview per package by PrimaryType; preview-less types get a placeholder (M)
 - [ ] 1.35 Thumbnails decode off UI thread with scroll-ahead prefetch (M: no UI stall on fast scroll)
 
