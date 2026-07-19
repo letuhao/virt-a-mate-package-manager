@@ -1,58 +1,50 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VarVault.Sdk.Library;
 
 namespace VarVault.App.ViewModels;
 
-/// <summary>The kinds of reviewable proposal. (5.14)</summary>
-public enum ProposalKind { Migration, Dedup, EncodingFix, Stale }
-
-/// <summary>One pending proposal shown in the inbox.</summary>
-public sealed record Proposal(long Id, ProposalKind Kind, string Description, long Bytes);
-
 /// <summary>
-/// Proposals inbox: the pending migrations/dedup/fixes/stale queue with approve/reject/batch — the
-/// home of "propose, never auto-destroy". (Checklist 5.14.)
+/// SCR-8 · Proposals inbox: the pending migrate/dedup/encoding/stale queue with approve/reject — "propose,
+/// never auto-destroy". Approve dispatches to the matching runner via <see cref="IProposalService"/>.
+/// (16-checklist SCR-8.)
 /// </summary>
-public sealed partial class ProposalsViewModel : ObservableObject
+public sealed partial class ProposalsViewModel(IProposalService proposals) : ObservableObject
 {
     public ObservableCollection<Proposal> Pending { get; } = [];
-    public ObservableCollection<Proposal> Approved { get; } = [];
-    public ObservableCollection<Proposal> Rejected { get; } = [];
+
+    [ObservableProperty] private string? _statusMessage;
 
     public int PendingCount => Pending.Count;
 
-    public void Load(IEnumerable<Proposal> proposals)
+    [RelayCommand]
+    public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(proposals);
         Pending.Clear();
-        Approved.Clear();
-        Rejected.Clear();
-        foreach (var p in proposals)
+        foreach (var p in await proposals.ListAsync(cancellationToken).ConfigureAwait(true))
             Pending.Add(p);
         OnPropertyChanged(nameof(PendingCount));
     }
 
     [RelayCommand]
-    public void Approve(Proposal? proposal) => Move(proposal, Approved);
-
-    [RelayCommand]
-    public void Reject(Proposal? proposal) => Move(proposal, Rejected);
-
-    [RelayCommand]
-    public void ApproveAll()
+    public async Task ApproveAsync(Proposal? proposal, CancellationToken cancellationToken = default)
     {
-        foreach (var p in Pending.ToList())
-            Approved.Add(p);
-        Pending.Clear();
+        if (proposal is null)
+            return;
+        var result = await proposals.ApproveAsync(proposal, cancellationToken).ConfigureAwait(true);
+        StatusMessage = result.Message;
+        Pending.Remove(proposal);
         OnPropertyChanged(nameof(PendingCount));
     }
 
-    private void Move(Proposal? proposal, ObservableCollection<Proposal> destination)
+    [RelayCommand]
+    public async Task RejectAsync(Proposal? proposal, CancellationToken cancellationToken = default)
     {
-        if (proposal is null || !Pending.Remove(proposal))
+        if (proposal is null)
             return;
-        destination.Add(proposal);
+        await proposals.RejectAsync(proposal, cancellationToken).ConfigureAwait(true);
+        Pending.Remove(proposal);
         OnPropertyChanged(nameof(PendingCount));
     }
 }

@@ -31,6 +31,7 @@ public static class AppHost
             ["dupes"] = new DupesViewModel(services.GetRequiredService<IReclaimService>()),
             ["history"] = new ActivityViewModel(services.GetRequiredService<IActivityLog>()),
             ["missing"] = new MissingDepsViewModel(services.GetRequiredService<IMissingDepsQuery>()),
+            ["proposals"] = new ProposalsViewModel(services.GetRequiredService<IProposalService>()),
         };
 
         // Placeholders for screens whose full views arrive in SCR slices — keeps the shell complete.

@@ -35,30 +35,32 @@ public class OnboardingViewModelTests
 [Trait("Category", TestCategories.Unit)]
 public class ProposalsViewModelTests
 {
-    private static Proposal P(long id, ProposalKind kind) => new(id, kind, $"proposal {id}", 1000);
-
-    [Fact]
-    public void Approve_and_reject_move_out_of_pending()
+    private sealed class StubProposals : VarVault.Sdk.Library.IProposalService
     {
-        var vm = new ProposalsViewModel();
-        vm.Load([P(1, ProposalKind.Migration), P(2, ProposalKind.Dedup), P(3, ProposalKind.EncodingFix)]);
-        Assert.Equal(3, vm.PendingCount);
-
-        vm.Approve(vm.Pending[0]);
-        vm.Reject(vm.Pending[0]);
-
-        Assert.Equal(1, vm.PendingCount);
-        Assert.Single(vm.Approved);
-        Assert.Single(vm.Rejected);
+        public Task<IReadOnlyList<VarVault.Sdk.Library.Proposal>> ListAsync(CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<VarVault.Sdk.Library.Proposal>>(
+            [
+                new("dedup:X", VarVault.Sdk.Library.ProposalKind.Dedup, "Remove 3 dups", "verified", 312, [1, 2, 3]),
+                new("stale", VarVault.Sdk.Library.ProposalKind.RetireStale, "Retire 2", "→ trash", 88, [4]),
+            ]);
+        public Task<VarVault.Sdk.Library.ProposalActionResult> ApproveAsync(VarVault.Sdk.Library.Proposal p, CancellationToken ct = default) =>
+            Task.FromResult(new VarVault.Sdk.Library.ProposalActionResult(true, "done"));
+        public Task<VarVault.Sdk.Library.ProposalActionResult> RejectAsync(VarVault.Sdk.Library.Proposal p, CancellationToken ct = default) =>
+            Task.FromResult(new VarVault.Sdk.Library.ProposalActionResult(true, "rejected"));
     }
 
     [Fact]
-    public void Approve_all_clears_pending()
+    public async Task Loads_then_approve_and_reject_remove_from_pending()
     {
-        var vm = new ProposalsViewModel();
-        vm.Load([P(1, ProposalKind.Migration), P(2, ProposalKind.Stale)]);
-        vm.ApproveAll();
+        var vm = new ProposalsViewModel(new StubProposals());
+        await vm.LoadAsync();
+        Assert.Equal(2, vm.PendingCount);
+
+        await vm.ApproveCommand.ExecuteAsync(vm.Pending[0]);
+        Assert.Equal(1, vm.PendingCount);
+        Assert.Equal("done", vm.StatusMessage);
+
+        await vm.RejectCommand.ExecuteAsync(vm.Pending[0]);
         Assert.Equal(0, vm.PendingCount);
-        Assert.Equal(2, vm.Approved.Count);
     }
 }

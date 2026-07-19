@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:VarVault.App.Controls"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             xmlns:lib="clr-namespace:VarVault.Sdk.Library;assembly=VarVault.Sdk"
+             x:Class="VarVault.App.Views.ProposalsView"
+             x:DataType="vm:ProposalsViewModel">
+  <DockPanel Margin="18">
+    <TextBlock DockPanel.Dock="Top" Text="Proposals &amp; review" FontSize="21" FontWeight="SemiBold"
+               Foreground="{DynamicResource TextHiBrush}" Margin="0,0,0,4" />
+    <TextBlock DockPanel.Dock="Top" Foreground="{DynamicResource TextLoBrush}" Margin="0,0,0,12"
+               Text="Nothing runs unattended. The analyzer proposes; you approve." />
+    <ScrollViewer>
+      <ItemsControl ItemsSource="{Binding Pending}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="lib:Proposal">
+            <c:Card Margin="0,0,0,10">
+              <Grid ColumnDefinitions="*,Auto,Auto">
+                <StackPanel Grid.Column="0">
+                  <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+                  <TextBlock Text="{Binding Detail}" Opacity="0.7" FontSize="12" />
+                </StackPanel>
+                <Button Grid.Column="1" Content="Reject" Margin="0,0,8,0"
+                        Command="{Binding ((vm:ProposalsViewModel)DataContext).RejectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding}" />
+                <Button Grid.Column="2" Content="Approve" Background="{DynamicResource AccentBrush}" Foreground="White"
+                        Command="{Binding ((vm:ProposalsViewModel)DataContext).ApproveCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding}" />
+              </Grid>
+            </c:Card>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>

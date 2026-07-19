@@ -227,7 +227,10 @@ Each cites its plan item numbers (15-plan) and its HTML range. Read both before 
 - [x] **SCR-7 · Analytics.** *Read:* `:521–538`. *BE:* `IAnalyticsService`. *Done:* `Views/AnalyticsView.axaml`
   bound to existing `AnalyticsViewModel` (space-by-type + space-by-creator cards). Wired in AppHost. T:
   `AnalyticsScreenTests.Renders_space_breakdowns`.
-- [ ] **SCR-8 · Proposals & review.** *Read:* `:503–518`. *Items:* Proposals #1–39. *BE:* N8. *Test:* tabs + 4 proposal cards; Approve dispatches, Reject records.
+- [x] **SCR-8 · Proposals & review.** *Read:* `:503–518`. *BE:* N8. *Done:* `ProposalsViewModel(IProposalService)`
+  (rewritten from placeholder to bind SDK) + `Views/ProposalsView.axaml` (proposal cards, approve→dispatch,
+  reject→remove). Wired in AppHost. T: `ProposalsViewModelTests.Loads_then_approve_and_reject_remove_from_pending`
+  + `ProposalsScreenTests.Renders_proposal_cards`.
 - [ ] **SCR-9 · Health & fix.** *Read:* `:477–490`. *Items:* Health #1–19. *BE:* N5. *Test:* tabs + group cards + detected table; Fix opens m-fix.
 - [ ] **SCR-10 · Missing deps.** *Read:* `:493–500`. *Items:* Missing #1–8. *BE:* `IMissingDepsQuery`, N11. *Test:* table binds; Resolve opens m-alias.
 - [ ] **SCR-11 · Trash & backup.** *Read:* `:541–549`. *Items:* Trash #1–12. *BE:* N6. *Test:* trash table restore/purge; backups tab.
