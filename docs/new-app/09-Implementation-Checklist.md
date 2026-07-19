@@ -194,8 +194,8 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 
 ### Duplicates & reclaim
 - [x] 4.5 Dedup grouping by ContentSignature within one identity · T: `DedupGroupingTests` (within-identity dup groups, content-conflict same-identity-diff-sig excluded, cross-identity report-only) + `RealRepoDedupTests` (groups the real corpus by structural signature) — `DedupGrouping.Analyze`
-- [ ] 4.6 Near-dup by PayloadSignature (same content, diff meta) flagged separately (T)
-- [ ] 4.7 Download-intake classification: exact/logical/same-name-diff/near-dup/new (T)
+- [x] 4.6 Near-dup by PayloadSignature (same content, diff meta) flagged separately · T: `IntakeClassifierTests.Near_duplicate_different_identity_same_payload` — `IntakeClassifier` (payload match across identities → NearDuplicate)
+- [x] 4.7 Download-intake classification: exact / same-name-different / near-dup / encoding-variant / new · T: `IntakeClassifierTests` (all five classes + exact-wins precedence) — `IntakeClassifier.Classify`
 - [ ] 4.8 Reclaim wizard aggregates duplicates + cold-on-SSD + never-loaded orphans (single-copy excluded) with size estimates (M)
 - [ ] 4.9 Duplicate review: keep-one, ranked by integrity/health; verified-before-delete (M)
 
