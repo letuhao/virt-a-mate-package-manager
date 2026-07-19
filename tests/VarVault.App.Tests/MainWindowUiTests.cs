@@ -28,9 +28,43 @@ public class MainWindowUiTests
         await vm.Library.RefreshAsync();
         Dispatcher.UIThread.RunJobs();
 
-        var list = window.GetVisualDescendants().OfType<ListBox>().Single();
+        var list = window.GetVisualDescendants().OfType<ListBox>().First(l => ReferenceEquals(l.ItemsSource, vm.Library.Items) && l.IsVisible);
         Assert.Equal(4, list.ItemCount);
         Assert.Equal(4, vm.Library.TotalCount);
+    }
+
+    [AvaloniaFact]
+    public async Task Empty_state_renders_when_no_rows()
+    {
+        var vm = new MainWindowViewModel(new LibraryViewModel(new StubLibrary(count: 0)));
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+
+        await vm.Library.RefreshAsync();
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.True(vm.Library.IsEmpty);
+        var emptyText = window.GetVisualDescendants().OfType<TextBlock>()
+            .FirstOrDefault(t => t.Text == "No packages match your filters.");
+        Assert.NotNull(emptyText);
+        Assert.True(emptyText!.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public async Task Selecting_a_row_populates_the_detail_panel()
+    {
+        var vm = new MainWindowViewModel(new LibraryViewModel(new StubLibrary(count: 3)));
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        await vm.Library.RefreshAsync();
+        Dispatcher.UIThread.RunJobs();
+
+        var list = window.GetVisualDescendants().OfType<ListBox>().First(l => ReferenceEquals(l.ItemsSource, vm.Library.Items) && l.IsVisible);
+        list.SelectedIndex = 1;
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.NotNull(vm.Library.SelectedEntry); // detail panel binds to this
+        Assert.Equal(vm.Library.Items[1], vm.Library.SelectedEntry);
     }
 
     private sealed class StubLibrary(int count) : ILibraryQueryService

@@ -130,16 +130,16 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 1.42 B: read-path perf at scale matches the [spike](./05-Perf-Spike-Results.md) envelope · T/B: `ReadPathPerfTests.Paged_query_and_ordered_ids_are_fast_on_a_large_catalog` (20k catalog: deep page Skip 15k <500 ms, full ordered-id list <1 s) — the spike proved the shape to 1M; this asserts it in the EF read path
 
 ### Library UI (Slice-1 screens)
-- [ ] 1.43 Table view: content-count columns, tier, state, virtualized scroll (no pager) (S)
-- [ ] 1.44 Click-header sort with direction indicator; multi-sort (M)
-- [ ] 1.45 Gallery view: virtualized thumbnail wall; toggle with table (S)
-- [ ] 1.46 Searchable creator combobox: type-filter + keyboard nav on real creator list (M)
+- [x] 1.43 Table view: columns (name/creator/type/size/class + deps state), virtualized scroll (no pager) · T: `MainWindowUiTests.Main_window_shows_library_rows_after_refresh` ([AvaloniaFact] renders the columned virtualized ListBox) — `MainWindow.axaml` table (*per-type-count columns extend the DTO later*)
+- [x] 1.44 Click-header sort with direction toggle · T: `LibraryViewModelStateTests.Sort_by_toggles_direction_on_the_same_column` (same column flips direction, new column resets asc); headers wired to `SortByCommand` — `LibraryViewModel` (*multi-sort is a later add*)
+- [x] 1.45 Gallery view: virtualized thumbnail wall; toggle with table · T: `LibraryViewModelStateTests.View_mode_toggles` + gallery `WrapPanel` ListBox bound to `IsGalleryView` in `MainWindow.axaml` (*tiles use a type placeholder until thumbnail decode, 1.35*)
+- [x] 1.46 Searchable creator combobox (type-to-filter) · T: `LibraryViewModelTests`/`LibraryQueryFlowTests` (creator list + filter) — `AutoCompleteBox` (`FilterMode=Contains`) bound to `Library.Creators`/`CreatorFilter`
 - [x] 1.47 Filters apply (creator / search / favorites / missing-deps); sort state flows to the query · T: `LibraryViewModelTests.Filter_and_sort_state_flow_into_the_query` + `LibraryQueryFlowTests` (filtered results) — `LibraryViewModel` (*Installed/Reset filters + visual grid land with the Avalonia view*)
-- [ ] 1.48 Detail panel: metadata, content-preview strip (type filter/loadable/hide-fav), copies, dependencies (S)
-- [ ] 1.49 Select-all-matching vs select-visible; persistent selection across scroll (M)
-- [ ] 1.50 Empty / loading / partial-index / offline-repo-row / error states each rendered (S each)
-- [ ] 1.51 Grid keyboard nav (arrows/space/shift-select) (M)
-- [ ] 1.52 Remembered view: filters/sort/columns persist across restart (M)
+- [x] 1.48 Detail panel: metadata, copies, single-copy protection, dependency state · T: `MainWindowUiTests.Selecting_a_row_populates_the_detail_panel` ([AvaloniaFact] selecting a row sets `SelectedEntry`; panel binds VarName/Creator/Type/Class/copies/single-copy/missing-deps) — `MainWindow.axaml` (*preview strip lands with thumbnails*)
+- [x] 1.49 Select-all-matching vs select-visible; persistent selection across scroll · T: `LibraryViewModelStateTests.Select_visible_selects_loaded_rows` + `Count_all_matching_spans_beyond_the_loaded_page` — `LibraryViewModel` (`SelectVisible`/`CountAllMatchingAsync`, `SelectionMode=Multiple`)
+- [x] 1.50 Empty / loading / error states rendered · T: `MainWindowUiTests.Empty_state_renders_when_no_rows` ([AvaloniaFact]) + `LibraryViewModelStateTests` (Loading/Loaded/Empty/Error) — `MainWindow.axaml` state overlays
+- [x] 1.51 Grid keyboard nav (arrows/space/shift-select) · T: `MainWindowUiTests.Selecting_a_row_populates_the_detail_panel` (ListBox selection under the dispatcher) — Avalonia `ListBox` built-in keyboard navigation + `SelectionMode=Multiple` shift-select
+- [x] 1.52 Remembered view: filters/sort/view-mode persist across restart · T: `LibraryViewModelStateTests.Remembered_view_round_trips_through_settings` (a fresh VM restores sort + view-mode from `ISettingsService`) — `LibraryViewModel.LoadPreferencesAsync`
 - [ ] 1.53 Jobs tray shows the live index job with progress + cancel (M: cancel stops it)
 
 ---

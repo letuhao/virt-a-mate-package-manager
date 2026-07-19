@@ -1,0 +1,145 @@
+using VarVault.App.ViewModels;
+using VarVault.Sdk.Library;
+using VarVault.Sdk.Settings;
+using VarVault.TestKit;
+
+namespace VarVault.App.Tests;
+
+/// <summary>
+/// Library view-model logic (sort toggle, view-mode, selection, states, remembered view) as plain
+/// units. (Checklist 1.44/1.45/1.49/1.50/1.52.)
+/// </summary>
+[Trait("Category", TestCategories.Unit)]
+public class LibraryViewModelStateTests
+{
+    [Fact]
+    public async Task Sort_by_toggles_direction_on_the_same_column()
+    {
+        var query = new StubLibrary(total: 2);
+        var vm = new LibraryViewModel(query);
+
+        await vm.SortByAsync(LibrarySort.Size);
+        Assert.Equal(LibrarySort.Size, vm.Sort);
+        Assert.False(vm.Descending);
+
+        await vm.SortByAsync(LibrarySort.Size); // same column → flip direction
+        Assert.True(vm.Descending);
+
+        await vm.SortByAsync(LibrarySort.Creator); // new column → reset ascending
+        Assert.Equal(LibrarySort.Creator, vm.Sort);
+        Assert.False(vm.Descending);
+    }
+
+    [Fact]
+    public async Task View_mode_toggles()
+    {
+        var vm = new LibraryViewModel(new StubLibrary(0));
+        Assert.Equal(LibraryViewMode.Table, vm.ViewMode);
+        await vm.ToggleViewModeAsync();
+        Assert.Equal(LibraryViewMode.Gallery, vm.ViewMode);
+    }
+
+    [Fact]
+    public async Task Empty_and_loaded_states_are_set()
+    {
+        var empty = new LibraryViewModel(new StubLibrary(0));
+        await empty.RefreshAsync();
+        Assert.True(empty.IsEmpty);
+        Assert.False(empty.IsLoading);
+
+        var loaded = new LibraryViewModel(new StubLibrary(5));
+        await loaded.RefreshAsync();
+        Assert.Equal(LibraryState.Loaded, loaded.State);
+    }
+
+    [Fact]
+    public async Task Error_state_when_the_query_throws()
+    {
+        var vm = new LibraryViewModel(new ThrowingLibrary());
+        await vm.RefreshAsync();
+        Assert.True(vm.HasError);
+    }
+
+    [Fact]
+    public async Task Select_visible_selects_loaded_rows()
+    {
+        var vm = new LibraryViewModel(new StubLibrary(3));
+        await vm.RefreshAsync();
+        vm.SelectVisible();
+        Assert.Equal(3, vm.SelectedItems.Count);
+        vm.ClearSelection();
+        Assert.Empty(vm.SelectedItems);
+    }
+
+    [Fact]
+    public async Task Count_all_matching_spans_beyond_the_loaded_page()
+    {
+        var vm = new LibraryViewModel(new StubLibrary(250)); // more than one page
+        await vm.RefreshAsync();
+        Assert.Equal(100, vm.Items.Count);              // only a page loaded
+        Assert.Equal(250, await vm.CountAllMatchingAsync()); // but all-matching is 250
+    }
+
+    [Fact]
+    public async Task Remembered_view_round_trips_through_settings()
+    {
+        var settings = new FakeSettings();
+        var first = new LibraryViewModel(new StubLibrary(1), settings);
+        await first.SortByAsync(LibrarySort.LastUsed);
+        await first.ToggleViewModeAsync();
+
+        // A fresh view-model restores the remembered sort + view-mode.
+        var second = new LibraryViewModel(new StubLibrary(1), settings);
+        await second.LoadPreferencesAsync();
+        Assert.Equal(LibrarySort.LastUsed, second.Sort);
+        Assert.Equal(LibraryViewMode.Gallery, second.ViewMode);
+    }
+
+    [Fact]
+    public void Format_size_is_human_readable()
+    {
+        Assert.Equal("1.0 GB", LibraryViewModel.FormatSize(1L << 30));
+        Assert.Equal("2.0 MB", LibraryViewModel.FormatSize(2L << 20));
+    }
+
+    private sealed class StubLibrary(int total) : ILibraryQueryService
+    {
+        public Task<LibraryPage> GetPageAsync(LibraryQuery query, CancellationToken cancellationToken = default)
+        {
+            var remaining = Math.Max(0, total - query.Skip);
+            var count = Math.Min(remaining, query.Take);
+            var items = Enumerable.Range(query.Skip, count)
+                .Select(i => new PackageListEntry(i, $"C.P.{i}", "C", "P", "1", "Scene", 1024, 1, 1, true, false, "Cold", false, null))
+                .ToList();
+            return Task.FromResult(new LibraryPage(items, total));
+        }
+
+        public Task<IReadOnlyList<string>> GetCreatorsAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>(["C"]);
+
+        public Task<IReadOnlyList<long>> GetOrderedIdsAsync(LibraryQuery query, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<long>>(Enumerable.Range(0, total).Select(i => (long)i).ToList());
+    }
+
+    private sealed class ThrowingLibrary : ILibraryQueryService
+    {
+        public Task<LibraryPage> GetPageAsync(LibraryQuery query, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("boom");
+        public Task<IReadOnlyList<string>> GetCreatorsAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>([]);
+        public Task<IReadOnlyList<long>> GetOrderedIdsAsync(LibraryQuery query, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<long>>([]);
+    }
+
+    private sealed class FakeSettings : ISettingsService
+    {
+        private readonly Dictionary<string, string> _values = new(StringComparer.Ordinal);
+        public Task<string?> GetAsync(string key, CancellationToken ct = default) => Task.FromResult(_values.GetValueOrDefault(key));
+        public Task SetAsync(string key, string value, CancellationToken ct = default) { _values[key] = value; return Task.CompletedTask; }
+        public Task<bool> GetBoolAsync(string key, bool fallback = false, CancellationToken ct = default) =>
+            Task.FromResult(_values.TryGetValue(key, out var v) && bool.TryParse(v, out var b) ? b : fallback);
+        public Task SetBoolAsync(string key, bool value, CancellationToken ct = default) => SetAsync(key, value.ToString(), ct);
+        public Task<IReadOnlyDictionary<string, string>> GetAllAsync(CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyDictionary<string, string>>(_values);
+    }
+}
