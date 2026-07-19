@@ -32,6 +32,7 @@ public static class AppHost
             ["history"] = new ActivityViewModel(services.GetRequiredService<IActivityLog>()),
             ["missing"] = new MissingDepsViewModel(services.GetRequiredService<IMissingDepsQuery>()),
             ["proposals"] = new ProposalsViewModel(services.GetRequiredService<IProposalService>()),
+            ["health"] = new HealthViewModel(services.GetRequiredService<IHealthService>()),
         };
 
         // Placeholders for screens whose full views arrive in SCR slices — keeps the shell complete.

@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:VarVault.App.Controls"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             xmlns:lib="clr-namespace:VarVault.Sdk.Library;assembly=VarVault.Sdk"
+             x:Class="VarVault.App.Views.HealthView"
+             x:DataType="vm:HealthViewModel">
+  <DockPanel Margin="18">
+    <TextBlock DockPanel.Dock="Top" Text="Health &amp; fix" FontSize="21" FontWeight="SemiBold"
+               Foreground="{DynamicResource TextHiBrush}" Margin="0,0,0,12" />
+    <c:Card Header="Encoding — fixable groups">
+      <StackPanel Spacing="6">
+        <ItemsControl ItemsSource="{Binding EncodingGroups}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="lib:EncodingGroup">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="{Binding Codepage}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding Count}" Opacity="0.7" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Text="{Binding StatusMessage}" Opacity="0.7" />
+      </StackPanel>
+    </c:Card>
+  </DockPanel>
+</UserControl>
