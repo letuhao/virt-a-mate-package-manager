@@ -171,8 +171,10 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
 
 ## Section 2 — Shell spine (SH)
 
-- [ ] **SH-1 · ShellViewModel + navigation.** Owns `ActiveScreen` + `NavigateCommand`; hosts the 13 screen
-  VMs. *Rule:* screens resolved via DI, lazily shown. *Test:* navigate switches `ActiveScreen`.
+- [x] **SH-1 · ShellViewModel + navigation.** *Done:* `ViewModels/ShellViewModel.cs` — `ActiveScreen`/
+  `ActiveScreenId` + `NavigateCommand`, grouped `AllScreens` rail list (13, Browse/Optimize/Problems/System),
+  screen VMs supplied as a DI map. T: `ShellViewModelTests` (`Navigate_swaps_active_screen`,
+  `Rail_lists_all_13_screens_in_four_groups`, `Navigate_to_unregistered_screen_sets_id_but_null_screen`).
 - [ ] **SH-2 · Rail nav.** *Read:* `:196–222`. *Items:* Shell rail nav #1–20 (13 nav + 4 group labels + 3
   badges). Uses SC-11. *Test:* 13 items present, grouped Browse/Optimize/Problems/System; badges bind counts.
 - [ ] **SH-3 · Top bar.** *Read:* `:225–232`. *Items:* Top-bar #1–6 (search, rescue, jobs, dot, add-repo,
