@@ -45,6 +45,7 @@ public static class PersistenceRegistration
         services.AddScoped<Sdk.Library.IAnalyticsService, Library.EfAnalyticsService>();
         services.AddScoped<Sdk.Settings.ISettingsService, EfSettingsService>();
         services.AddScoped<Sdk.Presets.IPresetService, Indexing.EfPresetService>();
+        services.AddScoped<Sdk.Activation.IActivityLog, Indexing.EfActivityLog>();
         services.AddScoped<Sdk.Activation.IActivationService, Indexing.EfActivationService>();
         services.AddSingleton<CatalogDatabaseInitializer>();
         services.AddScoped<SqliteDatabaseBackup>();

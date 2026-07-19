@@ -291,7 +291,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] X.9 Import-from-old-varManager: recognize quarantine dirs + ingest `.fav`/`.hide` sidecars → ContentItemPref (T)
 - [x] X.10 Portable catalog: shuffle drive letters → re-point by volume-serial keeps var paths valid · ⚠ T: `RepositoryRepointFlowTests` (same-serial re-point updates MountPath so VarFiles resolve at the new path; different serial refused) — `RepositoryService.RepointAsync`
 - [x] X.11 Jobs tray: multiple concurrent jobs, per-job progress + cancel · T: `JobsViewModelTests` (2 concurrent jobs listed; per-job cancel) — `JobsViewModel` over `IJobQueue.Active` (each `JobHandle` carries `Progress`/`State`/`Cancel`)
-- [ ] X.12 Activity history: every move/install/delete/fix/alias audited (M)
+- [x] X.12 Activity history: every move/install/delete/fix/alias audited · T: `EfActivityLogTests.Records_and_reads_newest_first` (records Index/Migrate/Delete, reads newest-first; limit caps) — `IActivityLog`/`EfActivityLog` (`ActivityEntry` table via migration `AddActivityEntry`) + `ActivityViewModel`
 - [x] X.13 Settings persist (VaM path, policies, fix-on-import, …) · T: `EfSettingsServiceTests` (set/get/overwrite upsert, bool fallback, get-all) — `ISettingsService`/`EfSettingsService` over the `Setting` table
 - [x] X.14 Command palette (Ctrl-K) global search/actions · T: `CommandPaletteViewModelTests` (type-to-filter narrows the action list; Invoke runs the command + closes) — `CommandPaletteViewModel`
 - [ ] X.15 Light/dark theme correct on both; WCAG AA contrast on muted text (M: contrast check)

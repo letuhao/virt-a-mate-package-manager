@@ -47,6 +47,7 @@ public class VarVaultDbContext(DbContextOptions<VarVaultDbContext> options) : Db
     public DbSet<PackageListItem> PackageListItems => Set<PackageListItem>();
     public DbSet<TrashItem> TrashItems => Set<TrashItem>();
     public DbSet<Setting> Settings => Set<Setting>();
+    public DbSet<ActivityEntry> ActivityEntries => Set<ActivityEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
