@@ -66,7 +66,9 @@ Build once, reused everywhere. Read the CSS token block `prototype.html:1–195`
   *Done:* `Controls/Bars.cs` (`MeterBar` value-tracking fill via star cols; `StackedBar` proportional
   segments; no animation → reduced-motion safe). T: `BarsControlTests` (`Meter_fill_tracks_value`,
   `Meter_clamps_out_of_range_value`, `Stacked_renders_proportional_segments`).
-- [ ] **SC-7 · StatTile / TempDot.** *Read:* `.stat`(`:261`), `.temp`(`:246`). Big number + unit; hot/warm/cold dot. *Test:* value + temp render.
+- [x] **SC-7 · StatTile / TempDot.** *Read:* `.stat`(`:261`), `.temp`(`:246`). Big number + unit; hot/warm/cold dot.
+  *Done:* `Controls/Stat.cs` (`StatTile` value+unit+brush; `TempDot` class-per-temperature). T:
+  `StatControlTests` (`Stat_tile_renders_value_and_unit`, `Temp_dot_classes_by_temperature`).
 - [ ] **SC-8 · SearchableCombo.** *Read:* `:318–321` + JS `:720–732`.
   *Items:* button (label+caret), search input, filtered list with counts, keyboard ↑/↓/Enter/Esc, empty
   state. *Rule:* type-to-filter over 41k creators (client filter of `GetCreatorsAsync`). *Test:* filter

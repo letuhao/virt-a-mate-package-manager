@@ -26,6 +26,34 @@
     </Setter>
   </ControlTheme>
 
+  <!-- SC-7 · StatTile -->
+  <ControlTheme x:Key="{x:Type c:StatTile}" TargetType="c:StatTile">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" Spacing="6">
+          <TextBlock Text="{TemplateBinding Value}" FontSize="24" FontWeight="SemiBold"
+                     Foreground="{TemplateBinding ValueBrush}" />
+          <TextBlock Text="{TemplateBinding Unit}" Foreground="{DynamicResource TextLoBrush}"
+                     FontSize="12" VerticalAlignment="Bottom" Margin="0,0,0,3" />
+        </StackPanel>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
+  <!-- SC-7 · TempDot -->
+  <ControlTheme x:Key="{x:Type c:TempDot}" TargetType="c:TempDot">
+    <Setter Property="Width" Value="8" />
+    <Setter Property="Height" Value="8" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="PART_Dot" CornerRadius="4" Background="{DynamicResource ColdBrush}" />
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^.hot /template/ Border#PART_Dot"><Setter Property="Background" Value="{DynamicResource HotBrush}" /></Style>
+    <Style Selector="^.warm /template/ Border#PART_Dot"><Setter Property="Background" Value="{DynamicResource WarmBrush}" /></Style>
+    <Style Selector="^.cold /template/ Border#PART_Dot"><Setter Property="Background" Value="{DynamicResource ColdBrush}" /></Style>
+  </ControlTheme>
+
   <!-- SC-6 · MeterBar -->
   <ControlTheme x:Key="{x:Type c:MeterBar}" TargetType="c:MeterBar">
     <Setter Property="Height" Value="5" />
