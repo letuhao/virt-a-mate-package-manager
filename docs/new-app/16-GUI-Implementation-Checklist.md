@@ -69,10 +69,11 @@ Build once, reused everywhere. Read the CSS token block `prototype.html:1–195`
 - [x] **SC-7 · StatTile / TempDot.** *Read:* `.stat`(`:261`), `.temp`(`:246`). Big number + unit; hot/warm/cold dot.
   *Done:* `Controls/Stat.cs` (`StatTile` value+unit+brush; `TempDot` class-per-temperature). T:
   `StatControlTests` (`Stat_tile_renders_value_and_unit`, `Temp_dot_classes_by_temperature`).
-- [ ] **SC-8 · SearchableCombo.** *Read:* `:318–321` + JS `:720–732`.
-  *Items:* button (label+caret), search input, filtered list with counts, keyboard ↑/↓/Enter/Esc, empty
-  state. *Rule:* type-to-filter over 41k creators (client filter of `GetCreatorsAsync`). *Test:* filter
-  narrows; arrows move highlight; Enter picks; Esc closes.
+- [x] **SC-8 · SearchableCombo.** *Read:* `:318–321` + JS `:720–732`.
+  *Items:* button (label+caret), search input, count-annotated filtered list, keyboard ↑/↓/Enter/Esc, empty
+  state. *Rule:* type-to-filter (client). *Done:* `Controls/SearchableCombo.cs` (+ `ComboOption`) + Popup
+  ControlTheme; `Refilter`/`MoveHighlight`/`CommitHighlighted`/`HandleKey` logic seam. T:
+  `SearchableComboTests` (filter narrows, empty state, highlight+clamp+enter, keyboard map, escape closes).
 - [ ] **SC-9 · ModalHost / Dialog base.** *Read:* `.modal-bg`/`.modal`(`:581`) + JS `:708–710,734`.
   *Items:* backdrop, header+×, body slot, footer buttons; open/close; **Esc closes**; backdrop-click closes;
   focus trap. *Rule:* one host, dialogs are content. *Test:* open shows; Esc + backdrop close; focus trapped.

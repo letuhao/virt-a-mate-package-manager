@@ -26,6 +26,46 @@
     </Setter>
   </ControlTheme>
 
+  <!-- SC-8 · SearchableCombo -->
+  <ControlTheme x:Key="{x:Type c:SearchableCombo}" TargetType="c:SearchableCombo">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid>
+          <Button Name="PART_Button" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <TextBlock Text="{TemplateBinding SelectedName}" Foreground="{DynamicResource TextHiBrush}" />
+              <TextBlock Text="▾" Opacity="0.6" />
+            </StackPanel>
+          </Button>
+          <Popup Name="PART_Popup" IsOpen="{TemplateBinding IsOpen}" PlacementTarget="{Binding #PART_Button}"
+                 Placement="BottomEdgeAlignedLeft" IsLightDismissEnabled="True">
+            <Border Background="{DynamicResource Bg2Brush}" BorderBrush="{DynamicResource BorderHiBrush}"
+                    BorderThickness="1" CornerRadius="{DynamicResource RadiusSm}" Padding="6" MinWidth="220">
+              <StackPanel Spacing="6">
+                <TextBox Name="PART_Search" Text="{Binding FilterText, RelativeSource={RelativeSource TemplatedParent}}"
+                         Watermark="Search…" />
+                <ListBox Name="PART_List" MaxHeight="260"
+                         ItemsSource="{TemplateBinding FilteredOptions}"
+                         SelectedIndex="{Binding HighlightedIndex, RelativeSource={RelativeSource TemplatedParent}}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="c:ComboOption">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="{Binding Name}" />
+                        <TextBlock Grid.Column="1" Text="{Binding Count}" Opacity="0.6" />
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <TextBlock Text="No matches" Opacity="0.6" HorizontalAlignment="Center"
+                           IsVisible="{TemplateBinding IsEmpty}" />
+              </StackPanel>
+            </Border>
+          </Popup>
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
   <!-- SC-7 · StatTile -->
   <ControlTheme x:Key="{x:Type c:StatTile}" TargetType="c:StatTile">
     <Setter Property="Template">
