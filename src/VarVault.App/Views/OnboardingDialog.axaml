@@ -1,0 +1,21 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             x:Class="VarVault.App.Views.OnboardingDialog"
+             x:DataType="vm:OnboardingViewModel">
+  <StackPanel Spacing="12" MinWidth="440">
+    <TextBlock Text="Welcome — set up your library" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+    <TextBlock Text="{Binding Step, StringFormat='Step: {0}'}" Opacity="0.7" />
+    <TextBlock Text="Point VarVault at a folder where your .var files live." Opacity="0.8" TextWrapping="Wrap" />
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <TextBox Width="300" Watermark="D:\vars" Text="{Binding FolderPath}" />
+      <Button Content="Add &amp; index" Command="{Binding AddAndIndexCommand}"
+              Background="{DynamicResource AccentBrush}" Foreground="White" />
+    </StackPanel>
+    <TextBlock Text="{Binding ResultMessage}" Opacity="0.8" Foreground="{DynamicResource GoodBrush}" />
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <Button Content="Back" Command="{Binding BackCommand}" />
+      <Button Content="Continue →" Command="{Binding NextCommand}" />
+    </StackPanel>
+  </StackPanel>
+</UserControl>

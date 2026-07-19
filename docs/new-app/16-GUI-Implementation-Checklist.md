@@ -252,7 +252,9 @@ Each cites its plan item numbers (15-plan) and its HTML range. Read both before 
 ## Section 4 — Dialogs / modals (DLG)
 Each is content inside SC-9. Read its exact modal lines (HR-0).
 
-- [ ] **DLG-1 · m-onboard.** *Read:* `:581–589`. *Items:* Modal onboard #1–10. *BE:* N13, N0. *Test:* stepper + folder table; Continue indexes.
+- [x] **DLG-1 · m-onboard.** *Read:* `:581–589`. *BE:* N13. *Done:* `OnboardingViewModel` extended
+  (FolderPath, `AddAndIndexCommand` via `IOnboardingService`) + `Views/OnboardingDialog.axaml` (stepper,
+  folder input, add&index). T: `OnboardingDialogTests.Add_and_index_reports_result_and_completes`.
 - [ ] **DLG-2 · m-addrepo.** *Read:* `:591–596`. *Items:* addrepo #1–8. *BE:* Register/Benchmark, N2. *Test:* detected media/tier bind; Add&index registers.
 - [ ] **DLG-3 · m-migrate.** *Read:* `:598–607`. *Items:* migrate #1–14. *BE:* N3. *Rule:* show copy→verify→rename→delete flow + single-copy exclusion warning. *Test:* plan summary + Approve runs job (stub).
 - [ ] **DLG-4 · m-fix.** *Read:* `:609–617`. *Items:* fix #1–7. *BE:* N5. *Test:* before/after preview; apply-to-group.
