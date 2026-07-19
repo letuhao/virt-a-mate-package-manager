@@ -264,7 +264,7 @@ Each is content inside SC-9. Read its exact modal lines (HR-0).
 - [x] **DLG-8 · m-dupe (review).** *BE:* N4. *Done:* `DupeReviewViewModel(IReclaimService)` + `Views/DupeReviewDialog.axaml` (keep-one, trash rest, full-hash verified). T: `DupeReviewDialogTests.Keep_first_trash_rest`.
 - [x] **DLG-9 · m-rescue.** *BE:* `IActivationService.RescueAsync`. *Done:* `RescueViewModel(IActivationService)` + `Views/RescueDialog.axaml` (baseline apply). T: `RescueDialogTests.Apply_calls_rescue`.
 - [x] **DLG-10 · m-vardetail.** *BE:* N9. *Done:* `VarDetailViewModel(IPackageDetailQuery)` + `Views/VarDetailDialog.axaml` (identity/foldkey/license/size/depended-on/class, copies/content/closure counts). T: `VarDetailDialogTests.Loads_and_renders_detail`.
-- [ ] **DLG-11 · Toast/undo.** Covered by SC-10; wire per-action undo (trash restore / activation revert). *Test:* Undo reverses the last action.
+- [x] **DLG-11 · Toast/undo.** *Done:* `ShellViewModel.ShowToast(message, undo)` + `UndoToast`/`DismissToast` commands (SC-10 Toast wired at shell). T: `ShellToastTests.Undo_reverses_the_last_action`, `Dismiss_hides_without_undo`.
 
 ---
 

@@ -84,6 +84,31 @@ public sealed partial class ShellViewModel : ObservableObject
     [ObservableProperty] private int _selectedCount;
     [ObservableProperty] private string? _tierSummary;
 
+    // Toast / undo (DLG-11)
+    [ObservableProperty] private string? _toastMessage;
+    [ObservableProperty] private bool _toastVisible;
+    [ObservableProperty] private bool _toastHasUndo;
+    private System.Action? _toastUndo;
+
+    /// <summary>Show a transient toast; the optional undo reverses the just-completed action. (DLG-11)</summary>
+    public void ShowToast(string message, System.Action? undo = null)
+    {
+        ToastMessage = message;
+        _toastUndo = undo;
+        ToastHasUndo = undo is not null;
+        ToastVisible = true;
+    }
+
+    [RelayCommand]
+    private void UndoToast()
+    {
+        _toastUndo?.Invoke();
+        ToastVisible = false;
+    }
+
+    [RelayCommand]
+    private void DismissToast() => ToastVisible = false;
+
     /// <summary>Hook the shell can set to run the rescue baseline (wired in AppHost, SH-6).</summary>
     public System.Func<System.Threading.Tasks.Task>? RescueHandler { get; set; }
     /// <summary>Hook to open the add-repository dialog (wired in AppHost, SH-6).</summary>
