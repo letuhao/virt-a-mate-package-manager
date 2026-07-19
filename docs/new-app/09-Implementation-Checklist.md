@@ -205,9 +205,9 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 4.12 🔒⚠ Fix writes a NEW UTF-8 var (never overwrite in place); temp→validate→atomic rename · T: `EncodingFixerTests.Fixes_a_gbk_broken_var_into_valid_utf8` (`.partial`→validate→`File.Move`) + `Refuses_to_overwrite_an_existing_output` + `No_partial_file_remains_after_success` — `EncodingFixer`
 - [x] 4.13 🔒 Fixed var validated against VaM constraints (Deflate, UTF-8 flag, meta present) before preferring it · T: `EncodingFixerTests` (fixed var → `EncodingHealth.Ok` + `VamVarValidator.Validate` success; 衣装 decodes correctly, non-ASCII names flagged UTF-8) — `VamVarValidator`
 - [ ] 4.14 ⚠ Original retained (not trashed) until fix confirmed (done); `FixedFromVarFileId` lineage set (pending) · T: `EncodingFixerTests.Fixes_a_gbk_broken_var_into_valid_utf8` (original untouched, still `NeedsFix`) — DB lineage wiring pending
-- [ ] 4.15 ⚠ Auto/batch mode flags low-confidence for review, never deletes originals unattended (T)
+- [x] 4.15 ⚠ Auto/batch mode flags low-confidence for review, never deletes originals unattended · T: `EncodingFixPolicyTests` (confident NeedsFix → AutoFix; PartiallyBroken / undetectable → FlagForReview; healthy → None) — `EncodingFixPolicy.Decide` (`EncodingFixer` never deletes the original, 4.12)
 - [ ] 4.16 Health report grouped by codepage; batch "fix all" (M)
-- [ ] 4.17 Optional slimming is separate, off by default (T)
+- [x] 4.17 Optional slimming is separate, off by default · T: `SlimmingPolicyTests` (`SlimmingOptions.Off` strips nothing; only enabled types stripped; scenes never) — `SlimmingPolicy`/`SlimmingOptions` (layered separately, never part of the pure encoding fix)
 
 ---
 
