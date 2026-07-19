@@ -99,17 +99,27 @@ public sealed class MigrationRunner(VarVaultDbContext db, IDurableFileMover move
             link.VarFileId = targetVar.Id;
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        // Delete the source last — to trash, never hard-delete (X.1).
+        // Delete the source last — to trash, never hard-delete (X.1). Raise durability to FULL for the
+        // transaction that gates this destructive FS op (5.9), then restore the baseline.
         job.State = MigrationState.Deleting;
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        if (File.Exists(sourcePath))
-            await trash.TrashAsync(sourcePath, "migration", cancellationToken).ConfigureAwait(false);
-        db.VarFiles.Remove(source);
+        var connection = db.Database.GetDbConnection();
+        SqlitePragmas.ApplySynchronousFull(connection);
+        try
+        {
+            if (File.Exists(sourcePath))
+                await trash.TrashAsync(sourcePath, "migration", cancellationToken).ConfigureAwait(false);
+            db.VarFiles.Remove(source);
 
-        job.State = MigrationState.Done;
-        job.CompletedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            job.State = MigrationState.Done;
+            job.CompletedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            SqlitePragmas.RestoreSynchronousNormal(connection);
+        }
         return MigrationState.Done;
     }
 
