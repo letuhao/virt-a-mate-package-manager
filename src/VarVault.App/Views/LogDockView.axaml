@@ -1,0 +1,21 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             x:Class="VarVault.App.Views.LogDockView"
+             x:DataType="vm:ShellViewModel">
+  <Border Background="{DynamicResource Bg1Brush}" BorderBrush="{DynamicResource BorderBrush}"
+          BorderThickness="0,1,0,0" Height="26" Padding="14,0">
+    <DockPanel LastChildFill="False">
+      <!-- 1. index status -->
+      <TextBlock DockPanel.Dock="Left" Name="PART_Index" Text="{Binding IndexStatus}"
+                 Foreground="{DynamicResource AccentHiBrush}" VerticalAlignment="Center" FontSize="11" />
+      <!-- 3. storage tier % -->
+      <TextBlock DockPanel.Dock="Right" Text="{Binding TierSummary}" Foreground="{DynamicResource TextLoBrush}"
+                 VerticalAlignment="Center" FontSize="11" />
+      <!-- 2. selected count -->
+      <TextBlock DockPanel.Dock="Right" Margin="0,0,16,0" Name="PART_Selected"
+                 Text="{Binding SelectedCount, StringFormat='selected {0}'}"
+                 Foreground="{DynamicResource TextLoBrush}" VerticalAlignment="Center" FontSize="11" />
+    </DockPanel>
+  </Border>
+</UserControl>

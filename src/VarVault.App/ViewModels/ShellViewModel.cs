@@ -79,6 +79,11 @@ public sealed partial class ShellViewModel : ObservableObject
     [ObservableProperty] private bool _hasActiveJobs;
     [ObservableProperty] private bool _paletteOpen;
 
+    // Log dock (SH-5)
+    [ObservableProperty] private string? _indexStatus;
+    [ObservableProperty] private int _selectedCount;
+    [ObservableProperty] private string? _tierSummary;
+
     /// <summary>Hook the shell can set to run the rescue baseline (wired in AppHost, SH-6).</summary>
     public System.Func<System.Threading.Tasks.Task>? RescueHandler { get; set; }
     /// <summary>Hook to open the add-repository dialog (wired in AppHost, SH-6).</summary>

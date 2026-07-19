@@ -188,7 +188,9 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
   `Views/JobsPanelView.axaml` (ItemsControl of `JobRow` over `ActiveJobs`, pause-all) + shell
   `ActiveJobs`/`RefreshJobs`/`PauseAllCommand`. T: `JobsPanelViewTests`
   (`Panel_renders_job_rows_with_progress`, `Pause_all_cancels_every_job`).
-- [ ] **SH-5 · Log dock.** *Read:* `:576`. *Items:* Log-dock #1–3 (index status, selected count, tier %). *Test:* binds job status + BE-N1 tier %.
+- [x] **SH-5 · Log dock.** *Read:* `:576`. *Items:* index status, selected count, tier %. *Done:*
+  `Views/LogDockView.axaml` + shell `IndexStatus`/`SelectedCount`/`TierSummary`. T:
+  `LogDockViewTests.Binds_index_selected_and_tier_summary`.
 - [ ] **SH-6 · AppHost wiring.** Replace stub: build host, register **all** screen VMs + shell, resolve
   `ShellViewModel`. *Rule:* no orphaned VMs. *Test:* host resolves shell with all 13 screens non-null.
 
