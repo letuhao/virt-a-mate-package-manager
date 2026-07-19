@@ -26,6 +26,17 @@
     </Setter>
   </ControlTheme>
 
+  <!-- SC-4 · Tabs strip -->
+  <ControlTheme x:Key="{x:Type c:Tabs}" TargetType="c:Tabs">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+          <StackPanel Name="PART_Strip" Orientation="Horizontal" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
   <!-- SC-3 · DataTable (sortable header band + virtualized multi-select body) -->
   <ControlTheme x:Key="{x:Type c:DataTable}" TargetType="c:DataTable">
     <Setter Property="Template">

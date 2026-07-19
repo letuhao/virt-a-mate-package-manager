@@ -54,7 +54,10 @@ Build once, reused everywhere. Read the CSS token block `prototype.html:1–195`
   + `DataTableColumn.cs` + ControlTheme. T: `DataTableControlTests`
   (`Header_click_raises_sort_command_with_the_column_key`, `Active_caret_reflects_sort_key_and_direction`,
   `Body_virtualizes_a_large_list` (realized<200 of 5000), `Multi_select_populates_selected_items`).
-- [ ] **SC-4 · Tabs.** *Read:* `:445,462,479,505,543,565`. Single active tab, count badges. *Test:* click switches active; content swaps.
+- [x] **SC-4 · Tabs.** *Read:* `:445,462,479,505,543,565`. Single active tab, count badges. *Done:*
+  `Controls/Tabs.cs` (+ `TabItemModel`) + ControlTheme — `SelectedIndex`/`SelectedItem` seam, count badges,
+  active styling. T: `TabsControlTests` (`Click_switches_active_tab_and_selected_item`, `Count_badges_render`,
+  `Selected_item_swaps_when_index_changes`).
 - [ ] **SC-5 · Chip / Tag / StatePill.** *Read:* `.chip`(`:323`), `.tag`(`:362`), `.st`(`:381` ok/sub/miss).
   *Rule:* state via text+shape (HR-5). *Test:* ok/sub/miss render distinct text, not colour-only.
 - [ ] **SC-6 · Bars (progress / capacity / stacked).** *Read:* `.bar`(`:246`), stacked(`:267`), job bar(`:235`).
