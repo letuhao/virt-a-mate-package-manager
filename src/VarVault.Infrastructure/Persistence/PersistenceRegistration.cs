@@ -30,6 +30,7 @@ public static class PersistenceRegistration
         services.AddScoped<IRepositoryStore, EfRepositoryStore>();
         services.AddScoped<Sdk.Library.ILibraryQueryService, Library.EfLibraryQueryService>();
         services.AddScoped<Sdk.Settings.ISettingsService, EfSettingsService>();
+        services.AddScoped<Sdk.Presets.IPresetService, Indexing.EfPresetService>();
         services.AddSingleton<CatalogDatabaseInitializer>();
         services.AddScoped<SqliteDatabaseBackup>();
 
