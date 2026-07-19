@@ -115,9 +115,9 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 1.31 D: full index of a real var repo completes; reports counts + flagged files · T/D: `IndexingFlowTests.Indexes_the_real_repository_corpus` (indexes `D:\VarVault_test_repo` — 277 vars incl. quarantine dirs — into SQLite in ~9 s; asserts packages/varfiles/read-model rows created, quarantined tagged). *Note: current writer does per-var SaveChanges; transaction batching (1.25) is the pending throughput optimization.*
 
 ### Preview extraction & thumbnails
-- [ ] 1.32 Sibling `.jpg` extracted for previewable content items (T)
+- [x] 1.32 Sibling `.jpg` extracted for previewable content items · T: `PreviewExtractorTests` (extracts `Saves/scene/s.jpg` for `s.json`; null when absent) + `PreviewRulesTests.Sibling_jpg_path_swaps_the_extension` — `PreviewExtractor` + `PreviewRules.SiblingJpgPath`
 - [x] 1.33 Thumbnails in a **packed store** (not 700k loose files) keyed by PackageId · T: `SqliteThumbnailStoreTests` (put/get/overwrite by PackageId; 50 thumbs = one packed DB, zero loose .jpg) — `IThumbnailStore`/`SqliteThumbnailStore` (dedicated `thumbs.db`, D2)
-- [ ] 1.34 Representative preview per package by PrimaryType; preview-less types get a placeholder (M)
+- [x] 1.34 Representative preview per package by PrimaryType; preview-less types get a placeholder · T: `PreviewRulesTests` (`RepresentativeType`=PrimaryType; asset/morph/plugin → `HasPreview`=false → placeholder) — `PreviewRules`
 - [ ] 1.35 Thumbnails decode off UI thread with scroll-ahead prefetch (M: no UI stall on fast scroll)
 
 ### Read model & search
@@ -267,7 +267,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] BE-P1 Desired tier = f(class, policy); diff → misplaced set · T: `PlacementPolicyTests` — `PlacementPolicy.DesiredTier`/`IsMisplaced` (actual tier = VarFile→Repo→Tier at call sites)
 - [x] BE-P2 ⚠ Proposal set excludes single-copy, offline members, and removable/network targets · T: `MigrationPlannerTests.Excludes_single_copy_offline_and_unsafe_targets` — `MigrationPlanner`
 - [x] BE-P3 ⚠ Free-space reservation ledger for concurrent-job capacity safety · T: `FreeSpaceLedgerTests` — `FreeSpaceLedger` (thread-safe reserve/release, `free − reserved − requested ≥ minFree`)
-- [ ] BE-P4 ETA estimate from bytes ÷ target write speed (M)
+- [x] BE-P4 ETA estimate from bytes ÷ target write speed · T: `MigrationEtaTests` (100 MB ÷ 100 MB/s ≈ 1 s; zero on 0 bytes/speed) — `MigrationEta.Estimate`
 - [x] BE-P5 🔒 Propose-only by default; auto-execute is explicit opt-in · T: `MigrationPlannerTests.Planner_only_proposes_and_never_returns_an_executed_action` — `MigrationPlanner.Plan` returns proposals only; it has no execute path (execution is a separate, explicitly-invoked step)
 
 ### Fingerprint & dedup engine
