@@ -1,0 +1,39 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:VarVault.App.Controls"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             xmlns:lib="clr-namespace:VarVault.Sdk.Library;assembly=VarVault.Sdk"
+             x:Class="VarVault.App.Views.AnalyticsView"
+             x:DataType="vm:AnalyticsViewModel">
+  <ScrollViewer Padding="18">
+    <StackPanel Spacing="12">
+      <TextBlock Text="Analytics" FontSize="21" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+      <WrapPanel>
+        <c:Card Header="Space by content type" Width="320" Margin="0,0,14,14">
+          <ItemsControl ItemsSource="{Binding ByType}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="lib:SpaceByGroup">
+                <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                  <TextBlock Grid.Column="0" Text="{Binding Group}" />
+                  <TextBlock Grid.Column="1" Text="{Binding TotalBytes}" Opacity="0.7" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </c:Card>
+        <c:Card Header="Top space by creator" Width="320" Margin="0,0,14,14">
+          <ItemsControl ItemsSource="{Binding ByCreator}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="lib:SpaceByGroup">
+                <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                  <TextBlock Grid.Column="0" Text="{Binding Group}" />
+                  <TextBlock Grid.Column="1" Text="{Binding TotalBytes}" Opacity="0.7" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </c:Card>
+      </WrapPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

@@ -224,7 +224,9 @@ Each cites its plan item numbers (15-plan) and its HTML range. Read both before 
 - [x] **SCR-6 · Duplicates & reclaim.** *Read:* `:460–474`. *BE:* N4. *Done:* `DupesViewModel` +
   `Views/DupesView.axaml` (reclaimable total, exact-dup group list, trash-group). Wired in AppHost. T:
   `DupesScreenTests.Lists_groups_and_reclaimable`.
-- [ ] **SCR-7 · Analytics.** *Read:* `:521–538`. *Items:* Analytics #1–15. *BE:* `IAnalyticsService`, N2, `IUsageAnalyzer`. *Test:* space-by-type/creator bars + usage chart bind.
+- [x] **SCR-7 · Analytics.** *Read:* `:521–538`. *BE:* `IAnalyticsService`. *Done:* `Views/AnalyticsView.axaml`
+  bound to existing `AnalyticsViewModel` (space-by-type + space-by-creator cards). Wired in AppHost. T:
+  `AnalyticsScreenTests.Renders_space_breakdowns`.
 - [ ] **SCR-8 · Proposals & review.** *Read:* `:503–518`. *Items:* Proposals #1–39. *BE:* N8. *Test:* tabs + 4 proposal cards; Approve dispatches, Reject records.
 - [ ] **SCR-9 · Health & fix.** *Read:* `:477–490`. *Items:* Health #1–19. *BE:* N5. *Test:* tabs + group cards + detected table; Fix opens m-fix.
 - [ ] **SCR-10 · Missing deps.** *Read:* `:493–500`. *Items:* Missing #1–8. *BE:* `IMissingDepsQuery`, N11. *Test:* table binds; Resolve opens m-alias.
