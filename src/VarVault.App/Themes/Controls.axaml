@@ -26,6 +26,55 @@
     </Setter>
   </ControlTheme>
 
+  <!-- SC-5 · StatePill (ok/sub/miss) — colour + text label -->
+  <ControlTheme x:Key="{x:Type c:StatePill}" TargetType="c:StatePill">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="PART_Bg" CornerRadius="4" Padding="6,1" Background="{DynamicResource Bg3Brush}">
+          <TextBlock Name="PART_Text" Text="{TemplateBinding Text}" FontSize="10" FontWeight="SemiBold"
+                     Foreground="{DynamicResource TextBrush}" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^.ok /template/ Border#PART_Bg"><Setter Property="Background" Value="{DynamicResource GoodBgBrush}" /></Style>
+    <Style Selector="^.ok /template/ TextBlock#PART_Text"><Setter Property="Foreground" Value="{DynamicResource GoodBrush}" /></Style>
+    <Style Selector="^.sub /template/ Border#PART_Bg"><Setter Property="Background" Value="{DynamicResource WarnBgBrush}" /></Style>
+    <Style Selector="^.sub /template/ TextBlock#PART_Text"><Setter Property="Foreground" Value="{DynamicResource WarnBrush}" /></Style>
+    <Style Selector="^.miss /template/ Border#PART_Bg"><Setter Property="Background" Value="{DynamicResource CritBgBrush}" /></Style>
+    <Style Selector="^.miss /template/ TextBlock#PART_Text"><Setter Property="Foreground" Value="{DynamicResource CritBrush}" /></Style>
+  </ControlTheme>
+
+  <!-- SC-5 · Chip (filter) -->
+  <ControlTheme x:Key="{x:Type c:Chip}" TargetType="c:Chip">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="PART_Bg" CornerRadius="100" Padding="10,3" BorderThickness="1"
+                Background="{DynamicResource Bg2Brush}" BorderBrush="{DynamicResource BorderBrush}">
+          <ContentPresenter Content="{TemplateBinding Content}" Foreground="{DynamicResource TextBrush}" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^.active /template/ Border#PART_Bg">
+      <Setter Property="Background" Value="{DynamicResource AccentBgBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentLineBrush}" />
+    </Style>
+  </ControlTheme>
+
+  <!-- SC-5 · Tag (default/good/warn/crit) -->
+  <ControlTheme x:Key="{x:Type c:Tag}" TargetType="c:Tag">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="PART_Bg" CornerRadius="6" Padding="8,2" BorderThickness="1"
+                Background="{DynamicResource Bg2Brush}" BorderBrush="{DynamicResource BorderBrush}">
+          <ContentPresenter Name="PART_Content" Content="{TemplateBinding Content}" Foreground="{DynamicResource TextBrush}" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^.good /template/ Border#PART_Bg"><Setter Property="Background" Value="{DynamicResource GoodBgBrush}" /><Setter Property="BorderBrush" Value="Transparent" /></Style>
+    <Style Selector="^.warn /template/ Border#PART_Bg"><Setter Property="Background" Value="{DynamicResource WarnBgBrush}" /><Setter Property="BorderBrush" Value="Transparent" /></Style>
+    <Style Selector="^.crit /template/ Border#PART_Bg"><Setter Property="Background" Value="{DynamicResource CritBgBrush}" /><Setter Property="BorderBrush" Value="Transparent" /></Style>
+  </ControlTheme>
+
   <!-- SC-4 · Tabs strip -->
   <ControlTheme x:Key="{x:Type c:Tabs}" TargetType="c:Tabs">
     <Setter Property="Template">

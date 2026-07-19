@@ -58,8 +58,10 @@ Build once, reused everywhere. Read the CSS token block `prototype.html:1–195`
   `Controls/Tabs.cs` (+ `TabItemModel`) + ControlTheme — `SelectedIndex`/`SelectedItem` seam, count badges,
   active styling. T: `TabsControlTests` (`Click_switches_active_tab_and_selected_item`, `Count_badges_render`,
   `Selected_item_swaps_when_index_changes`).
-- [ ] **SC-5 · Chip / Tag / StatePill.** *Read:* `.chip`(`:323`), `.tag`(`:362`), `.st`(`:381` ok/sub/miss).
-  *Rule:* state via text+shape (HR-5). *Test:* ok/sub/miss render distinct text, not colour-only.
+- [x] **SC-5 · Chip / Tag / StatePill.** *Read:* `.chip`(`:323`), `.tag`(`:362`), `.st`(`:381` ok/sub/miss).
+  *Rule:* state via text+shape (HR-5). *Done:* `Controls/Pills.cs` (`StatePill`+`Chip`+`Tag`, class-driven
+  ControlThemes). T: `PillsControlTests` (`State_pill_carries_meaning_in_text_per_state`,
+  `State_pill_defaults_text_to_state_name`, `Chip_active_toggles_class`, `Tag_kind_sets_class`).
 - [ ] **SC-6 · Bars (progress / capacity / stacked).** *Read:* `.bar`(`:246`), stacked(`:267`), job bar(`:235`).
   *Test:* width tracks value; reduced-motion respected.
 - [ ] **SC-7 · StatTile / TempDot.** *Read:* `.stat`(`:261`), `.temp`(`:246`). Big number + unit; hot/warm/cold dot. *Test:* value + temp render.
