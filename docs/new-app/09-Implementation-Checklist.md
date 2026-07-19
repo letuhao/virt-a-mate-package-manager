@@ -229,7 +229,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 5.12 ⚠ Re-point ActivationLink/CanonicalVarFileId/refs to surviving copy BEFORE deleting source · T: `MigrationFlowTests.Migrates_a_var_between_repos...` (`CanonicalVarFileId` re-points to the target row; ActivationLinks re-pointed) — `MigrationRunner` re-points before trashing the source (which goes to trash, X.1)
 - [x] 5.13 Interrupted copy leaves temp only; destination appears only post-verify · T: `DurableFileMoverTests.Cancellation_leaves_no_destination` + `Copies_verifies_and_renames...` (dest created only after verify via atomic rename) — `DurableFileMover` (*indexing already skips `.partial` since it enumerates `*.var`; target DB row post-verify wires in with the migration orchestrator*)
 - [ ] 5.14 Proposals inbox: all pending migrations/dedup/fixes/stale queue; approve/reject/batch (M)
-- [ ] 5.15 🔒 Propose-never-auto default; auto-migrate is explicit opt-in only (T: default config = propose)
+- [x] 5.15 🔒 Propose-never-auto default; auto-migrate is explicit opt-in only · T: `AutomationSettingsTests.Auto_migrate_defaults_to_off_and_is_opt_in` (no setting → propose; explicit set → auto) — `AutomationSettings.IsAutoMigrateEnabledAsync` (default false) + `MigrationPlanner` is propose-only (BE-P5)
 - [ ] 5.16 Analytics: space-by-type/creator/tier, wasting-fast/slow-where-hurts, usage trend (M)
 
 ---
@@ -244,7 +244,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] BE-R3 Capacity/free refresh via `DriveInfo` · T: `DriveProfilerTests.Capacity_refresh_matches_drive_info` (matches OS `DriveInfo.TotalSize`) — `DriveProfiler.GetCapacity` (*short-TTL cache is a later optimization*)
 - [x] BE-R4 `VolumeSerial` capture + strict match on re-point · ⚠ T: `RepositoryRepointFlowTests` (mismatched serial blocks bind, marks read-only) + `DriveProfilerTests.Volume_serial_is_read_on_windows` — `RepositoryService.RepointAsync`
 - [x] BE-R5 Tier auto-assign thresholds (configurable, >3000 MB/s→T1, >800→T2, else T3; media-type fallback) · T: `TierPolicyTests` (media-type + speed-threshold cases; removable stays cold) — `TierPolicy.AssignTier`
-- [ ] BE-R6 Add-drive rebalance candidate computation (which vars would move) (T)
+- [x] BE-R6 Add-drive rebalance candidate computation (which vars would move) · T: `RebalancePlannerTests` (hot var on cold tier → moves to a new hot tier; offline/single-copy excluded) — `RebalancePlanner.CandidatesForNewTier`
 
 ### Content classification engine
 - [x] BE-C1 Precompiled rule set (path-prefix + ext → type); NO per-entry regex recompile · T: `ContentClassificationEngineTests` — `ContentClassificationEngine.Rules` is a single static array of string prefix/suffix checks (zero regex); reused for every entry
