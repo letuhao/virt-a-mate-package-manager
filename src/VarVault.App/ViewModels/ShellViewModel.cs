@@ -73,6 +73,37 @@ public sealed partial class ShellViewModel : ObservableObject
     [ObservableProperty] private object? _activeScreen;
     [ObservableProperty] private string _activeScreenId = "";
 
+    // Top bar (SH-3)
+    [ObservableProperty] private string? _searchText;
+    [ObservableProperty] private bool _jobsPanelOpen;
+    [ObservableProperty] private bool _hasActiveJobs;
+    [ObservableProperty] private bool _paletteOpen;
+
+    /// <summary>Hook the shell can set to run the rescue baseline (wired in AppHost, SH-6).</summary>
+    public System.Func<System.Threading.Tasks.Task>? RescueHandler { get; set; }
+    /// <summary>Hook to open the add-repository dialog (wired in AppHost, SH-6).</summary>
+    public System.Action? AddRepoHandler { get; set; }
+
+    [RelayCommand] private void ToggleJobs() => JobsPanelOpen = !JobsPanelOpen;
+    [RelayCommand] private void OpenPalette() => PaletteOpen = true;
+    [RelayCommand] private void AddRepo() => AddRepoHandler?.Invoke();
+
+    [RelayCommand]
+    private async System.Threading.Tasks.Task RescueAsync()
+    {
+        if (RescueHandler is not null)
+            await RescueHandler().ConfigureAwait(true);
+    }
+
+    [RelayCommand]
+    private void ToggleTheme()
+    {
+        if (Avalonia.Application.Current is { } app)
+            app.RequestedThemeVariant = app.ActualThemeVariant == Avalonia.Styling.ThemeVariant.Dark
+                ? Avalonia.Styling.ThemeVariant.Light
+                : Avalonia.Styling.ThemeVariant.Dark;
+    }
+
     /// <summary>Navigate to a screen by id; swaps the active screen view-model if one is registered.</summary>
     [RelayCommand]
     public void Navigate(string screenId)

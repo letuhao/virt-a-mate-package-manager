@@ -180,8 +180,10 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
   each a `RailNavItem` in a nav Button → `NavigateCommand`); `ShellViewModel.RailItems`/`SetBadge`. T:
   `RailViewTests` (`Renders_13_nav_items_and_group_headers`, `Badges_bind_to_problem_screens`,
   `Clicking_a_rail_item_navigates`).
-- [ ] **SH-3 · Top bar.** *Read:* `:225–232`. *Items:* Top-bar #1–6 (search, rescue, jobs, dot, add-repo,
-  theme). *Test:* buttons bind commands; jobs dot reflects `IJobQueue.Active`.
+- [x] **SH-3 · Top bar.** *Read:* `:225–232`. *Items:* search, rescue, jobs+dot, add-repo, theme. *Done:*
+  `Views/TopBarView.axaml` + shell commands (`ToggleJobs`/`OpenPalette`/`AddRepo`/`Rescue`/`ToggleTheme`,
+  `HasActiveJobs` dot, `SearchText`). T: `TopBarViewTests` (`Renders_controls_and_binds_commands`,
+  `Jobs_dot_reflects_active_jobs`, `Toggle_jobs_and_theme_commands_work`).
 - [ ] **SH-4 · Jobs panel.** *Read:* `:233–238`. *Items:* Jobs-panel #7–20 (header, pause-all, 3× JobRow via
   SC-12). *Test:* rows bind live `IJobQueue.Active` with progress + cancel.
 - [ ] **SH-5 · Log dock.** *Read:* `:576`. *Items:* Log-dock #1–3 (index status, selected count, tier %). *Test:* binds job status + BE-N1 tier %.

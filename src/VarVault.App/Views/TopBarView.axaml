@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             x:Class="VarVault.App.Views.TopBarView"
+             x:DataType="vm:ShellViewModel">
+  <Border Background="{DynamicResource Bg1Brush}" BorderBrush="{DynamicResource BorderBrush}"
+          BorderThickness="0,0,0,1" Padding="12,8">
+    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto">
+      <!-- 1. Global search → command palette -->
+      <TextBox Grid.Column="0" Name="PART_Search" MaxWidth="380" HorizontalAlignment="Left"
+               Watermark="Search everything…  (Ctrl K)" Text="{Binding SearchText}" />
+      <!-- 2. Rescue -->
+      <Button Grid.Column="1" Margin="8,0,0,0" Content="⛑ Rescue" Command="{Binding RescueCommand}"
+              Foreground="{DynamicResource WarnBrush}" />
+      <!-- 3. Jobs + 4. unread dot -->
+      <Button Grid.Column="2" Margin="8,0,0,0" Command="{Binding ToggleJobsCommand}">
+        <StackPanel Orientation="Horizontal" Spacing="4">
+          <TextBlock Text="⟳ Jobs" />
+          <Ellipse Width="7" Height="7" Fill="{DynamicResource AccentBrush}" IsVisible="{Binding HasActiveJobs}" />
+        </StackPanel>
+      </Button>
+      <!-- 5. Add repository -->
+      <Button Grid.Column="3" Margin="8,0,0,0" Content="+ Add repository" Command="{Binding AddRepoCommand}"
+              Background="{DynamicResource AccentBrush}" Foreground="White" />
+      <!-- 6. Theme toggle -->
+      <Button Grid.Column="4" Margin="8,0,0,0" Content="◐" Command="{Binding ToggleThemeCommand}" />
+    </Grid>
+  </Border>
+</UserControl>
