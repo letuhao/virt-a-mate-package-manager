@@ -21,7 +21,8 @@ public static class AppHost
         {
             ["library"] = new LibraryViewModel(
                 services.GetRequiredService<ILibraryQueryService>(),
-                services.GetService<Sdk.Settings.ISettingsService>()),
+                services.GetService<Sdk.Settings.ISettingsService>(),
+                actions: services.GetService<ILibraryActionService>()),
             ["analytics"] = new AnalyticsViewModel(services.GetRequiredService<IAnalyticsService>()),
             ["history"] = new ActivityViewModel(services.GetRequiredService<IActivityLog>()),
             ["missing"] = new MissingDepsViewModel(services.GetRequiredService<IMissingDepsQuery>()),

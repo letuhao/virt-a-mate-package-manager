@@ -1,0 +1,112 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:lib="clr-namespace:VarVault.Sdk.Library;assembly=VarVault.Sdk"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             x:Class="VarVault.App.Views.LibraryView"
+             x:DataType="vm:LibraryViewModel">
+  <Grid ColumnDefinitions="180,*,280">
+
+    <!-- Rail: saved views (SCR-2a) -->
+    <StackPanel Grid.Column="0" Margin="8" Spacing="4">
+      <TextBlock Text="Library" FontWeight="Bold" Foreground="{DynamicResource TextLoBrush}" FontSize="10" Margin="4,0,0,6" />
+      <Button Content="All packages" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding ShowAllCommand}" />
+      <Button Content="Favorites" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding ShowFavoritesCommand}" />
+    </StackPanel>
+
+    <!-- Center: facet + list + ops -->
+    <DockPanel Grid.Column="1" Margin="0,8">
+      <!-- Facet bar (SCR-2b) -->
+      <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" Margin="0,0,0,6">
+        <AutoCompleteBox Grid.Column="0" Width="150" Watermark="All creators"
+                         ItemsSource="{Binding Creators}" Text="{Binding CreatorFilter}" FilterMode="Contains" />
+        <TextBox Grid.Column="1" Margin="8,0" Watermark="Search packages…" Text="{Binding SearchText}" />
+        <TextBox Grid.Column="2" Width="120" Watermark="packageName…" Text="{Binding PackageNameFilter}" />
+        <CheckBox Grid.Column="3" Margin="8,0" Content="Favorites" IsChecked="{Binding FavoritesOnly}" />
+        <Button Grid.Column="4" Content="Refresh" Command="{Binding RefreshCommand}" />
+        <Button Grid.Column="5" Margin="6,0,0,0" Content="Table / Gallery" Command="{Binding ToggleViewModeCommand}" />
+      </Grid>
+
+      <!-- Column headers (sortable, SCR-2c) -->
+      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,150,100,90,90,50" Margin="6,0">
+        <Button Grid.Column="0" Content="Name" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                Command="{Binding SortByCommand}" CommandParameter="{x:Static lib:LibrarySort.Name}" />
+        <Button Grid.Column="1" Content="Creator" Command="{Binding SortByCommand}" CommandParameter="{x:Static lib:LibrarySort.Creator}" />
+        <TextBlock Grid.Column="2" Text="Type" VerticalAlignment="Center" Opacity="0.7" />
+        <Button Grid.Column="3" Content="Size" Command="{Binding SortByCommand}" CommandParameter="{x:Static lib:LibrarySort.Size}" />
+        <Button Grid.Column="4" Content="Class" Command="{Binding SortByCommand}" CommandParameter="{x:Static lib:LibrarySort.Class}" />
+        <TextBlock Grid.Column="5" Text="Deps" VerticalAlignment="Center" HorizontalAlignment="Center" Opacity="0.7" />
+      </Grid>
+
+      <!-- Ops bar (SCR-2e) -->
+      <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="6,6,0,0">
+        <TextBlock Text="{Binding SelectedItems.Count, StringFormat='{}{0} selected'}" VerticalAlignment="Center" Opacity="0.8" />
+        <Button Content="Add to preset…" />
+        <Button Content="Delete" Foreground="{DynamicResource CritBrush}" />
+        <Button Content="Fix encoding" />
+        <Button Content="Export → txt" Command="{Binding ExportSelectedCommand}" />
+        <TextBlock Text="{Binding LastActionMessage}" VerticalAlignment="Center" Opacity="0.7" />
+      </StackPanel>
+
+      <!-- Status -->
+      <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="6,6,0,0" Opacity="0.7">
+        <TextBlock Text="~" IsVisible="{Binding IsCountApproximate}" />
+        <TextBlock Text="{Binding TotalCount, StringFormat='{}{0} packages'}" />
+      </StackPanel>
+
+      <!-- Content -->
+      <Panel Margin="6,4">
+        <ListBox ItemsSource="{Binding Items}" SelectionMode="Multiple" SelectedItem="{Binding SelectedEntry}"
+                 IsVisible="{Binding IsTableView}">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="lib:PackageListEntry">
+              <Grid ColumnDefinitions="*,150,100,90,90,50" Height="24">
+                <TextBlock Grid.Column="0" Text="{Binding VarName}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding Creator}" VerticalAlignment="Center" Opacity="0.85" />
+                <TextBlock Grid.Column="2" Text="{Binding PrimaryType}" VerticalAlignment="Center" Opacity="0.85" />
+                <TextBlock Grid.Column="3" Text="{Binding TotalSize}" VerticalAlignment="Center" Opacity="0.85" />
+                <TextBlock Grid.Column="4" Text="{Binding StorageClass}" VerticalAlignment="Center" Opacity="0.85" />
+                <TextBlock Grid.Column="5" Text="!" HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Foreground="{DynamicResource CritBrush}" IsVisible="{Binding HasMissingDeps}" />
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+
+        <ListBox ItemsSource="{Binding Items}" SelectionMode="Multiple" SelectedItem="{Binding SelectedEntry}"
+                 IsVisible="{Binding IsGalleryView}">
+          <ListBox.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="lib:PackageListEntry">
+              <Border Width="150" Height="120" Margin="4" Padding="8" BorderBrush="#22808080" BorderThickness="1" CornerRadius="6">
+                <StackPanel Spacing="4">
+                  <Border Height="64" Background="#18808080" CornerRadius="4">
+                    <TextBlock Text="{Binding PrimaryType}" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.6" />
+                  </Border>
+                  <TextBlock Text="{Binding PackageName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Creator}" Opacity="0.7" FontSize="11" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+
+        <TextBlock Text="No packages match your filters." HorizontalAlignment="Center" VerticalAlignment="Center"
+                   Opacity="0.7" IsVisible="{Binding IsEmpty}" />
+      </Panel>
+    </DockPanel>
+
+    <!-- Detail panel (SCR-2f) -->
+    <Border Grid.Column="2" Margin="8" Padding="12" BorderBrush="#22808080" BorderThickness="1" CornerRadius="6"
+            IsVisible="{Binding SelectedEntry, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <StackPanel Spacing="6" DataContext="{Binding SelectedEntry}" x:DataType="lib:PackageListEntry">
+        <TextBlock Text="{Binding VarName}" FontWeight="SemiBold" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding Creator, StringFormat='by {0}'}" Opacity="0.8" />
+        <TextBlock Text="{Binding PrimaryType, StringFormat='Type: {0}'}" Opacity="0.8" />
+        <TextBlock Text="{Binding StorageClass, StringFormat='Class: {0}'}" Opacity="0.8" />
+        <TextBlock Text="{Binding OnlineInstanceCount, StringFormat='Online copies: {0}'}" Opacity="0.8" />
+        <TextBlock Text="Single copy — protected" Opacity="0.8" IsVisible="{Binding IsSingleCopy}" Foreground="{DynamicResource WarnBrush}" />
+        <TextBlock Text="Missing dependencies" Foreground="{DynamicResource CritBrush}" IsVisible="{Binding HasMissingDeps}" />
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

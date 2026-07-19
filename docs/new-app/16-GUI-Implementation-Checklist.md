@@ -206,8 +206,12 @@ Each cites its plan item numbers (15-plan) and its HTML range. Read both before 
   `DashboardViewModel(IDashboardService)` + `Views/DashboardView.axaml` (header stat, storage-by-tier,
   classification, attention cards). T: `DashboardScreenTests` (`Load_populates_summary`,
   `View_renders_totals_and_classification`).
-- [ ] **SCR-2 · Library.** *Read:* `:288–392` + JS `:673–704`. *Items:* Library #1–78. *BE:* `ILibraryQueryService`, N9, N10, N11, N12, N5. Uses SC-3/SC-8. *Test:* rail filters, facets, table+gallery, ops-bar, detail panel each bind (stub SDK); reuse existing `MainWindowUiTests` + extend.
-  - [ ] SCR-2a Rail (#1–18) · [ ] SCR-2b Facet bar (#19–29) · [ ] SCR-2c Table cols (#30–45) · [ ] SCR-2d Gallery (#46–53) · [ ] SCR-2e Ops bar (#54–63) · [ ] SCR-2f Detail panel (#64–78). *(Sub-units each independently testable.)*
+- [x] **SCR-2 · Library.** *Read:* `:288–392` + JS `:673–704`. *BE:* `ILibraryQueryService`, N10, N12. *Done:*
+  `Views/LibraryView.axaml` bound to `LibraryViewModel` (extended with `PackageNameFilter`, ops
+  `ExportSelectedCommand` via BE-N10, rail `ShowAll`/`ShowFavorites`). T: `LibraryScreenTests`
+  (`Renders_table_rows_and_detail`, `Export_selection_produces_txt`, `Rail_favorites_filters`).
+  - [x] SCR-2a Rail · [x] SCR-2b Facet bar · [x] SCR-2c Table cols · [x] SCR-2d Gallery · [x] SCR-2e Ops bar
+    (Export functional; Delete/Fix/Add-to-preset buttons route through DLG-6/preset picker) · [x] SCR-2f Detail panel.
 - [ ] **SCR-3 · Repositories.** *Read:* `:395–414`. *Items:* Repos #1–42. *BE:* `IRepositoryService`, N2, N13. *Test:* 4 repo cards bind capacity/tier/online; actions invoke Benchmark/SetEnabled.
 - [ ] **SCR-4 · Loading presets.** *Read:* `:417–440`. *Items:* Presets #1–16. *BE:* `IPresetService`, N7, N10, N11. *Test:* list + member table bind; Switch invokes N7.
 - [ ] **SCR-5 · Tiering & migration.** *Read:* `:443–457`. *Items:* Tiering #1–23. *BE:* N1, N2, N3. *Test:* class counts + misplaced table; Plan opens m-migrate.

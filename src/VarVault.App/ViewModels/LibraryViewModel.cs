@@ -22,7 +22,8 @@ public enum LibraryState { Loading, Loaded, Empty, Error }
 public sealed partial class LibraryViewModel(
     ILibraryQueryService library,
     ISettingsService? settings = null,
-    Func<TimeSpan, CancellationToken, Task>? delay = null) : ObservableObject
+    Func<TimeSpan, CancellationToken, Task>? delay = null,
+    ILibraryActionService? actions = null) : ObservableObject
 {
     private const int PageSize = 100;
 
@@ -40,6 +41,7 @@ public sealed partial class LibraryViewModel(
     public ObservableCollection<PackageListEntry> SelectedItems { get; } = [];
 
     [ObservableProperty] private string? _creatorFilter;
+    [ObservableProperty] private string? _packageNameFilter;
     [ObservableProperty] private string? _searchText;
     [ObservableProperty] private bool _favoritesOnly;
     [ObservableProperty] private bool _missingDepsOnly;
@@ -139,6 +141,45 @@ public sealed partial class LibraryViewModel(
 
     public void ClearSelection() => SelectedItems.Clear();
 
+    /// <summary>Last ops-bar action result message (shown transiently). (SCR-2e)</summary>
+    [ObservableProperty] private string? _lastActionMessage;
+
+    /// <summary>Export the selected packages to a txt list via the action service. (SCR-2e / BE-N10)</summary>
+    [RelayCommand]
+    public async Task ExportSelectedAsync(CancellationToken cancellationToken = default)
+    {
+        if (actions is null || SelectedItems.Count == 0)
+        {
+            LastActionMessage = "Nothing selected";
+            return;
+        }
+        var ids = SelectedItems.Select(s => s.PackageId).ToList();
+        var txt = await actions.ExportTxtAsync(ids, cancellationToken).ConfigureAwait(true);
+        LastExportText = txt;
+        LastActionMessage = $"Exported {ids.Count} packages";
+    }
+
+    /// <summary>The most recent export text (for save-to-file by the view). (SCR-2e)</summary>
+    public string? LastExportText { get; private set; }
+
+    /// <summary>Rail saved-view: toggle a favorites-only filter and refresh. (SCR-2a)</summary>
+    [RelayCommand]
+    public async Task ShowFavoritesAsync(CancellationToken cancellationToken = default)
+    {
+        FavoritesOnly = true;
+        MissingDepsOnly = false;
+        await RefreshAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    /// <summary>Rail saved-view: clear the saved-view filters (All packages). (SCR-2a)</summary>
+    [RelayCommand]
+    public async Task ShowAllAsync(CancellationToken cancellationToken = default)
+    {
+        FavoritesOnly = false;
+        MissingDepsOnly = false;
+        await RefreshAsync(cancellationToken).ConfigureAwait(true);
+    }
+
     /// <summary>
     /// Count of all rows matching the current filter (select-all-matching spans beyond the loaded
     /// page). (1.49)
@@ -182,7 +223,8 @@ public sealed partial class LibraryViewModel(
         FavoritesOnly: FavoritesOnly,
         MissingDepsOnly: MissingDepsOnly,
         Sort: Sort,
-        Descending: Descending);
+        Descending: Descending,
+        PackageName: string.IsNullOrWhiteSpace(PackageNameFilter) ? null : PackageNameFilter);
 
     private async Task LoadPageAsync(CancellationToken cancellationToken)
     {
