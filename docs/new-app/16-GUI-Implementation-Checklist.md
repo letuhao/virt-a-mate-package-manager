@@ -221,7 +221,9 @@ Each cites its plan item numbers (15-plan) and its HTML range. Read both before 
 - [x] **SCR-5 · Tiering & migration.** *Read:* `:443–457`. *BE:* N2. *Done:* `TieringViewModel` +
   `Views/TieringView.axaml` (class-count cards, misplaced table, build-plan). Wired in AppHost. T:
   `TieringScreenTests.Shows_counts_and_misplaced`.
-- [ ] **SCR-6 · Duplicates & reclaim.** *Read:* `:460–474`. *Items:* Dupes #1–22. *BE:* N4, N2. *Test:* reclaim cards + exact-dup groups bind; Review opens m-dupe.
+- [x] **SCR-6 · Duplicates & reclaim.** *Read:* `:460–474`. *BE:* N4. *Done:* `DupesViewModel` +
+  `Views/DupesView.axaml` (reclaimable total, exact-dup group list, trash-group). Wired in AppHost. T:
+  `DupesScreenTests.Lists_groups_and_reclaimable`.
 - [ ] **SCR-7 · Analytics.** *Read:* `:521–538`. *Items:* Analytics #1–15. *BE:* `IAnalyticsService`, N2, `IUsageAnalyzer`. *Test:* space-by-type/creator bars + usage chart bind.
 - [ ] **SCR-8 · Proposals & review.** *Read:* `:503–518`. *Items:* Proposals #1–39. *BE:* N8. *Test:* tabs + 4 proposal cards; Approve dispatches, Reject records.
 - [ ] **SCR-9 · Health & fix.** *Read:* `:477–490`. *Items:* Health #1–19. *BE:* N5. *Test:* tabs + group cards + detected table; Fix opens m-fix.

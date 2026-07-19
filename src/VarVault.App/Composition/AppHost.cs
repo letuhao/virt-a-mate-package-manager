@@ -28,6 +28,7 @@ public static class AppHost
             ["repos"] = new RepositoriesViewModel(services.GetRequiredService<Sdk.Repositories.IRepositoryService>()),
             ["presets"] = new PresetsViewModel(services.GetRequiredService<Sdk.Presets.IPresetService>(), services.GetService<IProfileService>()),
             ["tiering"] = new TieringViewModel(services.GetRequiredService<ITieringService>()),
+            ["dupes"] = new DupesViewModel(services.GetRequiredService<IReclaimService>()),
             ["history"] = new ActivityViewModel(services.GetRequiredService<IActivityLog>()),
             ["missing"] = new MissingDepsViewModel(services.GetRequiredService<IMissingDepsQuery>()),
         };

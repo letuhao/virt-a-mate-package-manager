@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:VarVault.App.Controls"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             xmlns:lib="clr-namespace:VarVault.Sdk.Library;assembly=VarVault.Sdk"
+             x:Class="VarVault.App.Views.DupesView"
+             x:DataType="vm:DupesViewModel">
+  <DockPanel Margin="18">
+    <TextBlock DockPanel.Dock="Top" Text="Duplicates &amp; reclaim" FontSize="21" FontWeight="SemiBold"
+               Foreground="{DynamicResource TextHiBrush}" Margin="0,0,0,12" />
+    <TextBlock DockPanel.Dock="Top" Foreground="{DynamicResource TextLoBrush}" Margin="0,0,0,12"
+               Text="{Binding ReclaimableBytes, StringFormat='{}{0} bytes reclaimable'}" />
+    <c:Card Header="Exact duplicate groups">
+      <ScrollViewer>
+        <ItemsControl ItemsSource="{Binding Groups}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="lib:DuplicateGroup">
+              <Grid ColumnDefinitions="*,80,Auto" Height="28">
+                <TextBlock Grid.Column="0" Text="{Binding IdentityKey}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding Copies.Count, StringFormat='{}{0} copies'}" VerticalAlignment="Center" Opacity="0.7" />
+                <Button Grid.Column="2" Content="Review" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </c:Card>
+  </DockPanel>
+</UserControl>
