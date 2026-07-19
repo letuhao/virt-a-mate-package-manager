@@ -83,7 +83,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 1.1 Register a repo by folder path; row persisted · T: `RepositoryRegistrationFlowTests.Registers_profiles_and_lists_a_repository` (register → RepositoryInfo → appears in `ListAsync`) — `RepositoryService.RegisterAsync`
 - [x] 1.2 🔒 Reject repo path equal to or nested within `{vampath}\AddonPackages`, or overlapping another repo · T: `RepositoryPathValidatorTests` (AddonPackages + subfolder, same/nested/parent overlap) + `RepositoryRegistrationFlowTests.Rejects_a_repository_overlapping_an_existing_one` — `RepositoryPathValidator`
 - [x] 1.3 Detect drive media type (NVMe/SSD/HDD/Network/Removable) · T: `DriveProfilerTests.Profiles_a_fixed_volume...` (fixed drive → NVMe/SSD/HDD, never Removable/Network) — `DriveProfiler` (seek-penalty + bus-type Win32 queries, HDD fallback)
-- [ ] 1.4 Capture `VolumeSerial` on register (done); on re-point, mismatch → read-only + prompt (⚠ pending) · T: `DriveProfilerTests.Volume_serial_is_read_on_windows` (capture) — re-point strict-match guard still to build
+- [x] 1.4 Capture `VolumeSerial` on register; on re-point, mismatch → read-only + refused · ⚠ T: `RepositoryRepointFlowTests.Same_serial_repoint_succeeds_and_different_serial_is_blocked` (different serial → `repo.repoint.serial`, marked read-only) + `DriveProfilerTests.Volume_serial_is_read_on_windows` — `RepositoryService.RepointAsync`
 - [ ] 1.5 Benchmark read/write MB/s on register (B: numbers within ~20% of a known reference tool)
 - [ ] 1.6 Auto-assign tier from benchmark; manual override persists (M) — *tier currently from media type (BE-R5); benchmark re-tier pending*
 - [x] 1.7 Live free/total capacity; refresh on demand · T: `DriveProfilerTests.Capacity_refresh_matches_drive_info` + `RepositoryService.RefreshCapacityAsync` (matches `DriveInfo`)
@@ -242,7 +242,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] BE-R1 Benchmark: warm-up then N sequential + random read/write samples on a temp file in the repo; return median MB/s (B: within ~20% of CrystalDiskMark on the same drive)
 - [x] BE-R2 Media-type detection via device query → NVMe/SSD/HDD/Removable/Network; unknown → HDD · T: `DriveProfilerTests` — `DriveProfiler.DetectMediaType` (DriveType + `IOCTL_STORAGE_QUERY_PROPERTY` seek-penalty + bus-type; every failure path falls back to HDD)
 - [x] BE-R3 Capacity/free refresh via `DriveInfo` · T: `DriveProfilerTests.Capacity_refresh_matches_drive_info` (matches OS `DriveInfo.TotalSize`) — `DriveProfiler.GetCapacity` (*short-TTL cache is a later optimization*)
-- [ ] BE-R4 `VolumeSerial` capture (done) + strict match on re-point (pending) · T: `DriveProfilerTests.Volume_serial_is_read_on_windows` (`GetVolumeInformation`) — re-point mismatch guard still to build
+- [x] BE-R4 `VolumeSerial` capture + strict match on re-point · ⚠ T: `RepositoryRepointFlowTests` (mismatched serial blocks bind, marks read-only) + `DriveProfilerTests.Volume_serial_is_read_on_windows` — `RepositoryService.RepointAsync`
 - [x] BE-R5 Tier auto-assign thresholds (configurable, >3000 MB/s→T1, >800→T2, else T3; media-type fallback) · T: `TierPolicyTests` (media-type + speed-threshold cases; removable stays cold) — `TierPolicy.AssignTier`
 - [ ] BE-R6 Add-drive rebalance candidate computation (which vars would move) (T)
 
@@ -289,7 +289,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] X.7 Confirm-destructive modal: reverse-dep check + single-copy protection shown (M)
 - [ ] X.8 Onboarding wizard: add drives → benchmark → index → rescue (M/D end-to-end)
 - [ ] X.9 Import-from-old-varManager: recognize quarantine dirs + ingest `.fav`/`.hide` sidecars → ContentItemPref (T)
-- [ ] X.10 Portable catalog: move DB + shuffle drive letters → app re-finds vars by hash/volume-serial (⚠ D)
+- [x] X.10 Portable catalog: shuffle drive letters → re-point by volume-serial keeps var paths valid · ⚠ T: `RepositoryRepointFlowTests` (same-serial re-point updates MountPath so VarFiles resolve at the new path; different serial refused) — `RepositoryService.RepointAsync`
 - [ ] X.11 Jobs tray: multiple concurrent jobs, per-job progress + pause/cancel (M)
 - [ ] X.12 Activity history: every move/install/delete/fix/alias audited (M)
 - [x] X.13 Settings persist (VaM path, policies, fix-on-import, …) · T: `EfSettingsServiceTests` (set/get/overwrite upsert, bool fallback, get-all) — `ISettingsService`/`EfSettingsService` over the `Setting` table

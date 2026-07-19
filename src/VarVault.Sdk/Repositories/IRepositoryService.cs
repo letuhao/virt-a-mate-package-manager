@@ -29,4 +29,11 @@ public interface IRepositoryService
     Task<IReadOnlyList<RepositoryInfo>> ListAsync(CancellationToken cancellationToken = default);
     Task<bool> SetEnabledAsync(Guid repositoryId, bool enabled, CancellationToken cancellationToken = default);
     Task<RepositoryInfo?> RefreshCapacityAsync(Guid repositoryId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Re-point a repository to a new path (drive-letter shuffle / portable catalog). Blocked if the new
+    /// volume's serial doesn't match the captured one — the drive is different, so vars aren't there.
+    /// (Checklist 1.4/BE-R4, X.10.)
+    /// </summary>
+    Task<Result<RepositoryInfo>> RepointAsync(Guid repositoryId, string newPath, CancellationToken cancellationToken = default);
 }
