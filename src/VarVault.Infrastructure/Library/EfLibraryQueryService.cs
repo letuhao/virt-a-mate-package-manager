@@ -26,8 +26,17 @@ public sealed class EfLibraryQueryService(VarVaultDbContext db) : ILibraryQueryS
             q = q.Where(x => x.HasMissingDeps);
         if (!string.IsNullOrWhiteSpace(query.SearchText))
         {
-            var text = query.SearchText;
-            q = q.Where(x => EF.Functions.Like(x.VarName, $"%{text}%"));
+            var text = query.SearchText.Trim();
+            // Trigram FTS needs ≥3 chars (and handles space-less CJK); shorter → substring LIKE.
+            if (text.Length >= 3)
+            {
+                var matchIds = await SearchIdsAsync(text, cancellationToken).ConfigureAwait(false);
+                q = q.Where(x => matchIds.Contains(x.PackageId));
+            }
+            else
+            {
+                q = q.Where(x => EF.Functions.Like(x.VarName, $"%{text}%"));
+            }
         }
 
         var total = await q.CountAsync(cancellationToken).ConfigureAwait(false);
@@ -50,6 +59,16 @@ public sealed class EfLibraryQueryService(VarVaultDbContext db) : ILibraryQueryS
         await db.PackageListItems.AsNoTracking()
             .Select(x => x.Creator).Distinct().OrderBy(c => c)
             .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    // FTS5 trigram MATCH → matching package ids (rowid = PackageId). Handles CJK. (1.40)
+    private async Task<HashSet<long>> SearchIdsAsync(string text, CancellationToken cancellationToken)
+    {
+        var quoted = "\"" + text.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";
+        var ids = await db.Database
+            .SqlQueryRaw<long>("SELECT rowid AS \"Value\" FROM PackageSearch WHERE Blob MATCH {0}", quoted)
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        return ids.ToHashSet();
+    }
 
     // Each order maps to a composite index from data-arch §6 (trailing PackageId keeps it stable).
     private static IQueryable<PackageListItem> ApplySort(IQueryable<PackageListItem> q, LibrarySort sort, bool desc) => sort switch

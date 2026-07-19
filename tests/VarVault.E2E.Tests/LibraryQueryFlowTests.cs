@@ -85,6 +85,27 @@ public sealed class LibraryQueryFlowTests
         Assert.Equal("A.Fav.1", favs.Items[0].VarName);
     }
 
+    [Fact]
+    public async Task Fts_search_finds_cjk_creator_names()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+
+        // A CJK creator name — the exact case VaM users hit; searchable via the trigram FTS blob.
+        WriteVar(repoDir, "刘亦菲.衣装.1.var", "刘亦菲", "衣装", [("Custom/Clothing/c.vam", "x")]);
+        WriteVar(repoDir, "Bob.Plain.1.var", "Bob", "Plain", [("Custom/Hair/h.vam", "y")]);
+
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        var library = scope.ServiceProvider.GetRequiredService<ILibraryQueryService>();
+
+        var hits = await library.GetPageAsync(new LibraryQuery(SearchText: "刘亦菲"));
+        Assert.Equal(1, hits.TotalCount);
+        Assert.Equal("刘亦菲.衣装.1", hits.Items[0].VarName);
+    }
+
     private static async Task<Guid> Register(TestHost host, string path)
     {
         using var scope = host.Host.Services.CreateScope();

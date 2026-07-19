@@ -231,6 +231,18 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
         item.Class = stat?.Class ?? ContentClass.Cold;
         item.LastUsedAt = stat?.LastUsedAt;
         item.HasMissingDeps = false; // dependency resolution is Slice 2
+
+        await UpdateSearchIndexAsync(package, counts, cancellationToken).ConfigureAwait(false);
+    }
+
+    // Maintain the FTS5 search blob for a package: creator + names + content-type words (CJK-safe).
+    private async Task UpdateSearchIndexAsync(Package package, IReadOnlyDictionary<ContentType, int> counts, CancellationToken cancellationToken)
+    {
+        var typeWords = string.Join(' ', counts.Where(c => c.Value > 0).Select(c => c.Key.ToString()));
+        var blob = $"{package.Creator} {package.PackageName} {package.VarName} {typeWords}".Trim();
+
+        await db.Database.ExecuteSqlRawAsync("DELETE FROM PackageSearch WHERE rowid = {0};", [package.Id], cancellationToken).ConfigureAwait(false);
+        await db.Database.ExecuteSqlRawAsync("INSERT INTO PackageSearch(rowid, Blob) VALUES ({0}, {1});", [package.Id, blob], cancellationToken).ConfigureAwait(false);
     }
 
     private async Task ReplaceContentItemsAsync(long varFileId, IReadOnlyList<UpsertContentItem> items, CancellationToken cancellationToken)

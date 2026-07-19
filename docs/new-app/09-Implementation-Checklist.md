@@ -125,7 +125,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 1.37 `OnlineInstanceCount` vs `TotalInstanceCount` distinct; `IsSingleCopy` derived from online count · ⚠ T: `IndexingFlowTests` (OnlineInstanceCount=1, IsSingleCopy=true) + `Offline_repository_does_not_prune...` (online count reflects repo online state)
 - [x] 1.38 Composite index per sort order; sort query uses index (no temp B-tree) · T: `SchemaIndexTests.Gallery_class_sort_uses_composite_index_without_temp_btree` (EXPLAIN QUERY PLAN) + `LibraryQueryFlowTests` (filter/sort/page over the read model) — `ILibraryQueryService`/`EfLibraryQueryService` maps each `LibrarySort` to a §6 composite index
 - [ ] 1.39 `OrderedSnapshot` built per (filter,sort); random `rows[i]` is O(1) (B: matches spike ~0.08 ms)
-- [ ] 1.40 FTS search returns ranked results incl. CJK (T: search "刘亦菲" hits)
+- [x] 1.40 FTS search returns results incl. CJK · T: `LibraryQueryFlowTests.Fts_search_finds_cjk_creator_names` (index a 刘亦菲 var → search "刘亦菲" hits exactly it) — `EfCatalogStore.UpdateSearchIndexAsync` populates the trigram `PackageSearch` blob; `EfLibraryQueryService.SearchIdsAsync` runs `MATCH`
 - [ ] 1.41 Faceted count debounced + approximate during typing, exact on settle (M)
 - [ ] 1.42 B: read-path perf on real 70k catalog matches the [spike](./05-Perf-Spike-Results.md) envelope (paging <5 ms, scrollbar jump <1 ms)
 
