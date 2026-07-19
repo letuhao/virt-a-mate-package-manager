@@ -26,6 +26,30 @@
     </Setter>
   </ControlTheme>
 
+  <!-- SC-6 · MeterBar -->
+  <ControlTheme x:Key="{x:Type c:MeterBar}" TargetType="c:MeterBar">
+    <Setter Property="Height" Value="5" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Background="{DynamicResource Bg3Brush}" CornerRadius="3" ClipToBounds="True">
+          <Grid Name="PART_Track" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
+  <!-- SC-6 · StackedBar -->
+  <ControlTheme x:Key="{x:Type c:StackedBar}" TargetType="c:StackedBar">
+    <Setter Property="Height" Value="8" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border CornerRadius="4" ClipToBounds="True">
+          <Grid Name="PART_Track" />
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
   <!-- SC-5 · StatePill (ok/sub/miss) — colour + text label -->
   <ControlTheme x:Key="{x:Type c:StatePill}" TargetType="c:StatePill">
     <Setter Property="Template">
