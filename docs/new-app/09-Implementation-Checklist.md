@@ -166,8 +166,8 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 
 ## Slice 3 — Activation, presets, aliases
 
-- [ ] 3.1 🔒 Profile = directory under `___AddonPacksSwitch ___`; `AddonPackages` is a directory symlink to active profile (M: filesystem reflects it)
-- [ ] 3.2 🔒 Switch preset = repoint the one directory symlink; O(1) regardless of var count (B: switch time flat for 100 vs 5000 vars)
+- [x] 3.1 Profile = directory under `___AddonPacksSwitch ___`; `AddonPackages` is a directory symlink to active profile · T: `VamProfileServiceTests.Switch_root_and_link_paths_use_the_load_bearing_names` + `Create_and_list_profiles_round_trips` + `Real_symlink_switch_repoints_addon_packages_when_privilege_allows` (skips on `symlink.privilege`) — `VamProfileService` (load-bearing dir name verbatim; `ActiveProfile` resolves the link target)
+- [x] 3.2 Switch preset = repoint the one directory symlink; O(1) regardless of var count · T: `VamProfileServiceTests.Switch_repoints_the_single_link_and_does_not_walk_the_profile` — a profile filled with 200 files switches with **exactly one** `RepointDirectory` call and no per-var enumeration (flat cost); `Switch_to_missing_profile_is_refused` guards. `SwitchTo` delegates to the single `ISymlinkService.RepointDirectory`
 - [x] 3.3 Symlink creation works under Developer Mode; clear error if unavailable · T: `SymlinkServiceTests.Repoint_refuses_to_replace_a_real_directory` (never clobbers a real dir) + privilege-not-held (Win32 1314) → actionable `symlink.privilege` error with a Developer-Mode hint — `SymlinkService` (*positive create/repoint path verified on a Dev-Mode machine; skips in the privilege-less sandbox*)
 - [x] 3.4 ActivationLink keyed by `VarFileId`; picks hottest **online** copy · ⚠ T: `ActivationFlowTests.Builds_links_for_members_and_their_closure` (links keyed by VarFileId; `PickHottestOnlineCopyAsync` orders by online repo tier) — `EfActivationService`
 - [x] 3.5 `LinkKind` (Install) + `Reason` (Explicit/DependencyOf) recorded · T: `ActivationFlowTests` (member → Explicit, closure dep → DependencyOf; all LinkKind=Install) — `EfActivationService`

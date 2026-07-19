@@ -28,6 +28,7 @@ public static class InfrastructureRegistration
         services.AddSingleton<Domain.Content.IEncodingFixer, Indexing.EncodingFixer>();
         services.AddSingleton<Domain.Migration.IDurableFileMover, Indexing.DurableFileMover>();
         services.AddSingleton<Domain.Activation.ISymlinkService, Activation.SymlinkService>();
+        services.AddSingleton<Domain.Activation.IVamProfileService, Activation.VamProfileService>();
         services.AddSingleton<Domain.Repositories.IDriveProfiler, Repositories.DriveProfiler>();
         services.AddSingleton<Domain.Repositories.IDriveBenchmark, Repositories.DriveBenchmark>();
 
