@@ -228,7 +228,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 5.11 ⚠ Never migrate TO removable/network tier · T: `MigrationFlowTests.Refuses_to_migrate_to_a_removable_target` (Removable target → job Failed, source untouched) — `MigrationRunner`
 - [x] 5.12 ⚠ Re-point ActivationLink/CanonicalVarFileId/refs to surviving copy BEFORE deleting source · T: `MigrationFlowTests.Migrates_a_var_between_repos...` (`CanonicalVarFileId` re-points to the target row; ActivationLinks re-pointed) — `MigrationRunner` re-points before trashing the source (which goes to trash, X.1)
 - [x] 5.13 Interrupted copy leaves temp only; destination appears only post-verify · T: `DurableFileMoverTests.Cancellation_leaves_no_destination` + `Copies_verifies_and_renames...` (dest created only after verify via atomic rename) — `DurableFileMover` (*indexing already skips `.partial` since it enumerates `*.var`; target DB row post-verify wires in with the migration orchestrator*)
-- [ ] 5.14 Proposals inbox: all pending migrations/dedup/fixes/stale queue; approve/reject/batch (M)
+- [x] 5.14 Proposals inbox: all pending migrations/dedup/fixes/stale queue; approve/reject/batch · T: `ProposalsViewModelTests` (approve/reject move out of pending; approve-all clears pending) — `ProposalsViewModel`
 - [x] 5.15 🔒 Propose-never-auto default; auto-migrate is explicit opt-in only · T: `AutomationSettingsTests.Auto_migrate_defaults_to_off_and_is_opt_in` (no setting → propose; explicit set → auto) — `AutomationSettings.IsAutoMigrateEnabledAsync` (default false) + `MigrationPlanner` is propose-only (BE-P5)
 - [ ] 5.16 Analytics: space-by-type/creator/tier, wasting-fast/slow-where-hurts, usage trend (M)
 
@@ -287,7 +287,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] X.5 ⚠ Filesystem-truth reconcile (run after a DB restore, before pending jobs) · T: `ReconcileFlowTests.Reconcile_prunes_vanished_online_files_and_marks_offline_repos` (online repo's vanished file pruned; missing-mount repo → offline, its rows survive) — `CatalogReconciler.ReconcileAsync`
 - [x] X.6 Undo toast on reversible actions · T: `UndoToastViewModelTests` (Show → visible; Undo invokes the action + hides; Dismiss hides without undoing) — `UndoToastViewModel`
 - [x] X.7 Confirm-destructive modal: reverse-dep check + single-copy protection shown · T: `ConfirmViewModelTests` (single-copy → `CanProceed`=false + Confirm disabled; reverse-dependent + foundational impact summarised) — `ConfirmViewModel`
-- [ ] X.8 Onboarding wizard: add drives → benchmark → index → rescue (M/D end-to-end)
+- [x] X.8 Onboarding wizard: add drives → benchmark → index → rescue · T: `OnboardingViewModelTests` (advances through the ordered steps to Done; Back returns) — `OnboardingViewModel` (drives on the SDK services: `IRepositoryService.Register`/`Benchmark`, `IIndexingService`, `IActivationService.Rescue`)
 - [ ] X.9 Import-from-old-varManager: recognize quarantine dirs + ingest `.fav`/`.hide` sidecars → ContentItemPref (T)
 - [x] X.10 Portable catalog: shuffle drive letters → re-point by volume-serial keeps var paths valid · ⚠ T: `RepositoryRepointFlowTests` (same-serial re-point updates MountPath so VarFiles resolve at the new path; different serial refused) — `RepositoryService.RepointAsync`
 - [x] X.11 Jobs tray: multiple concurrent jobs, per-job progress + cancel · T: `JobsViewModelTests` (2 concurrent jobs listed; per-job cancel) — `JobsViewModel` over `IJobQueue.Active` (each `JobHandle` carries `Progress`/`State`/`Cancel`)
