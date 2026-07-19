@@ -122,7 +122,11 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
   lazy hash then `DeletionPredicate.Evaluate` gates each trash via `ITrashService`), registered. T:
   `ReclaimServiceFlowTests.Groups_exact_duplicates_and_trashes_only_redundant_verified_copies` (3 dups →
   trash 2, keep 1; single-copy blocked).
-- [ ] **BE-N5 · `IHealthService`** (EncodingHealthEngine/EncodingFixCoordinator). *Test:* encoding groups; fix writes UTF-8 var, keeps original, validates load.
+- [x] **BE-N5 · `IHealthService`** (EncodingHealthEngine/EncodingFixCoordinator). *Done:* SDK `IHealthService`
+  (`EncodingGroup`/`IntegrityIssue`) + `EfHealthService` (groups by codepage, integrity list, `FixAsync`
+  computes the `.fixed.var` sibling path → `EncodingFixCoordinator`), registered. T:
+  `HealthServiceFlowTests.Encoding_groups_then_fix_creates_utf8_var` (GBK group; fix creates UTF-8 sibling,
+  original retained).
 - [ ] **BE-N6 · `ITrashQueryService`** (ITrashService/SqliteDatabaseBackup). *Test:* list/restore/purge round-trip; backup+restore.
 - [ ] **BE-N7 · `IProfileService`** (IVamProfileService). *Test:* list profiles; switch repoints one symlink (skip where privilege absent).
 - [ ] **BE-N8 · `IProposalService`** (aggregates N2/N4/N5/stale). *Test:* proposals listed; approve dispatches to the right runner; reject records.
