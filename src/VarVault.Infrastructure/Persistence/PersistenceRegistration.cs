@@ -24,6 +24,7 @@ public static class PersistenceRegistration
         services.AddScoped<ICatalogStore, EfCatalogStore>();
         services.AddScoped<IDependencyResolver, EfDependencyResolver>();
         services.AddScoped<Domain.Analyzer.IUsageAnalyzer, EfUsageAnalyzer>();
+        services.AddScoped<IDependencyGraph, EfDependencyGraph>();
         services.AddScoped<IRepositoryStore, EfRepositoryStore>();
         services.AddScoped<Sdk.Library.ILibraryQueryService, Library.EfLibraryQueryService>();
         services.AddSingleton<CatalogDatabaseInitializer>();

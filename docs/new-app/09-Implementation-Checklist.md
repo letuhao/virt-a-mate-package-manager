@@ -155,7 +155,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] 2.7 Incremental re-resolve on new version: only edges targeting that `(Creator,Package)` touched; audit event emitted (T) — *currently a full-catalog pass; incremental scoping pending*
 - [x] 2.8 `IsMissing`/`ResolvedPackageId` written in one pass **including alias application**; `ResolvedVia` set · T: `DependencyResolutionFlowTests.Resolves_present_deps_and_flags_missing` + `Closest_version_substitution_is_recorded` — `EfDependencyResolver.ResolveAllAsync`
 - [x] 2.9 🔒 Alias precedence: present real match outranks alias · T: `DependencyResolutionFlowTests.Alias_resolves_a_missing_ref_but_a_real_match_outranks_it` (alias only used when no real match; real match → `Exact`)
-- [ ] 2.10 Forward closure via recursive CTE with cycle detection + depth cap (T: cyclic graph terminates)
+- [x] 2.10 Forward closure via recursive CTE with cycle detection + depth cap · T: `ForwardClosureFlowTests` (`Chain_resolves_transitively` A→B→C → {B,C}; `Cycle_terminates` A→B→A → {B}, no infinite loop) — `EfDependencyGraph.ForwardClosureAsync` (`UNION` set semantics + depth cap)
 - [x] 2.11 ⚠ Reverse closure: `ReverseDependentCount` + `IsFoundational` precomputed; NO on-demand enumeration · T: `DependencyResolutionFlowTests.Foundational_flag_set_when_many_packages_depend_on_one` (in-degree counted, `IsFoundational` at threshold) + `Resolves_present_deps...` (count=1) — precomputed on `Package`, never enumerated interactively
 - [ ] 2.12 Reverse-closure for safe-delete spans Dependency + SaveDependency + PresetMember + VarAlias + ActivationLink (⚠ T: a var needed only by a UserSave is NOT an orphan)
 - [ ] 2.13 UserSave scan of `{vampath}\Saves` + `Custom` → SaveDependency edges (T)
