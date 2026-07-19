@@ -10,7 +10,7 @@ namespace VarVault.Infrastructure.Safety;
 /// restore needs only the trash folder — never the catalog DB. Move (not copy+delete) keeps it instant
 /// on the same volume. (Data-arch §5.9; checklist X.1/X.2/X.3.)
 /// </summary>
-public sealed class FileTrashService(string trashRoot, IClock clock) : ITrashService
+public sealed class FileTrashService(string trashRoot, IClock clock, long quotaBytes = long.MaxValue) : ITrashService
 {
     private const string ManifestName = "manifest.json";
 
@@ -41,7 +41,30 @@ public sealed class FileTrashService(string trashRoot, IClock clock) : ITrashSer
 
         var entry = new TrashEntry(id, Path.GetFullPath(sourcePath), trashPath, reason, clock.UtcNow.UtcDateTime, bytes);
         await WriteManifestAsync(itemDir, entry, cancellationToken).ConfigureAwait(false);
+
+        await EnforceQuotaAsync(cancellationToken).ConfigureAwait(false);
         return entry;
+    }
+
+    // Keep trash under the quota by purging the oldest items (already-deleted files) — never a silent
+    // hard-delete of the *source*; only long-trashed items are aged out. (X.2)
+    private async Task EnforceQuotaAsync(CancellationToken cancellationToken)
+    {
+        if (quotaBytes == long.MaxValue)
+            return;
+
+        var items = (await ListAsync(cancellationToken).ConfigureAwait(false))
+            .OrderBy(e => e.TrashedAtUtc)
+            .ToList();
+
+        var total = items.Sum(e => e.Bytes);
+        foreach (var oldest in items)
+        {
+            if (total <= quotaBytes)
+                break;
+            TryCleanup(Path.Combine(trashRoot, oldest.Id));
+            total -= oldest.Bytes;
+        }
     }
 
     public async Task<Result> RestoreAsync(string trashId, CancellationToken cancellationToken = default)

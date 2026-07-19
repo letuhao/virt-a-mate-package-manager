@@ -104,4 +104,25 @@ public sealed class FileTrashServiceTests
         var trash = NewService(dir);
         Assert.True((await trash.TrashAsync(Path.Combine(dir.Path, "ghost.var"), "x")).IsFailure);
     }
+
+    [Fact]
+    public async Task Quota_evicts_the_oldest_trashed_items()
+    {
+        using var dir = new TempDirectory();
+        var clock = new FakeClock();
+        // Quota holds ~2 items of 100 bytes.
+        var trash = new FileTrashService(Path.Combine(dir.Path, "trash"), clock, quotaBytes: 250);
+
+        for (var i = 0; i < 3; i++)
+        {
+            var f = dir.File($"v{i}.var");
+            await File.WriteAllTextAsync(f, new string('x', 100));
+            await trash.TrashAsync(f, "test");
+            clock.Advance(TimeSpan.FromSeconds(1)); // distinct TrashedAt for ordering
+        }
+
+        var list = await trash.ListAsync();
+        Assert.Equal(2, list.Count); // oldest evicted to stay under quota
+        Assert.DoesNotContain(list, e => e.OriginalPath.EndsWith("v0.var", StringComparison.Ordinal));
+    }
 }
