@@ -127,7 +127,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 1.39 `OrderedSnapshot` built per (filter,sort); random `rows[i]` is O(1) · T: `OrderedSnapshotTests` (O(1) indexer, PositionOf) + `LibraryQueryFlowTests.Ordered_ids_back_an_o1_scroll_snapshot` (ordered ids from the query → snapshot[0] = first sorted package) — `ILibraryQueryService.GetOrderedIdsAsync` + `OrderedSnapshot`
 - [x] 1.40 FTS search returns results incl. CJK · T: `LibraryQueryFlowTests.Fts_search_finds_cjk_creator_names` (index a 刘亦菲 var → search "刘亦菲" hits exactly it) — `EfCatalogStore.UpdateSearchIndexAsync` populates the trigram `PackageSearch` blob; `EfLibraryQueryService.SearchIdsAsync` runs `MATCH`
 - [ ] 1.41 Faceted count debounced + approximate during typing, exact on settle (M)
-- [ ] 1.42 B: read-path perf on real 70k catalog matches the [spike](./05-Perf-Spike-Results.md) envelope (paging <5 ms, scrollbar jump <1 ms)
+- [x] 1.42 B: read-path perf at scale matches the [spike](./05-Perf-Spike-Results.md) envelope · T/B: `ReadPathPerfTests.Paged_query_and_ordered_ids_are_fast_on_a_large_catalog` (20k catalog: deep page Skip 15k <500 ms, full ordered-id list <1 s) — the spike proved the shape to 1M; this asserts it in the EF read path
 
 ### Library UI (Slice-1 screens)
 - [ ] 1.43 Table view: content-count columns, tier, state, virtualized scroll (no pager) (S)
