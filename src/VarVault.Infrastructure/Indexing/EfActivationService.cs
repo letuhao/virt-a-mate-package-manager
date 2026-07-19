@@ -26,6 +26,21 @@ public sealed class EfActivationService(VarVaultDbContext db, IClock clock, IDep
         return await RecomputeAsync(presetId, active, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<int> RescueAsync(long profileId, CancellationToken cancellationToken = default)
+    {
+        // Remove every app-created link (a preset owns it); user-made links (null attribution) survive.
+        return await db.ActivationLinks
+            .Where(l => l.ProfileId == profileId && l.RequestedByPresetId != null)
+            .ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<int> CleanTempLinksAsync(long profileId, CancellationToken cancellationToken = default)
+    {
+        return await db.ActivationLinks
+            .Where(l => l.ProfileId == profileId && l.LinkKind == LinkKind.Temp)
+            .ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+    }
+
     private async Task<HashSet<long>> ResolvedMemberIdsAsync(long presetId, CancellationToken cancellationToken)
     {
         var ids = await db.PresetMembers.AsNoTracking()

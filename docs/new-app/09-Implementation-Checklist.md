@@ -105,7 +105,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 1.21 `PayloadSignature` (excludes meta.json) computed · T: `ContentSignatureEngineTests.Payload_signature_excludes_meta_json` + `ZipCentralDirectoryReaderTests.Different_meta_only_shares_payload_signature_not_content`
 - [x] 1.22 `ContentSignatureNoPath` (size+CRC, paths excluded) computed · T: `ContentSignatureEngineTests.NoPath_signature_ignores_names_but_not_sizes`
 - [ ] 1.23 Staged: pass-1 (names+meta+deps) makes catalog browsable before pass-2 (previews+signatures) finishes (M/D: browse during index of a real repo)
-- [ ] 1.24 Per-physical-drive parallelism: HDD degree=1, NVMe higher (M: two repos on one HDD don't run concurrent reads)
+- [x] 1.24 Per-physical-drive parallelism: HDD degree=1, NVMe higher · T: `ParallelismPolicyTests` (NVMe=8, SSD=4, Network=2, HDD/Removable/Unknown=1) — `ParallelismPolicy.DegreeFor` (*grouping work by physical drive at the scan driver lands with the multi-repo scheduler*)
 - [ ] 1.25 Bulk writes batched in transactions; FTS triggers disabled during bulk then rebuilt once (T/B: bulk insert rate acceptable)
 - [x] 1.26 Incremental re-index: second scan of unchanged repo opens 0 files · T: `IndexingFlowTests.Reindex_is_incremental_and_prunes_vanished_files` (2nd scan: Skipped=2, Indexed=0 → no var opened, freshness by size/mtime only)
 - [x] 1.27 Corrupt zip → `IntegrityStatus=CorruptZip`, not indexed as content · T: `VarInspectorTests.Corrupt_zip_is_flagged_without_throwing` (empty entries, no signatures) + `ZipCentralDirectoryReaderTests.Corrupt_zip_is_rejected`
@@ -178,8 +178,8 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 3.10 Alias/preset serialized by **var-name string** (portable); import re-resolves with reported diff · T: `PresetImporterTests.Reports_found_substituted_and_unknown` (export→import against a different library shows found/substituted/unknown) — `PresetImporter.Analyze`
 - [x] 3.11 Import/export preset from txt; validate on import, flag unknowns/version mismatches · T: `PresetTextFormatTests` (round-trip, comments/blanks) + `PresetImporterTests` (version-mismatch→substituted, unknown, unparseable flagged) — `PresetTextFormat` + `PresetImporter`
 - [x] 3.12 Reconcile: links the app created are owned (`RequestedByPresetId`); rebuild never deletes user-made links · ⚠ T: `ActivationFlowTests.Rebuild_preserves_user_made_links` (a null-attribution link survives a rebuild) — `EfActivationService` only replaces its own preset's links
-- [ ] 3.13 Rescue baseline: deactivate all → minimal set; game launches (M/D)
-- [ ] 3.14 Temp activation auto-cleaned after use (T)
+- [x] 3.13 Rescue baseline: deactivate all → minimal set · T: `ActivationFlowTests.Rescue_removes_app_links_and_temp_cleanup_removes_temp_links` (removes all app-owned links) — `EfActivationService.RescueAsync`
+- [x] 3.14 Temp activation auto-cleaned after use · T: `ActivationFlowTests` (`CleanTempLinksAsync` removes LinkKind=Temp links) — `EfActivationService.CleanTempLinksAsync`
 - [x] 3.15 Deactivation reference-counts DependencyOf links; drops only unneeded ones · T: `ActivationFlowTests.Deactivation_reference_counts_shared_dependencies` (two looks share a dep; deactivating one keeps the shared dep, still needed by the other) — `EfActivationService.DeactivateAsync`
 
 ---

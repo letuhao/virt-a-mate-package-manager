@@ -143,6 +143,42 @@ public sealed class ActivationFlowTests
         Assert.True(await db.ActivationLinks.AnyAsync(l => l.RequestedByPresetId == null));
     }
 
+    [Fact]
+    public async Task Rescue_removes_app_links_and_temp_cleanup_removes_temp_links()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+        WriteVar(repoDir, "A.Solo.1.var", "A", "Solo");
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IDependencyResolver>().ResolveAllAsync();
+        var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+        var preset = (await scope.ServiceProvider.GetRequiredService<IPresetService>().CreateAsync("P", ["A.Solo.1"])).Value;
+        var activation = scope.ServiceProvider.GetRequiredService<IActivationService>();
+
+        await activation.BuildProfileLinksAsync(preset.Id);
+        var profile = await db.Profiles.FirstAsync();
+        var solo = await db.VarFiles.FirstAsync();
+
+        // Add a temp link.
+        db.ActivationLinks.Add(new ActivationLink
+        {
+            ProfileId = profile.Id, VarFileId = solo.Id, LinkPath = "temp/link.var",
+            LinkKind = LinkKind.Temp, LinkType = LinkType.Symlink, Reason = ActivationReason.Temp,
+            RequestedByPresetId = preset.Id,
+        });
+        await db.SaveChangesAsync();
+
+        Assert.Equal(1, await activation.CleanTempLinksAsync(profile.Id)); // 3.14 — temp cleaned
+        Assert.False(await db.ActivationLinks.AnyAsync(l => l.LinkKind == LinkKind.Temp));
+
+        var removed = await activation.RescueAsync(profile.Id); // 3.13 — deactivate all
+        Assert.True(removed >= 1);
+        Assert.Empty(await db.ActivationLinks.ToListAsync());
+    }
+
     private static async Task<Guid> Register(TestHost host, string path)
     {
         using var scope = host.Host.Services.CreateScope();

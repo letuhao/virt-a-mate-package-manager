@@ -19,4 +19,10 @@ public interface IActivationService
     /// (reference-counted). Returns the resulting link set. (Checklist 3.15.)
     /// </summary>
     Task<ActivationBuildResult> DeactivateAsync(long presetId, long packageId, CancellationToken cancellationToken = default);
+
+    /// <summary>Rescue baseline: remove all app-owned links from a profile (deactivate everything). (3.13)</summary>
+    Task<int> RescueAsync(long profileId, CancellationToken cancellationToken = default);
+
+    /// <summary>Clean up temp activation links after use. (3.14)</summary>
+    Task<int> CleanTempLinksAsync(long profileId, CancellationToken cancellationToken = default);
 }
