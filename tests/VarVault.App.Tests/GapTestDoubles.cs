@@ -128,6 +128,24 @@ public sealed class StubPresetsMin : VarVault.Sdk.Presets.IPresetService
     public Task<VarVault.Sdk.Presets.ActivationPreview?> PreviewActivationAsync(long id, CancellationToken ct = default) => Task.FromResult<VarVault.Sdk.Presets.ActivationPreview?>(null);
 }
 
+public sealed class StubAnalytics(
+    IReadOnlyList<SpaceByGroup>? byCreator = null,
+    IReadOnlyList<SpaceByGroup>? byType = null,
+    IReadOnlyList<SpaceByGroup>? byTier = null) : IAnalyticsService
+{
+    public Task<IReadOnlyList<SpaceByGroup>> SpaceByCreatorAsync(CancellationToken ct = default) => Task.FromResult(byCreator ?? []);
+    public Task<IReadOnlyList<SpaceByGroup>> SpaceByTypeAsync(CancellationToken ct = default) => Task.FromResult(byType ?? []);
+    public Task<IReadOnlyList<SpaceByGroup>> SpaceByTierAsync(CancellationToken ct = default) => Task.FromResult(byTier ?? []);
+}
+
+public sealed class StubActivityLog(IReadOnlyList<VarVault.Sdk.Activation.ActivityRecord>? records = null)
+    : VarVault.Sdk.Activation.IActivityLog
+{
+    public Task RecordAsync(string kind, string desc, long? pkg = null, CancellationToken ct = default) => Task.CompletedTask;
+    public Task<IReadOnlyList<VarVault.Sdk.Activation.ActivityRecord>> GetRecentAsync(int limit = 100, CancellationToken ct = default) =>
+        Task.FromResult(records ?? []);
+}
+
 public sealed class StubSettings : ISettingsService
 {
     private readonly Dictionary<string, string> _store = new();

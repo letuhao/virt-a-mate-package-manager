@@ -5,19 +5,43 @@ using VarVault.Sdk.Library;
 
 namespace VarVault.App.ViewModels;
 
+/// <summary>A proposal row: the proposal + a checkbox + an icon glyph and tag label derived from its kind. (GD-13)</summary>
+public sealed partial class ProposalRowViewModel(Proposal proposal) : ObservableObject
+{
+    public Proposal Proposal { get; } = proposal;
+    [ObservableProperty] private bool _isSelected;
+    public string Title => Proposal.Title;
+    public string Detail => Proposal.Detail;
+    public string Icon => Proposal.Kind switch
+    {
+        ProposalKind.Rebalance => "⇄",
+        ProposalKind.Dedup => "⧉",
+        ProposalKind.EncodingFix => "⚑",
+        ProposalKind.RetireStale => "⌦",
+        _ => "◈",
+    };
+    public string Tag => Proposal.Kind switch
+    {
+        ProposalKind.Dedup => "verified",
+        ProposalKind.EncodingFix => "high conf.",
+        _ => $"{Proposal.AffectedBytes / (1L << 30)} GB",
+    };
+}
+
 /// <summary>
 /// SCR-8 · Proposals inbox: the pending migrate/dedup/encoding/stale queue with approve/reject — "propose,
 /// never auto-destroy". Approve dispatches to the matching runner via <see cref="IProposalService"/>.
 /// (16-checklist SCR-8.)
 /// </summary>
-public sealed partial class ProposalsViewModel(IProposalService proposals) : ObservableObject
+public sealed partial class ProposalsViewModel(
+    IProposalService proposals, Services.IDialogLauncher? launcher = null) : ObservableObject
 {
     /// <summary>Sub-navigation tabs (GC-2).</summary>
     public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =
         [new("All"), new("Migrations"), new("Duplicates"), new("Encoding fixes"), new("Stale")];
     [ObservableProperty] private int _selectedTabIndex;
 
-    public ObservableCollection<Proposal> Pending { get; } = [];
+    public ObservableCollection<ProposalRowViewModel> Pending { get; } = [];
 
     [ObservableProperty] private string? _statusMessage;
 
@@ -28,28 +52,64 @@ public sealed partial class ProposalsViewModel(IProposalService proposals) : Obs
     {
         Pending.Clear();
         foreach (var p in await proposals.ListAsync(cancellationToken).ConfigureAwait(true))
-            Pending.Add(p);
+            Pending.Add(new ProposalRowViewModel(p));
         OnPropertyChanged(nameof(PendingCount));
     }
 
+    /// <summary>Screen-head "Reject all" → reject every pending proposal. (GD-13)</summary>
     [RelayCommand]
-    public async Task ApproveAsync(Proposal? proposal, CancellationToken cancellationToken = default)
+    public async Task RejectAllAsync(CancellationToken cancellationToken = default)
     {
-        if (proposal is null)
+        foreach (var row in Pending.ToList())
+            await proposals.RejectAsync(row.Proposal, cancellationToken).ConfigureAwait(true);
+        Pending.Clear();
+        OnPropertyChanged(nameof(PendingCount));
+    }
+
+    /// <summary>Screen-head "Approve selected" → approve the checked proposals. (GD-13)</summary>
+    [RelayCommand]
+    public async Task ApproveSelectedAsync(CancellationToken cancellationToken = default)
+    {
+        foreach (var row in Pending.Where(r => r.IsSelected).ToList())
+        {
+            var result = await proposals.ApproveAsync(row.Proposal, cancellationToken).ConfigureAwait(true);
+            StatusMessage = result.Message;
+            Pending.Remove(row);
+        }
+        OnPropertyChanged(nameof(PendingCount));
+    }
+
+    /// <summary>Per-card "Review…" → the matching dialog for the proposal kind. (GD-13)</summary>
+    [RelayCommand]
+    private void Review(ProposalRowViewModel? row)
+    {
+        if (row is null || launcher is null)
             return;
-        var result = await proposals.ApproveAsync(proposal, cancellationToken).ConfigureAwait(true);
+        switch (row.Proposal.Kind)
+        {
+            case ProposalKind.EncodingFix: launcher.OpenFix(0, null); break;
+            default: launcher.OpenMigratePlan(); break;
+        }
+    }
+
+    [RelayCommand]
+    public async Task ApproveAsync(ProposalRowViewModel? row, CancellationToken cancellationToken = default)
+    {
+        if (row is null)
+            return;
+        var result = await proposals.ApproveAsync(row.Proposal, cancellationToken).ConfigureAwait(true);
         StatusMessage = result.Message;
-        Pending.Remove(proposal);
+        Pending.Remove(row);
         OnPropertyChanged(nameof(PendingCount));
     }
 
     [RelayCommand]
-    public async Task RejectAsync(Proposal? proposal, CancellationToken cancellationToken = default)
+    public async Task RejectAsync(ProposalRowViewModel? row, CancellationToken cancellationToken = default)
     {
-        if (proposal is null)
+        if (row is null)
             return;
-        await proposals.RejectAsync(proposal, cancellationToken).ConfigureAwait(true);
-        Pending.Remove(proposal);
+        await proposals.RejectAsync(row.Proposal, cancellationToken).ConfigureAwait(true);
+        Pending.Remove(row);
         OnPropertyChanged(nameof(PendingCount));
     }
 }

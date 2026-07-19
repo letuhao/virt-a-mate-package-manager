@@ -2,7 +2,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:c="clr-namespace:VarVault.App.Controls"
              xmlns:vm="clr-namespace:VarVault.App.ViewModels"
-             xmlns:lib="clr-namespace:VarVault.Sdk.Library;assembly=VarVault.Sdk"
              x:Class="VarVault.App.Views.AnalyticsView"
              x:DataType="vm:AnalyticsViewModel">
   <ScrollViewer Padding="18">
@@ -12,23 +11,54 @@
         <c:Card Header="Space by content type" Width="320" Margin="0,0,14,14">
           <ItemsControl ItemsSource="{Binding ByType}">
             <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="lib:SpaceByGroup">
-                <Grid ColumnDefinitions="*,Auto" Margin="0,2">
-                  <TextBlock Grid.Column="0" Text="{Binding Group}" />
-                  <TextBlock Grid.Column="1" Text="{Binding TotalBytes}" Opacity="0.7" />
-                </Grid>
+              <DataTemplate x:DataType="vm:SpaceRowViewModel">
+                <StackPanel Margin="0,3">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Text="{Binding Group}" />
+                    <TextBlock Grid.Column="1" Text="{Binding SizeLabel}" Opacity="0.7" FontFamily="{DynamicResource MonoFont}" />
+                  </Grid>
+                  <c:MeterBar Height="5" Margin="0,3,0,0" Value="{Binding Fraction}" Fill="{DynamicResource AccentBrush}" />
+                </StackPanel>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
         </c:Card>
+
         <c:Card Header="Top space by creator" Width="320" Margin="0,0,14,14">
           <ItemsControl ItemsSource="{Binding ByCreator}">
             <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="lib:SpaceByGroup">
-                <Grid ColumnDefinitions="*,Auto" Margin="0,2">
-                  <TextBlock Grid.Column="0" Text="{Binding Group}" />
-                  <TextBlock Grid.Column="1" Text="{Binding TotalBytes}" Opacity="0.7" />
-                </Grid>
+              <DataTemplate x:DataType="vm:SpaceRowViewModel">
+                <StackPanel Margin="0,3">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Text="{Binding Group}" />
+                    <TextBlock Grid.Column="1" Text="{Binding SizeLabel}" Opacity="0.7" FontFamily="{DynamicResource MonoFont}" />
+                  </Grid>
+                  <c:MeterBar Height="5" Margin="0,3,0,0" Value="{Binding Fraction}" Fill="{DynamicResource AccentBrush}" />
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </c:Card>
+
+        <c:Card Header="⚠ Wasting fast storage" Width="320" Margin="0,0,14,14">
+          <StackPanel Spacing="6">
+            <TextBlock Text="Cold vars sitting on Tier-1 NVMe." Opacity="0.7" FontSize="12" />
+            <TextBlock Text="{Binding WastedOnFastBytes, StringFormat='{}{0} bytes'}" FontSize="20"
+                       Foreground="{DynamicResource WarnBrush}" FontFamily="{DynamicResource MonoFont}" />
+          </StackPanel>
+        </c:Card>
+
+        <c:Card Header="Space by tier" Width="320" Margin="0,0,14,14">
+          <ItemsControl ItemsSource="{Binding ByTier}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:SpaceRowViewModel">
+                <StackPanel Margin="0,3">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Text="{Binding Group}" />
+                    <TextBlock Grid.Column="1" Text="{Binding SizeLabel}" Opacity="0.7" FontFamily="{DynamicResource MonoFont}" />
+                  </Grid>
+                  <c:MeterBar Height="5" Margin="0,3,0,0" Value="{Binding Fraction}" Fill="{DynamicResource ColdBrush}" />
+                </StackPanel>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>

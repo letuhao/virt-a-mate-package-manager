@@ -8,11 +8,17 @@
     <TextBlock Text="Settings" FontSize="21" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
     <c:Tabs ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" />
     <c:Card Header="General">
-      <Grid ColumnDefinitions="200,*" RowDefinitions="Auto,Auto">
+      <Grid ColumnDefinitions="200,*" RowDefinitions="Auto,Auto,Auto,Auto">
         <TextBlock Grid.Row="0" Grid.Column="0" Text="VaM install path" VerticalAlignment="Center" Opacity="0.8" Margin="0,0,14,10" />
         <TextBox Grid.Row="0" Grid.Column="1" Name="PART_VamPath" Text="{Binding VamPath}" Margin="0,0,0,10" />
-        <TextBlock Grid.Row="1" Grid.Column="0" Text="Fix-on-import" VerticalAlignment="Center" Opacity="0.8" Margin="0,0,14,0" />
-        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding FixOnImport}" />
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="Catalog DB location" VerticalAlignment="Center" Opacity="0.8" Margin="0,0,14,10" />
+        <TextBox Grid.Row="1" Grid.Column="1" Name="PART_CatalogDb" Text="{Binding CatalogDbPath}" Margin="0,0,0,10" />
+        <TextBlock Grid.Row="2" Grid.Column="0" Text="Symlink type" VerticalAlignment="Center" Opacity="0.8" Margin="0,0,14,10" />
+        <ComboBox Grid.Row="2" Grid.Column="1" Name="PART_Symlink" HorizontalAlignment="Stretch"
+                  ItemsSource="{Binding SymlinkOptions}" SelectedItem="{Binding SymlinkType}" Margin="0,0,0,10" />
+        <TextBlock Grid.Row="3" Grid.Column="0" Text="Fix-on-import" VerticalAlignment="Center" Opacity="0.8" Margin="0,0,14,0" />
+        <ComboBox Grid.Row="3" Grid.Column="1" Name="PART_FixOnImport" HorizontalAlignment="Stretch"
+                  ItemsSource="{Binding FixOnImportOptions}" SelectedItem="{Binding FixOnImport}" />
       </Grid>
     </c:Card>
     <StackPanel Orientation="Horizontal" Spacing="10">

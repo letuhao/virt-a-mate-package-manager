@@ -19,6 +19,16 @@ public sealed partial class TrashViewModel(ITrashQueryService trash) : Observabl
     [ObservableProperty] private string? _statusMessage;
     public bool IsEmpty => Items.Count == 0;
 
+    public bool IsTrashTab => SelectedTabIndex == 0;
+    public bool IsBackupsTab => SelectedTabIndex == 1;
+    public string TrashSummary => $"{Items.Count} items · {Backups.Count} backups";
+
+    partial void OnSelectedTabIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsTrashTab));
+        OnPropertyChanged(nameof(IsBackupsTab));
+    }
+
     [RelayCommand]
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
@@ -29,6 +39,7 @@ public sealed partial class TrashViewModel(ITrashQueryService trash) : Observabl
         foreach (var b in await trash.ListBackupsAsync(cancellationToken).ConfigureAwait(true))
             Backups.Add(b);
         OnPropertyChanged(nameof(IsEmpty));
+        OnPropertyChanged(nameof(TrashSummary));
     }
 
     [RelayCommand]

@@ -13,14 +13,27 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
     [ObservableProperty] private int _selectedTabIndex;
 
     [ObservableProperty] private string? _vamPath;
+    [ObservableProperty] private string? _catalogDbPath;
     [ObservableProperty] private string? _fixOnImport;
+    [ObservableProperty] private string? _symlinkType;
     [ObservableProperty] private string? _statusMessage;
+
+    /// <summary>Fix-on-import policy options (prototype dropdown). (GD-17)</summary>
+    public IReadOnlyList<string> FixOnImportOptions { get; } = ["Flag only", "Prompt", "Auto (high-confidence)"];
+
+    /// <summary>Symlink strategy options (prototype dropdown). (GD-17)</summary>
+    public IReadOnlyList<string> SymlinkOptions { get; } = ["Directory-swap profiles (fast)", "Per-var symlinks"];
+
+    private const string CatalogDbKey = "catalog.db_path";
+    private const string SymlinkKey = "symlink.type";
 
     [RelayCommand]
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         VamPath = await settings.GetAsync(SettingKeys.VamPath, cancellationToken).ConfigureAwait(true);
         FixOnImport = await settings.GetAsync(SettingKeys.FixOnImport, cancellationToken).ConfigureAwait(true) ?? "Flag only";
+        CatalogDbPath = await settings.GetAsync(CatalogDbKey, cancellationToken).ConfigureAwait(true);
+        SymlinkType = await settings.GetAsync(SymlinkKey, cancellationToken).ConfigureAwait(true) ?? "Directory-swap profiles (fast)";
     }
 
     [RelayCommand]
@@ -28,6 +41,8 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
     {
         await settings.SetAsync(SettingKeys.VamPath, VamPath ?? string.Empty, cancellationToken).ConfigureAwait(true);
         await settings.SetAsync(SettingKeys.FixOnImport, FixOnImport ?? "Flag only", cancellationToken).ConfigureAwait(true);
+        await settings.SetAsync(CatalogDbKey, CatalogDbPath ?? string.Empty, cancellationToken).ConfigureAwait(true);
+        await settings.SetAsync(SymlinkKey, SymlinkType ?? string.Empty, cancellationToken).ConfigureAwait(true);
         StatusMessage = "Saved";
     }
 }

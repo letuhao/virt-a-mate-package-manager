@@ -6,25 +6,36 @@
              x:Class="VarVault.App.Views.ProposalsView"
              x:DataType="vm:ProposalsViewModel">
   <DockPanel Margin="18">
-    <TextBlock DockPanel.Dock="Top" Text="Proposals &amp; review" FontSize="21" FontWeight="SemiBold"
-               Foreground="{DynamicResource TextHiBrush}" Margin="0,0,0,4" />
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,4">
+      <TextBlock Grid.Column="0" Text="Proposals &amp; review" FontSize="21" FontWeight="SemiBold"
+                 Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center" />
+      <Button Grid.Column="1" Content="Reject all" Margin="0,0,8,0" Command="{Binding RejectAllCommand}" />
+      <Button Grid.Column="2" Content="Approve selected" Command="{Binding ApproveSelectedCommand}"
+              Background="{DynamicResource AccentBrush}" Foreground="White" />
+    </Grid>
     <TextBlock DockPanel.Dock="Top" Foreground="{DynamicResource TextLoBrush}" Margin="0,0,0,12"
                Text="Nothing runs unattended. The analyzer proposes; you approve." />
     <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
     <ScrollViewer>
       <ItemsControl ItemsSource="{Binding Pending}">
         <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="lib:Proposal">
+          <DataTemplate x:DataType="vm:ProposalRowViewModel">
             <c:Card Margin="0,0,0,10">
-              <Grid ColumnDefinitions="*,Auto,Auto">
-                <StackPanel Grid.Column="0">
+              <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto" >
+                <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <TextBlock Grid.Column="1" Text="{Binding Icon}" FontSize="18" VerticalAlignment="Center" Margin="0,0,10,0" />
+                <StackPanel Grid.Column="2">
                   <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
                   <TextBlock Text="{Binding Detail}" Opacity="0.7" FontSize="12" />
                 </StackPanel>
-                <Button Grid.Column="1" Content="Reject" Margin="0,0,8,0"
+                <c:Tag Grid.Column="3" Content="{Binding Tag}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <Button Grid.Column="4" Content="Review…" Margin="0,0,8,0"
+                        Command="{Binding ((vm:ProposalsViewModel)DataContext).ReviewCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding}" />
+                <Button Grid.Column="5" Content="Reject" Margin="0,0,8,0"
                         Command="{Binding ((vm:ProposalsViewModel)DataContext).RejectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                         CommandParameter="{Binding}" />
-                <Button Grid.Column="2" Content="Approve" Background="{DynamicResource AccentBrush}" Foreground="White"
+                <Button Grid.Column="6" Content="Approve" Background="{DynamicResource AccentBrush}" Foreground="White"
                         Command="{Binding ((vm:ProposalsViewModel)DataContext).ApproveCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                         CommandParameter="{Binding}" />
               </Grid>
