@@ -98,10 +98,12 @@ Each = new SDK interface + Infrastructure impl + DI registration + **integration
 engine from the SDK boundary** (closes the "engine never runs" gap; see 15-plan §Engine audit). Algorithms
 are specified in 15-plan §New backend tasks catalog — read that entry before coding each.
 
-- [ ] **BE-N0 · Index orchestration + trigger.** `IIndexOrchestrator.IndexAllAsync/IndexRepositoryAsync`;
-  after index → `ResolveAllAsync` → `IUsageAnalyzer.RecomputeAsync`, as one `IJobQueue` job. **Fix**
-  `EfCatalogStore.RefreshOneAsync` `HasMissingDeps=false` clobber. *Test:* index a temp repo via the
-  orchestrator → `PackageListItem`s exist, `HasMissingDeps` populated, usage recomputed.
+- [x] **BE-N0 · Index orchestration + trigger.** `IIndexOrchestrator.IndexAllAsync/IndexRepositoryAsync`;
+  after index → `ResolveAllAsync` → `IUsageAnalyzer.RecomputeAsync`. **Fixed** `EfCatalogStore.RefreshOneAsync`
+  `HasMissingDeps` clobber (now recomputed from the canonical var's `Dependency.IsMissing`). *Done:* SDK
+  `IIndexOrchestrator` + `Modules.Indexing/IndexOrchestrator` (scope-factory pattern, registered singleton).
+  T: `IndexOrchestratorFlowTests.Index_all_populates_read_model_resolves_and_recomputes` (missing-dep var →
+  `HasMissingDeps=true`) + `Index_all_on_a_real_repo` (D: 277-var corpus; E/F/G reserved as move targets).
 - [ ] **BE-N1 · `IDashboardService`.** *Test:* summary totals/tiers/classes/reclaim/attention from a seeded catalog.
 - [ ] **BE-N2 · `ITieringService`** (PlacementPolicy/MigrationPlanner/RebalancePlanner/UsageAnalyzer). *Test:* misplaced detection + plan build with a full-tier.
 - [ ] **BE-N3 · `IMigrationService`** (MigrationRunner/DurableFileMover). *Test:* run a plan → copy→verify→rename→delete, source trashed, single-copy excluded.

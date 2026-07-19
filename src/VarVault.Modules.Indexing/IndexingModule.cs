@@ -14,6 +14,7 @@ public sealed class IndexingModule : IModule
         // The orchestrator binds only to Domain/SDK seams; Infrastructure provides the
         // IRepositoryEnumerator/IVarInspector/ICatalogStore implementations via DI.
         services.AddSingleton<IIndexingService, IndexingService>();
+        services.AddSingleton<IIndexOrchestrator, IndexOrchestrator>();
         _ = context;
     }
 }

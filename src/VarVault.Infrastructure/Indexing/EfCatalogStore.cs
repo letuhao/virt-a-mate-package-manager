@@ -265,7 +265,10 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
         item.IsFavorite = package.IsFavorite;
         item.Class = stat?.Class ?? ContentClass.Cold;
         item.LastUsedAt = stat?.LastUsedAt;
-        item.HasMissingDeps = false; // dependency resolution is Slice 2
+        // Recompute from the canonical var's persisted deps — never clobber the resolver-maintained bit
+        // on a plain read-model refresh (BE-N0). Pre-resolution these are all not-missing.
+        item.HasMissingDeps = package.CanonicalVarFileId is { } canonicalId
+            && await db.Dependencies.AnyAsync(d => d.VarFileId == canonicalId && d.IsMissing, cancellationToken).ConfigureAwait(false);
 
         // Defer FTS maintenance to the batched rebuild at the end of the transaction. (1.25)
         deferredFts.Add((package.Id, BuildSearchBlob(package, counts)));
