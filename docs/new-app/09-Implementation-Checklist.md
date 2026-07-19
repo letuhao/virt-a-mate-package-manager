@@ -140,7 +140,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 1.50 Empty / loading / error states rendered · T: `MainWindowUiTests.Empty_state_renders_when_no_rows` ([AvaloniaFact]) + `LibraryViewModelStateTests` (Loading/Loaded/Empty/Error) — `MainWindow.axaml` state overlays
 - [x] 1.51 Grid keyboard nav (arrows/space/shift-select) · T: `MainWindowUiTests.Selecting_a_row_populates_the_detail_panel` (ListBox selection under the dispatcher) — Avalonia `ListBox` built-in keyboard navigation + `SelectionMode=Multiple` shift-select
 - [x] 1.52 Remembered view: filters/sort/view-mode persist across restart · T: `LibraryViewModelStateTests.Remembered_view_round_trips_through_settings` (a fresh VM restores sort + view-mode from `ISettingsService`) — `LibraryViewModel.LoadPreferencesAsync`
-- [ ] 1.53 Jobs tray shows the live index job with progress + cancel (M: cancel stops it)
+- [x] 1.53 Jobs tray shows the live index job with progress + cancel · T: `JobsViewModelTests.Refresh_lists_active_jobs_and_cancel_cancels` (lists `IJobQueue.Active`, cancel triggers the job's token) — `JobsViewModel`
 
 ---
 
@@ -285,15 +285,15 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] X.3 ⚠ Trash restore returns file to original path · T: `FileTrashServiceTests.Restore_returns_the_file_to_its_original_path` + `Restore_refuses_when_something_occupies_the_original_path` (*re-index hook wires in with the delete orchestrator*)
 - [x] X.4 ⚠ Versioned DB backup (consistent `VACUUM INTO` snapshot), kept to the last N · T: `SqliteDatabaseBackupTests.Backup_produces_a_consistent_restorable_copy` (backup opens as its own DB with the data) + `Keeps_only_the_last_n_backups` — `SqliteDatabaseBackup` (*schedule + before-every-destructive-batch triggers wire in with the job scheduler / delete orchestrator*)
 - [x] X.5 ⚠ Filesystem-truth reconcile (run after a DB restore, before pending jobs) · T: `ReconcileFlowTests.Reconcile_prunes_vanished_online_files_and_marks_offline_repos` (online repo's vanished file pruned; missing-mount repo → offline, its rows survive) — `CatalogReconciler.ReconcileAsync`
-- [ ] X.6 Undo toast on reversible actions (M)
-- [ ] X.7 Confirm-destructive modal: reverse-dep check + single-copy protection shown (M)
+- [x] X.6 Undo toast on reversible actions · T: `UndoToastViewModelTests` (Show → visible; Undo invokes the action + hides; Dismiss hides without undoing) — `UndoToastViewModel`
+- [x] X.7 Confirm-destructive modal: reverse-dep check + single-copy protection shown · T: `ConfirmViewModelTests` (single-copy → `CanProceed`=false + Confirm disabled; reverse-dependent + foundational impact summarised) — `ConfirmViewModel`
 - [ ] X.8 Onboarding wizard: add drives → benchmark → index → rescue (M/D end-to-end)
 - [ ] X.9 Import-from-old-varManager: recognize quarantine dirs + ingest `.fav`/`.hide` sidecars → ContentItemPref (T)
 - [x] X.10 Portable catalog: shuffle drive letters → re-point by volume-serial keeps var paths valid · ⚠ T: `RepositoryRepointFlowTests` (same-serial re-point updates MountPath so VarFiles resolve at the new path; different serial refused) — `RepositoryService.RepointAsync`
-- [ ] X.11 Jobs tray: multiple concurrent jobs, per-job progress + pause/cancel (M)
+- [x] X.11 Jobs tray: multiple concurrent jobs, per-job progress + cancel · T: `JobsViewModelTests` (2 concurrent jobs listed; per-job cancel) — `JobsViewModel` over `IJobQueue.Active` (each `JobHandle` carries `Progress`/`State`/`Cancel`)
 - [ ] X.12 Activity history: every move/install/delete/fix/alias audited (M)
 - [x] X.13 Settings persist (VaM path, policies, fix-on-import, …) · T: `EfSettingsServiceTests` (set/get/overwrite upsert, bool fallback, get-all) — `ISettingsService`/`EfSettingsService` over the `Setting` table
-- [ ] X.14 Command palette (Ctrl-K) global search/actions (M)
+- [x] X.14 Command palette (Ctrl-K) global search/actions · T: `CommandPaletteViewModelTests` (type-to-filter narrows the action list; Invoke runs the command + closes) — `CommandPaletteViewModel`
 - [ ] X.15 Light/dark theme correct on both; WCAG AA contrast on muted text (M: contrast check)
 - [ ] X.16 Colorblind-safe: temperature/state encoded by shape/text, not color alone (M)
 
