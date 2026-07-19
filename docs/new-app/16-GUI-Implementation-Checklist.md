@@ -184,8 +184,10 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
   `Views/TopBarView.axaml` + shell commands (`ToggleJobs`/`OpenPalette`/`AddRepo`/`Rescue`/`ToggleTheme`,
   `HasActiveJobs` dot, `SearchText`). T: `TopBarViewTests` (`Renders_controls_and_binds_commands`,
   `Jobs_dot_reflects_active_jobs`, `Toggle_jobs_and_theme_commands_work`).
-- [ ] **SH-4 · Jobs panel.** *Read:* `:233–238`. *Items:* Jobs-panel #7–20 (header, pause-all, 3× JobRow via
-  SC-12). *Test:* rows bind live `IJobQueue.Active` with progress + cancel.
+- [x] **SH-4 · Jobs panel.** *Read:* `:233–238`. *Items:* header, pause-all, JobRows (SC-12). *Done:*
+  `Views/JobsPanelView.axaml` (ItemsControl of `JobRow` over `ActiveJobs`, pause-all) + shell
+  `ActiveJobs`/`RefreshJobs`/`PauseAllCommand`. T: `JobsPanelViewTests`
+  (`Panel_renders_job_rows_with_progress`, `Pause_all_cancels_every_job`).
 - [ ] **SH-5 · Log dock.** *Read:* `:576`. *Items:* Log-dock #1–3 (index status, selected count, tier %). *Test:* binds job status + BE-N1 tier %.
 - [ ] **SH-6 · AppHost wiring.** Replace stub: build host, register **all** screen VMs + shell, resolve
   `ShellViewModel`. *Rule:* no orphaned VMs. *Test:* host resolves shell with all 13 screens non-null.

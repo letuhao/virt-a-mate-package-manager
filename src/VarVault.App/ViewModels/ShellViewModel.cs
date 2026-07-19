@@ -84,6 +84,25 @@ public sealed partial class ShellViewModel : ObservableObject
     /// <summary>Hook to open the add-repository dialog (wired in AppHost, SH-6).</summary>
     public System.Action? AddRepoHandler { get; set; }
 
+    /// <summary>Live background jobs shown in the panel (refreshed from IJobQueue by the shell). (SH-4)</summary>
+    public System.Collections.ObjectModel.ObservableCollection<Sdk.Threading.JobHandle> ActiveJobs { get; } = new();
+
+    /// <summary>Replace the active-jobs snapshot (AppHost polls IJobQueue and calls this). (SH-4)</summary>
+    public void RefreshJobs(System.Collections.Generic.IReadOnlyList<Sdk.Threading.JobHandle> jobs)
+    {
+        ActiveJobs.Clear();
+        foreach (var j in jobs)
+            ActiveJobs.Add(j);
+        HasActiveJobs = jobs.Count > 0;
+    }
+
+    [RelayCommand]
+    private void PauseAll()
+    {
+        foreach (var j in ActiveJobs)
+            j.Cancel();
+    }
+
     [RelayCommand] private void ToggleJobs() => JobsPanelOpen = !JobsPanelOpen;
     [RelayCommand] private void OpenPalette() => PaletteOpen = true;
     [RelayCommand] private void AddRepo() => AddRepoHandler?.Invoke();

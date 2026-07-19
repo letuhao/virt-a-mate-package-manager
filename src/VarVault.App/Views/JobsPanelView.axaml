@@ -1,0 +1,27 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:VarVault.App.Controls"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             x:Class="VarVault.App.Views.JobsPanelView"
+             x:DataType="vm:ShellViewModel">
+  <Border Width="340" IsVisible="{Binding JobsPanelOpen}"
+          Background="{DynamicResource Bg2Brush}" BorderBrush="{DynamicResource BorderHiBrush}"
+          BorderThickness="1" CornerRadius="{DynamicResource RadiusMd}" Padding="12">
+    <StackPanel Spacing="8">
+      <DockPanel>
+        <TextBlock Text="Background jobs" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+        <Button DockPanel.Dock="Right" HorizontalAlignment="Right" Content="pause all"
+                Background="Transparent" BorderThickness="0" Foreground="{DynamicResource AccentHiBrush}"
+                Command="{Binding PauseAllCommand}" />
+      </DockPanel>
+      <ItemsControl ItemsSource="{Binding ActiveJobs}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <c:JobRow Handle="{Binding}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <TextBlock Text="No background jobs." Opacity="0.6" IsVisible="{Binding !HasActiveJobs}" />
+    </StackPanel>
+  </Border>
+</UserControl>
