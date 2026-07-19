@@ -158,7 +158,10 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
   `ITagService`/`TagInfo` + `EfTagService` (create/tag/untag/list-with-counts/package-ids). Registered. T:
   `LibraryFacetsTests` (`Facet_filters_narrow_the_page`, `Tag_create_apply_list_and_query`). *(Saved views =
   client-side query presets; `ICollectionService` follows the same shape at the rail screen.)*
-- [ ] **BE-N13 · Onboarding/add-repo** (Register/Benchmark + reserveBytes + BE-N0). *Test:* register → benchmark → suggested tier → index.
+- [x] **BE-N13 · Onboarding/add-repo** (Register/Benchmark + reserveBytes + BE-N0). *Done:* SDK
+  `IOnboardingService`/`OnboardingResult` + `EfOnboardingService` (register → set reserve → orchestrator
+  index). Registered. T: `OnboardingServiceFlowTests.Add_and_index_registers_detects_and_populates` (tier
+  assigned, catalog populated) + `Add_and_index_a_real_repo` (D: corpus).
 - [ ] **BE-N14 · Command palette / search** (action registry + `LibraryQuery.SearchText`). *Test:* query returns package hits + nav actions.
 
 ---
