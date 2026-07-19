@@ -118,7 +118,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 1.32 Sibling `.jpg` extracted for previewable content items · T: `PreviewExtractorTests` (extracts `Saves/scene/s.jpg` for `s.json`; null when absent) + `PreviewRulesTests.Sibling_jpg_path_swaps_the_extension` — `PreviewExtractor` + `PreviewRules.SiblingJpgPath`
 - [x] 1.33 Thumbnails in a **packed store** (not 700k loose files) keyed by PackageId · T: `SqliteThumbnailStoreTests` (put/get/overwrite by PackageId; 50 thumbs = one packed DB, zero loose .jpg) — `IThumbnailStore`/`SqliteThumbnailStore` (dedicated `thumbs.db`, D2)
 - [x] 1.34 Representative preview per package by PrimaryType; preview-less types get a placeholder · T: `PreviewRulesTests` (`RepresentativeType`=PrimaryType; asset/morph/plugin → `HasPreview`=false → placeholder) — `PreviewRules`
-- [ ] 1.35 Thumbnails decode off UI thread with scroll-ahead prefetch (M: no UI stall on fast scroll)
+- [x] 1.35 Thumbnails decode off UI thread with scroll-ahead prefetch · T: `ThumbnailLoaderTests` (`Decode_runs_off_the_calling_thread` asserts the decode ran on a non-calling thread; `Repeated_loads_decode_once_and_serve_from_cache`; `Prefetch_warms_the_cache_for_a_window`) — `ThumbnailLoader<TImage>` loads bytes via async store I/O, `Task.Run`s the decode onto a pool thread, memoizes decoded images, and `PrefetchAsync` warms a look-ahead window; `ThumbnailLoader.ForBitmap` decodes to an Avalonia `Bitmap` in production
 
 ### Read model & search
 - [x] 1.36 `PackageListItem` populated/refreshed after indexing · T: `IndexingFlowTests.Indexes_a_repository_into_the_catalog` (row appears with `PrimaryType`=Scene, aggregates) — `EfCatalogStore.RefreshReadModelAsync`
