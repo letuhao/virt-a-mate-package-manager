@@ -72,6 +72,27 @@ public sealed class ForwardClosureFlowTests
         Assert.Equal([b.Id], closure);
     }
 
+    [Fact]
+    public async Task Current_latest_returns_the_highest_version()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+        WriteVar(repoDir, "C.Pkg.1.var", "C", "Pkg");
+        WriteVar(repoDir, "C.Pkg.3.var", "C", "Pkg");
+        WriteVar(repoDir, "C.Pkg.2.var", "C", "Pkg");
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+        var v3 = await db.Packages.FirstAsync(p => p.VarName == "C.Pkg.3");
+
+        var latest = await scope.ServiceProvider.GetRequiredService<IDependencyGraph>().CurrentLatestAsync("C", "Pkg");
+        Assert.Equal(v3.Id, latest); // highest VersionSort
+
+        Assert.Null(await scope.ServiceProvider.GetRequiredService<IDependencyGraph>().CurrentLatestAsync("C", "Ghost"));
+    }
+
     private static async Task<Guid> Register(TestHost host, string path)
     {
         using var scope = host.Host.Services.CreateScope();

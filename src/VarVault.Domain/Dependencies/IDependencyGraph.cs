@@ -12,4 +12,10 @@ public interface IDependencyGraph
     /// var's resolved edges), excluding itself. Terminates on cycles and stops at <paramref name="maxDepth"/>.
     /// </summary>
     Task<IReadOnlyList<long>> ForwardClosureAsync(long packageId, int maxDepth = 50, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The current latest package of a <c>(Creator, PackageName)</c> family (highest VersionSort), or
+    /// null. Index-backed for an effectively-O(1) <c>latest</c> deref. (Checklist 2.6.)
+    /// </summary>
+    Task<long?> CurrentLatestAsync(string creator, string packageName, CancellationToken cancellationToken = default);
 }

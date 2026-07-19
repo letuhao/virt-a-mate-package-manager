@@ -30,4 +30,14 @@ public sealed class EfDependencyGraph(VarVaultDbContext db) : IDependencyGraph
             .SqlQueryRaw<long>(sql, packageId, maxDepth)
             .ToListAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    public async Task<long?> CurrentLatestAsync(string creator, string packageName, CancellationToken cancellationToken = default)
+    {
+        // Backed by IX_Package_Creator_PackageName_VersionSort → effectively O(1).
+        return await db.Packages.AsNoTracking()
+            .Where(p => p.Creator == creator && p.PackageName == packageName)
+            .OrderByDescending(p => p.VersionSort)
+            .Select(p => (long?)p.Id)
+            .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+    }
 }
