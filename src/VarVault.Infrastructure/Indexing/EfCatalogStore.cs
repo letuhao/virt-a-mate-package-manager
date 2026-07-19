@@ -167,13 +167,47 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
     public async Task RefreshReadModelAsync(IReadOnlyCollection<long> packageIds, CancellationToken cancellationToken = default)
     {
         Guard.NotNull(packageIds);
-        foreach (var packageId in packageIds.Distinct())
-            await RefreshOneAsync(packageId, cancellationToken).ConfigureAwait(false);
+        var ids = packageIds.Distinct().ToList();
+        if (ids.Count == 0)
+            return;
 
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        // Batch the whole refresh in one transaction, deferring FTS maintenance so the search index is
+        // rebuilt once at the end rather than DELETE+INSERT per row inside its own implicit transaction. (1.25)
+        var deferredFts = new List<(long Id, string Blob)>(ids.Count);
+        var ownTransaction = db.Database.CurrentTransaction is null;
+        var transaction = ownTransaction
+            ? await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false)
+            : null;
+        try
+        {
+            foreach (var packageId in ids)
+                await RefreshOneAsync(packageId, deferredFts, cancellationToken).ConfigureAwait(false);
+
+            await RebuildSearchIndexAsync(deferredFts, cancellationToken).ConfigureAwait(false);
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+            if (transaction is not null)
+                await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (transaction is not null)
+                await transaction.DisposeAsync().ConfigureAwait(false);
+        }
     }
 
-    private async Task RefreshOneAsync(long packageId, CancellationToken cancellationToken)
+    // Apply all deferred FTS rows for a bulk refresh in a single pass (inside the caller's transaction).
+    private async Task RebuildSearchIndexAsync(List<(long Id, string Blob)> entries, CancellationToken cancellationToken)
+    {
+        foreach (var (id, blob) in entries)
+        {
+            await db.Database.ExecuteSqlRawAsync("DELETE FROM PackageSearch WHERE rowid = {0};", [id], cancellationToken).ConfigureAwait(false);
+            if (blob is not null)
+                await db.Database.ExecuteSqlRawAsync("INSERT INTO PackageSearch(rowid, Blob) VALUES ({0}, {1});", [id, blob], cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task RefreshOneAsync(long packageId, List<(long Id, string Blob)> deferredFts, CancellationToken cancellationToken)
     {
         var package = await db.Packages.FirstOrDefaultAsync(p => p.Id == packageId, cancellationToken).ConfigureAwait(false);
         var item = await db.PackageListItems.FirstOrDefaultAsync(x => x.PackageId == packageId, cancellationToken).ConfigureAwait(false);
@@ -182,6 +216,7 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
         {
             if (item is not null)
                 db.PackageListItems.Remove(item);
+            deferredFts.Add((packageId, null!)); // null blob → delete-only in the rebuild
             return;
         }
 
@@ -232,17 +267,15 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
         item.LastUsedAt = stat?.LastUsedAt;
         item.HasMissingDeps = false; // dependency resolution is Slice 2
 
-        await UpdateSearchIndexAsync(package, counts, cancellationToken).ConfigureAwait(false);
+        // Defer FTS maintenance to the batched rebuild at the end of the transaction. (1.25)
+        deferredFts.Add((package.Id, BuildSearchBlob(package, counts)));
     }
 
-    // Maintain the FTS5 search blob for a package: creator + names + content-type words (CJK-safe).
-    private async Task UpdateSearchIndexAsync(Package package, IReadOnlyDictionary<ContentType, int> counts, CancellationToken cancellationToken)
+    // The FTS5 search blob for a package: creator + names + content-type words (CJK-safe, trigram-tokenized).
+    private static string BuildSearchBlob(Package package, IReadOnlyDictionary<ContentType, int> counts)
     {
         var typeWords = string.Join(' ', counts.Where(c => c.Value > 0).Select(c => c.Key.ToString()));
-        var blob = $"{package.Creator} {package.PackageName} {package.VarName} {typeWords}".Trim();
-
-        await db.Database.ExecuteSqlRawAsync("DELETE FROM PackageSearch WHERE rowid = {0};", [package.Id], cancellationToken).ConfigureAwait(false);
-        await db.Database.ExecuteSqlRawAsync("INSERT INTO PackageSearch(rowid, Blob) VALUES ({0}, {1});", [package.Id, blob], cancellationToken).ConfigureAwait(false);
+        return $"{package.Creator} {package.PackageName} {package.VarName} {typeWords}".Trim();
     }
 
     private async Task ReplaceContentItemsAsync(long varFileId, IReadOnlyList<UpsertContentItem> items, CancellationToken cancellationToken)
