@@ -39,7 +39,13 @@ public class AppHostShellTests
         Assert.IsType<LibraryViewModel>(shell.ActiveScreen);
         shell.NavigateCommand.Execute("analytics");
         Assert.IsType<AnalyticsViewModel>(shell.ActiveScreen);
-        shell.NavigateCommand.Execute("settings"); // no view yet → placeholder
-        Assert.IsType<PlaceholderScreenViewModel>(shell.ActiveScreen);
+        shell.NavigateCommand.Execute("settings");
+        Assert.IsType<SettingsViewModel>(shell.ActiveScreen);
+        // Every screen now has a real (non-placeholder) view-model.
+        foreach (var s in ShellViewModel.AllScreens)
+        {
+            shell.NavigateCommand.Execute(s.Id);
+            Assert.IsNotType<PlaceholderScreenViewModel>(shell.ActiveScreen);
+        }
     }
 }

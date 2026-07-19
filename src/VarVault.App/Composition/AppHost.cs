@@ -34,6 +34,7 @@ public static class AppHost
             ["proposals"] = new ProposalsViewModel(services.GetRequiredService<IProposalService>()),
             ["health"] = new HealthViewModel(services.GetRequiredService<IHealthService>()),
             ["trash"] = new TrashViewModel(services.GetRequiredService<ITrashQueryService>()),
+            ["settings"] = new SettingsViewModel(services.GetRequiredService<Sdk.Settings.ISettingsService>()),
         };
 
         // Placeholders for screens whose full views arrive in SCR slices — keeps the shell complete.

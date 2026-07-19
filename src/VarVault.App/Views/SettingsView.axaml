@@ -1,0 +1,22 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:VarVault.App.Controls"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             x:Class="VarVault.App.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+  <StackPanel Margin="18" Spacing="12" MaxWidth="640" HorizontalAlignment="Left">
+    <TextBlock Text="Settings" FontSize="21" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+    <c:Card Header="General">
+      <Grid ColumnDefinitions="200,*" RowDefinitions="Auto,Auto">
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="VaM install path" VerticalAlignment="Center" Opacity="0.8" Margin="0,0,14,10" />
+        <TextBox Grid.Row="0" Grid.Column="1" Name="PART_VamPath" Text="{Binding VamPath}" Margin="0,0,0,10" />
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="Fix-on-import" VerticalAlignment="Center" Opacity="0.8" Margin="0,0,14,0" />
+        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding FixOnImport}" />
+      </Grid>
+    </c:Card>
+    <StackPanel Orientation="Horizontal" Spacing="10">
+      <Button Content="Save" Command="{Binding SaveCommand}" Background="{DynamicResource AccentBrush}" Foreground="White" />
+      <TextBlock Text="{Binding StatusMessage}" Opacity="0.7" VerticalAlignment="Center" />
+    </StackPanel>
+  </StackPanel>
+</UserControl>

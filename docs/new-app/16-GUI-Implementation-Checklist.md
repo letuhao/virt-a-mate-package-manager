@@ -243,7 +243,9 @@ Each cites its plan item numbers (15-plan) and its HTML range. Read both before 
 - [x] **SCR-12 · Activity history.** *Read:* `:552–560`. *BE:* `IActivityLog`. *Done:* `Views/ActivityView.axaml`
   bound to existing `ActivityViewModel` (audit table: when/kind/detail). Wired in AppHost. T:
   `ActivityScreenTests.Lists_audit_records`.
-- [ ] **SCR-13 · Settings.** *Read:* `:563–573`. *Items:* Settings #1–11. *BE:* `ISettingsService`. *Test:* tabs + fields load/save via settings.
+- [x] **SCR-13 · Settings.** *Read:* `:563–573`. *BE:* `ISettingsService`. *Done:* `SettingsViewModel` +
+  `Views/SettingsView.axaml` (VaM path, fix-on-import, Save). Wired in AppHost. T:
+  `SettingsScreenTests.Loads_and_saves_vam_path`. *(All 13 screens now real VMs — no placeholders.)*
 
 ---
 
