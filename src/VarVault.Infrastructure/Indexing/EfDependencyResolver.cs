@@ -87,6 +87,51 @@ public sealed class EfDependencyResolver(VarVaultDbContext db) : IDependencyReso
         return new DependencyResolutionResult(dependencies.Count - missing, missing, foundational);
     }
 
+    public async Task<int> ResolveFamilyAsync(string creator, string packageName, CancellationToken cancellationToken = default)
+    {
+        var targetFamily = IdentityFold.Compute($"{creator}.{packageName}");
+
+        var packages = await db.Packages
+            .Select(p => new { p.Id, p.Creator, p.PackageName, p.VersionSort })
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        var familyMap = new Dictionary<string, List<AvailableVersion>>(StringComparer.Ordinal);
+        var packageFamily = new Dictionary<long, string>();
+        foreach (var p in packages)
+        {
+            var family = IdentityFold.Compute($"{p.Creator}.{p.PackageName}");
+            packageFamily[p.Id] = family;
+            if (!familyMap.TryGetValue(family, out var list))
+                familyMap[family] = list = [];
+            list.Add(new AvailableVersion(p.VersionSort, p.Id));
+        }
+
+        var varFilePackage = await db.VarFiles
+            .Where(v => v.PackageId != null)
+            .Select(v => new { v.Id, PackageId = v.PackageId!.Value })
+            .ToDictionaryAsync(v => v.Id, v => v.PackageId, cancellationToken).ConfigureAwait(false);
+        var aliasMap = await db.VarAliases
+            .Where(a => a.ResolvedPackageId != null)
+            .Select(a => new { a.MissingRefKey, PackageId = a.ResolvedPackageId!.Value })
+            .ToDictionaryAsync(a => a.MissingRefKey, a => a.PackageId, cancellationToken).ConfigureAwait(false);
+
+        var dependencies = await db.Dependencies.ToListAsync(cancellationToken).ConfigureAwait(false);
+        var touched = 0;
+        foreach (var dep in dependencies)
+        {
+            var parsed = DependencyRef.Parse(dep.DependsOnRefRaw);
+            if (parsed.IsFailure || !string.Equals(parsed.Value.FamilyKey, targetFamily, StringComparison.Ordinal))
+                continue; // only edges targeting the changed family
+
+            long? containerPackage = varFilePackage.TryGetValue(dep.VarFileId, out var cp) ? cp : null;
+            var containerFamily = containerPackage is { } cpid && packageFamily.TryGetValue(cpid, out var cf) ? cf : null;
+            ResolveOne(dep, containerPackage, containerFamily, familyMap, aliasMap);
+            touched++;
+        }
+
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return touched;
+    }
+
     private static void ResolveOne(
         Dependency dep,
         long? containerPackage,

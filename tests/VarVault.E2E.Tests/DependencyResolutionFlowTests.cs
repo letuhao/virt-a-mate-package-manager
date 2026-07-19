@@ -136,6 +136,40 @@ public sealed class DependencyResolutionFlowTests
         Assert.False(reloaded.IsMissing); // and it resolves to the present package
     }
 
+    [Fact]
+    public async Task Incremental_reresolve_touches_only_the_changed_family()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+
+        // Base v1 present; a consumer depends on Base.latest AND Other.Thing.1.
+        WriteVar(repoDir, "Base.Lib.1.var", Meta("Base", "Lib"), [("Custom/Hair/h.vam", "a")]);
+        WriteVar(repoDir, "Other.Thing.1.var", Meta("Other", "Thing"), [("Custom/Hair/h.vam", "o")]);
+        WriteVar(repoDir, "Author.Consumer.1.var", Meta("Author", "Consumer", "Base.Lib.latest", "Other.Thing.1"), [("Custom/Clothing/c.vam", "c")]);
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        var resolver = scope.ServiceProvider.GetRequiredService<IDependencyResolver>();
+        await resolver.ResolveAllAsync();
+
+        var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+        var baseV1 = await db.Packages.FirstAsync(p => p.VarName == "Base.Lib.1");
+        var latestDep = await db.Dependencies.FirstAsync(d => d.DependsOnRefRaw == "Base.Lib.latest");
+        Assert.Equal(baseV1.Id, latestDep.ResolvedPackageId);
+
+        // A new Base version arrives; index + incrementally re-resolve ONLY the Base.Lib family.
+        WriteVar(repoDir, "Base.Lib.2.var", Meta("Base", "Lib"), [("Custom/Hair/h.vam", "b")]);
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+        var touched = await resolver.ResolveFamilyAsync("Base", "Lib");
+
+        db.ChangeTracker.Clear();
+        var baseV2 = await db.Packages.FirstAsync(p => p.VarName == "Base.Lib.2");
+        var reloadedLatest = await db.Dependencies.FirstAsync(d => d.DependsOnRefRaw == "Base.Lib.latest");
+        Assert.Equal(baseV2.Id, reloadedLatest.ResolvedPackageId); // latest now points to v2
+        Assert.True(touched >= 1);
+    }
+
     private static void WriteVarWithScene(TempDirectory dir, string fileName, string metaCreator, string metaPackage, string sceneJson)
     {
         var path = Path.Combine(dir.Path, fileName);

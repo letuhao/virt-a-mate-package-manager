@@ -13,4 +13,11 @@ public sealed record DependencyResolutionResult(int Resolved, int Missing, int F
 public interface IDependencyResolver
 {
     Task<DependencyResolutionResult> ResolveAllAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Incrementally re-resolve only the edges targeting one <c>(Creator, PackageName)</c> family —
+    /// e.g. after a new version arrives, so <c>latest</c> refs update without touching unrelated edges.
+    /// Returns the number of edges re-resolved. (Checklist 2.7.)
+    /// </summary>
+    Task<int> ResolveFamilyAsync(string creator, string packageName, CancellationToken cancellationToken = default);
 }
