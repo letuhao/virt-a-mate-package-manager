@@ -23,6 +23,7 @@ public static class PersistenceRegistration
         services.AddScoped<IUnitOfWork>(sp => new EfUnitOfWork(sp.GetRequiredService<VarVaultDbContext>()));
         services.AddScoped<ICatalogStore, EfCatalogStore>();
         services.AddScoped<IDependencyResolver, EfDependencyResolver>();
+        services.AddScoped<Domain.Analyzer.IUsageAnalyzer, EfUsageAnalyzer>();
         services.AddScoped<IRepositoryStore, EfRepositoryStore>();
         services.AddScoped<Sdk.Library.ILibraryQueryService, Library.EfLibraryQueryService>();
         services.AddSingleton<CatalogDatabaseInitializer>();

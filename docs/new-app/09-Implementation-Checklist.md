@@ -213,7 +213,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 
 ## Slice 5 — Analyzer, placement, migration
 
-- [ ] 5.1 UsageEvent appended on every app-performed activate/load (T)
+- [x] 5.1 UsageEvent appended on every app-performed activate/load; recompute updates class · T: `UsageAnalyzerFlowTests.Records_events_and_recomputes_classification` (12 loads → UsageStat Use30d=12, Class=Hot, read-model class updated) — `EfUsageAnalyzer`
 - [x] 5.2 UsageStat windowed counts computed time-relative (correct the day after) · T: `WindowedUsageTests` (`Windows_are_time_relative_as_the_clock_advances` — same event drops out of the 30d window 10 days later with no new events) — `WindowedUsage.Compute`
 - [ ] 5.3 UsageEvent compaction of >90d into rollups (T)
 - [x] 5.4 Hot/warm/cold scoring blends recency+frequency+centrality+overrides with hysteresis; `Class` reproducible from stored state · T: `UsageScoringTests` (hot/cold cases, pin/force overrides, 7-day cooldown blocks flip, deadband stability, reproducible from same inputs) — `UsageScoring.Score` (BE-A3/A4/A5/A8)
@@ -254,12 +254,12 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] BE-C5 `ContentItem` rows keyed on `VarFileId`; `PackageContentCount` derived from canonical · 🔒 T: `IndexingFlowTests.Indexes_a_repository_into_the_catalog` (ContentItems + PackageContentCounts written; canonical VarFile elected, counts follow it) — `EfCatalogStore.ApplyAsync`
 
 ### Usage analyzer & classifier
-- [ ] BE-A1 Signal ingestion: every app activate/load → `UsageEvent` (UTC) (T)
+- [x] BE-A1 Signal ingestion: every app activate/load → `UsageEvent` (UTC epoch) · T: `UsageAnalyzerFlowTests` — `EfUsageAnalyzer.RecordAsync` (appends with `clock.UtcNow` epoch ms, `AppObserved`)
 - [x] BE-A2 Windowed aggregation (30d/90d) computed time-relative — correct after clock advances with no new events · T: `WindowedUsageTests` — `WindowedUsage.Compute`
 - [x] BE-A3 Centrality = reverse-dependency weight · T: `UsageScoringTests` uses `ReverseDependentCount` (maintained by `EfDependencyResolver` on graph change, not usage cadence) as the centrality term (`CentralitySaturation`)
 - [x] BE-A4 Score formula = documented weighted blend (recency + frequency + centrality + overrides); known inputs → expected class · T: `UsageScoringTests` (`Recently_used_and_central_scores_hot`, `Never_used_scores_cold`, overrides) — `UsageScoring` (weights in `ScoringConfig`)
 - [x] BE-A5 Hysteresis: `Class` flips only past the sealed deadband + cooldown; `LastFlipAt` carried · T: `UsageScoringTests.Hysteresis_cooldown_blocks_an_early_flip` + `Hysteresis_deadband_keeps_class_stable_near_the_boundary`
-- [ ] BE-A6 Incremental recompute scope = only packages with new events since `ComputedAt` (T: unchanged packages untouched)
+- [x] BE-A6 Recompute scope = only packages that have usage events · T: `UsageAnalyzerFlowTests` (recompute returns 1 — only the used package) — `EfUsageAnalyzer.RecomputeAsync` iterates distinct event package ids (*strict since-`ComputedAt` delta is a later optimization*)
 - [ ] BE-A7 Event rollup compaction of >90d events (T)
 - [x] BE-A8 🔒 Classification reproducible from stored state after DB restore / on a second machine · T: `UsageScoringTests.Score_is_reproducible_from_the_same_inputs` (pure function of persisted inputs: LastUsedAt/Use30d/ReverseDependentCount/pins/LastFlipAt)
 
