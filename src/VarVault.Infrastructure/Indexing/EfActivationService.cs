@@ -1,0 +1,108 @@
+using Microsoft.EntityFrameworkCore;
+using VarVault.Common;
+using VarVault.Domain.Dependencies;
+using VarVault.Domain.Entities;
+using VarVault.Infrastructure.Persistence;
+using VarVault.Sdk.Activation;
+
+namespace VarVault.Infrastructure.Indexing;
+
+/// <summary>
+/// EF activation link builder: member closure → hottest online copy per package → ActivationLink rows.
+/// (Checklist 3.4/3.5/3.7.)
+/// </summary>
+public sealed class EfActivationService(VarVaultDbContext db, IClock clock, IDependencyGraph graph) : IActivationService
+{
+    public async Task<ActivationBuildResult> BuildProfileLinksAsync(long presetId, CancellationToken cancellationToken = default)
+    {
+        var preset = await db.LoadingPresets.FirstOrDefaultAsync(p => p.Id == presetId, cancellationToken).ConfigureAwait(false);
+        if (preset is null)
+            return new ActivationBuildResult(0, 0);
+
+        var now = clock.UtcNow.UtcDateTime;
+        var profile = await EnsureProfileAsync(preset, now, cancellationToken).ConfigureAwait(false);
+
+        // Direct members + their forward-dependency closure.
+        var direct = await db.PresetMembers.AsNoTracking()
+            .Where(m => m.PresetId == presetId && m.ResolvedPackageId != null)
+            .Select(m => m.ResolvedPackageId!.Value)
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        var directSet = direct.ToHashSet();
+
+        var full = new HashSet<long>(directSet);
+        foreach (var id in directSet)
+        {
+            foreach (var dep in await graph.ForwardClosureAsync(id, cancellationToken: cancellationToken).ConfigureAwait(false))
+                full.Add(dep);
+        }
+
+        // Replace the profile's links.
+        var existing = await db.ActivationLinks.Where(l => l.ProfileId == profile.Id).ToListAsync(cancellationToken).ConfigureAwait(false);
+        if (existing.Count > 0)
+            db.ActivationLinks.RemoveRange(existing);
+
+        var created = 0;
+        var missing = 0;
+        foreach (var packageId in full)
+        {
+            var varFileId = await PickHottestOnlineCopyAsync(packageId, cancellationToken).ConfigureAwait(false);
+            if (varFileId is null)
+            {
+                missing++; // no online copy to link
+                continue;
+            }
+
+            db.ActivationLinks.Add(new ActivationLink
+            {
+                ProfileId = profile.Id,
+                VarFileId = varFileId.Value,
+                LinkPath = $"{profile.DirPath}/___VarsLink___/{packageId}.var",
+                LinkKind = LinkKind.Install,
+                LinkType = LinkType.Symlink,
+                Reason = directSet.Contains(packageId) ? ActivationReason.Explicit : ActivationReason.DependencyOf,
+                RequestedByPresetId = presetId,
+            });
+            created++;
+        }
+
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return new ActivationBuildResult(created, missing);
+    }
+
+    // The hottest online copy = the VarFile in the lowest-tier online repository. (3.4)
+    private async Task<long?> PickHottestOnlineCopyAsync(long packageId, CancellationToken cancellationToken)
+    {
+        return await (
+            from v in db.VarFiles
+            join r in db.Repositories on v.RepositoryId equals r.Id
+            where v.PackageId == packageId && r.IsOnline && r.IsEnabled
+            orderby r.Tier, r.PriorityInTier, v.Id
+            select (long?)v.Id)
+            .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<Profile> EnsureProfileAsync(LoadingPreset preset, DateTime now, CancellationToken cancellationToken)
+    {
+        if (preset.ProfileId is { } pid)
+        {
+            var existing = await db.Profiles.FirstOrDefaultAsync(p => p.Id == pid, cancellationToken).ConfigureAwait(false);
+            if (existing is not null)
+                return existing;
+        }
+
+        var profile = new Profile
+        {
+            Name = preset.Name,
+            DirPath = $"___AddonPacksSwitch ___/{preset.Name}",
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        db.Profiles.Add(profile);
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        preset.ProfileId = profile.Id;
+        preset.UpdatedAt = now;
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return profile;
+    }
+}
