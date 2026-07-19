@@ -135,7 +135,11 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
   (VaM root from `SettingKeys.VamPath`; list/create/active/switch delegate to `IVamProfileService`),
   registered. T: `ProfileServiceFlowTests.Create_list_and_switch_profiles` (switch skips on `symlink.privilege`)
   + `List_is_empty_without_vam_path`.
-- [ ] **BE-N8 · `IProposalService`** (aggregates N2/N4/N5/stale). *Test:* proposals listed; approve dispatches to the right runner; reject records.
+- [x] **BE-N8 · `IProposalService`** (aggregates N2/N4/N5/stale). *Done:* SDK `IProposalService`
+  (`Proposal`/`ProposalKind`/`ProposalActionResult`) + `EfProposalService` — lists Rebalance/Dedup/
+  EncodingFix/RetireStale; Approve dispatches to migration/reclaim/health/trash; Reject records. Registered.
+  T: `ProposalServiceFlowTests.Lists_proposals_and_approve_dispatches` (dedup approve trashes redundant;
+  stale approve retires old version; reject ok).
 - [ ] **BE-N9 · `IPackageDetailQuery`** (IDependencyGraph fwd+rev, ContentItem, VarFile lineage, IThumbnailStore). *Test:* detail returns deps closure, content items, copies for a seeded package.
 - [ ] **BE-N10 · `ILibraryActionService`** (activation/move/preset/txt). *Test:* install creates links; delete gated by `DeletionPredicate` → trash; export/import txt round-trips.
 - [ ] **BE-N11 · `IAliasService`** (VarAlias). *Test:* set alias → resolver substitutes it; missing→owned mapping applied on activation.
