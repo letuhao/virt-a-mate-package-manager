@@ -33,6 +33,10 @@ public sealed class MigrationRunner(VarVaultDbContext db, IDurableFileMover move
         if (sourceRepo is null || targetRepo is null)
             return await FailAsync(job, "source or target repository missing", cancellationToken).ConfigureAwait(false);
 
+        // ⚠ Never migrate TO a removable/network tier — data could vanish with the drive. (5.11)
+        if (targetRepo.MediaType is MediaType.Removable or MediaType.Network)
+            return await FailAsync(job, "cannot migrate to a removable/network tier", cancellationToken).ConfigureAwait(false);
+
         var sourcePath = Path.Combine(sourceRepo.MountPath, source.RelativePath);
         var targetPath = Path.Combine(targetRepo.MountPath, source.RelativePath);
 

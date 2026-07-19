@@ -224,8 +224,8 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 5.7 🔒⚠ State machine Planned→Copying→Verifying→Renaming→Deleting→Done, idempotent resume · T: `MigrationFlowTests.Migrates_a_var_between_repos_and_trashes_the_source` (Planned→Done) + `Resume_from_copying_completes_the_migration` (a job persisted in Copying resumes to Done) — `MigrationRunner` (target row inserted post-verify; skips already-done steps)
 - [x] 5.8 🔒⚠ Copy to `.partial` temp → flush (WriteThrough/`FlushFileBuffers`) → verify by full-hash re-read → atomic rename; source left for the caller to delete last · T: `DurableFileMoverTests` (verified copy, source preserved, no leftover `.partial`, refuses overwrite, cancellation leaves nothing) — `DurableFileMover` (*cache-bypassed `FILE_FLAG_NO_BUFFERING` verify is a later hardening*)
 - [ ] 5.9 🔒⚠ `synchronous=FULL` on any transaction gating a destructive FS op (T)
-- [ ] 5.10 ⚠ Free-space reservation ledger; concurrent jobs can't overfill past MinFree (T)
-- [ ] 5.11 ⚠ Never migrate TO removable/network tier (T)
+- [x] 5.10 ⚠ Free-space reservation ledger; concurrent jobs can't overfill past MinFree · T: `FreeSpaceLedgerTests` (reserve within free−minFree, concurrent reservations can't breach MinFree, release frees capacity, per-repo budgets) — `FreeSpaceLedger`
+- [x] 5.11 ⚠ Never migrate TO removable/network tier · T: `MigrationFlowTests.Refuses_to_migrate_to_a_removable_target` (Removable target → job Failed, source untouched) — `MigrationRunner`
 - [x] 5.12 ⚠ Re-point ActivationLink/CanonicalVarFileId/refs to surviving copy BEFORE deleting source · T: `MigrationFlowTests.Migrates_a_var_between_repos...` (`CanonicalVarFileId` re-points to the target row; ActivationLinks re-pointed) — `MigrationRunner` re-points before trashing the source (which goes to trash, X.1)
 - [x] 5.13 Interrupted copy leaves temp only; destination appears only post-verify · T: `DurableFileMoverTests.Cancellation_leaves_no_destination` + `Copies_verifies_and_renames...` (dest created only after verify via atomic rename) — `DurableFileMover` (*indexing already skips `.partial` since it enumerates `*.var`; target DB row post-verify wires in with the migration orchestrator*)
 - [ ] 5.14 Proposals inbox: all pending migrations/dedup/fixes/stale queue; approve/reject/batch (M)
@@ -266,7 +266,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 ### Placement & migration planner
 - [x] BE-P1 Desired tier = f(class, policy); diff → misplaced set · T: `PlacementPolicyTests` — `PlacementPolicy.DesiredTier`/`IsMisplaced` (actual tier = VarFile→Repo→Tier at call sites)
 - [x] BE-P2 ⚠ Proposal set excludes single-copy, offline members, and removable/network targets · T: `MigrationPlannerTests.Excludes_single_copy_offline_and_unsafe_targets` — `MigrationPlanner`
-- [ ] BE-P3 ⚠ Free-space reservation ledger for concurrent-job capacity safety (T)
+- [x] BE-P3 ⚠ Free-space reservation ledger for concurrent-job capacity safety · T: `FreeSpaceLedgerTests` — `FreeSpaceLedger` (thread-safe reserve/release, `free − reserved − requested ≥ minFree`)
 - [ ] BE-P4 ETA estimate from bytes ÷ target write speed (M)
 - [x] BE-P5 🔒 Propose-only by default; auto-execute is explicit opt-in · T: `MigrationPlannerTests.Planner_only_proposes_and_never_returns_an_executed_action` — `MigrationPlanner.Plan` returns proposals only; it has no execute path (execution is a separate, explicitly-invoked step)
 

@@ -86,6 +86,32 @@ public sealed class MigrationFlowTests
         Assert.True(File.Exists(Path.Combine(targetRepo.Path, "A.Thing.1.var")));
     }
 
+    [Fact]
+    public async Task Refuses_to_migrate_to_a_removable_target()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var sourceRepo = new TempDirectory();
+        using var targetRepo = new TempDirectory();
+        var sourceId = await Register(host, sourceRepo.Path);
+        var targetId = await Register(host, targetRepo.Path);
+
+        WriteVar(sourceRepo, "A.Thing.1.var", "A", "Thing");
+        await host.Get<IIndexingService>().IndexRepositoryAsync(sourceId, sourceRepo.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+        var target = await db.Repositories.FirstAsync(r => r.Id == targetId);
+        target.MediaType = MediaType.Removable; // ⚠ never migrate here (5.11)
+        var vf = await db.VarFiles.FirstAsync();
+        var job = new MigrationJob { VarFileId = vf.Id, SourceRepositoryId = sourceId, TargetRepositoryId = targetId, State = MigrationState.Planned };
+        db.MigrationJobs.Add(job);
+        await db.SaveChangesAsync();
+
+        var state = await scope.ServiceProvider.GetRequiredService<MigrationRunner>().RunAsync(job.Id);
+        Assert.Equal(MigrationState.Failed, state);
+        Assert.True(File.Exists(Path.Combine(sourceRepo.Path, "A.Thing.1.var"))); // source untouched
+    }
+
     private static async Task<Guid> Register(TestHost host, string path)
     {
         using var scope = host.Host.Services.CreateScope();
