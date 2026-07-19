@@ -19,9 +19,17 @@ public enum LibraryState { Loading, Loaded, Empty, Error }
 /// (visible vs all-matching), load states, and a remembered view persisted to settings.
 /// (Checklist 1.43–1.47, 1.49, 1.50, 1.52.)
 /// </summary>
-public sealed partial class LibraryViewModel(ILibraryQueryService library, ISettingsService? settings = null) : ObservableObject
+public sealed partial class LibraryViewModel(
+    ILibraryQueryService library,
+    ISettingsService? settings = null,
+    Func<TimeSpan, CancellationToken, Task>? delay = null) : ObservableObject
 {
     private const int PageSize = 100;
+
+    /// <summary>How long typing must settle before the exact faceted count is recomputed. (1.41)</summary>
+    private static readonly TimeSpan DebounceInterval = TimeSpan.FromMilliseconds(250);
+    private readonly Func<TimeSpan, CancellationToken, Task> _delay = delay ?? Task.Delay;
+    private CancellationTokenSource? _debounceCts;
     private const string PrefSort = "library.sort";
     private const string PrefDescending = "library.descending";
     private const string PrefViewMode = "library.view_mode";
@@ -41,6 +49,15 @@ public sealed partial class LibraryViewModel(ILibraryQueryService library, ISett
     [ObservableProperty] private int _totalCount;
     [ObservableProperty] private LibraryState _state = LibraryState.Loading;
     [ObservableProperty] private PackageListEntry? _selectedEntry;
+
+    /// <summary>
+    /// True while a keystroke is pending settle: the displayed <see cref="TotalCount"/> is the last exact
+    /// value (approximate for the in-flight query) until the debounced refresh recomputes it. (1.41)
+    /// </summary>
+    [ObservableProperty] private bool _isCountApproximate;
+
+    /// <summary>The debounced refresh triggered by the latest keystroke; exposed so tests can await settle. (1.41)</summary>
+    public Task? PendingRefresh { get; private set; }
 
     public bool IsLoading => State == LibraryState.Loading;
     public bool IsEmpty => State == LibraryState.Empty;
@@ -73,6 +90,7 @@ public sealed partial class LibraryViewModel(ILibraryQueryService library, ISett
 
             await LoadPageAsync(cancellationToken).ConfigureAwait(true);
             State = Items.Count == 0 ? LibraryState.Empty : LibraryState.Loaded;
+            IsCountApproximate = false; // the count now reflects the settled query exactly
         }
         catch (Exception) when (!cancellationToken.IsCancellationRequested)
         {
@@ -187,6 +205,28 @@ public sealed partial class LibraryViewModel(ILibraryQueryService library, ISett
 
     // Keep the derived state flags fresh when State changes via the generated setter.
     partial void OnStateChanged(LibraryState value) => NotifyStateFlags();
+
+    // Typing coalesces into one exact refresh after DebounceInterval; until then the count is approximate. (1.41)
+    partial void OnSearchTextChanged(string? value)
+    {
+        IsCountApproximate = true;
+        PendingRefresh = DebouncedRefreshAsync();
+    }
+
+    private async Task DebouncedRefreshAsync()
+    {
+        _debounceCts?.Cancel();
+        using var cts = _debounceCts = new CancellationTokenSource();
+        try
+        {
+            await _delay(DebounceInterval, cts.Token).ConfigureAwait(true);
+            await RefreshAsync(cts.Token).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer keystroke — the newer one owns the refresh.
+        }
+    }
 
     partial void OnViewModeChanged(LibraryViewMode value)
     {

@@ -58,8 +58,11 @@
     </Border>
 
     <!-- Status line -->
-    <TextBlock DockPanel.Dock="Bottom" Margin="18,4,18,12" Opacity="0.7"
-               Text="{Binding Library.TotalCount, StringFormat='{}{0} packages'}" />
+    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="18,4,18,12" Opacity="0.7">
+      <!-- "~" marks the count as approximate while typing settles (1.41). -->
+      <TextBlock Text="~" IsVisible="{Binding Library.IsCountApproximate}" />
+      <TextBlock Text="{Binding Library.TotalCount, StringFormat='{}{0} packages'}" />
+    </StackPanel>
 
     <!-- Content area with state overlays -->
     <Panel Margin="16,4">

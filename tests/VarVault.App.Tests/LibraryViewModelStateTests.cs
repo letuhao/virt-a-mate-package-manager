@@ -96,6 +96,46 @@ public class LibraryViewModelStateTests
     }
 
     [Fact]
+    public async Task Typing_flags_count_approximate_then_exact_after_settle()
+    {
+        // A yielding delay lets the setter return before the refresh completes, so the interim state is observable.
+        var vm = new LibraryViewModel(new StubLibrary(7), delay: async (_, _) => await Task.Yield());
+
+        vm.SearchText = "sce";
+        Assert.True(vm.IsCountApproximate);          // in-flight: shown count is stale/approximate
+
+        await vm.PendingRefresh!;                     // let the debounced refresh settle
+        Assert.False(vm.IsCountApproximate);          // now exact
+        Assert.Equal(7, vm.TotalCount);
+    }
+
+    [Fact]
+    public async Task Rapid_typing_coalesces_into_a_single_refresh()
+    {
+        // A gate delay per keystroke: superseded keystrokes are cancelled; only the last one fires.
+        var gates = new List<TaskCompletionSource>();
+        var library = new CountingLibrary(total: 3);
+        var vm = new LibraryViewModel(library, delay: (_, ct) =>
+        {
+            var tcs = new TaskCompletionSource();
+            gates.Add(tcs);
+            ct.Register(() => tcs.TrySetCanceled());
+            return tcs.Task;
+        });
+
+        vm.SearchText = "s";    // gate[0]
+        vm.SearchText = "sc";   // cancels gate[0], gate[1]
+        vm.SearchText = "sce";  // cancels gate[1], gate[2] pends
+
+        Assert.Equal(0, library.PageCalls);           // nothing queried mid-typing
+        gates[^1].TrySetResult();                     // the settled keystroke proceeds
+        await vm.PendingRefresh!;
+
+        Assert.Equal(1, library.PageCalls);           // exactly one refresh, not three
+        Assert.False(vm.IsCountApproximate);
+    }
+
+    [Fact]
     public void Format_size_is_human_readable()
     {
         Assert.Equal("1.0 GB", LibraryViewModel.FormatSize(1L << 30));
@@ -119,6 +159,22 @@ public class LibraryViewModelStateTests
 
         public Task<IReadOnlyList<long>> GetOrderedIdsAsync(LibraryQuery query, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<long>>(Enumerable.Range(0, total).Select(i => (long)i).ToList());
+    }
+
+    private sealed class CountingLibrary(int total) : ILibraryQueryService
+    {
+        public int PageCalls { get; private set; }
+
+        public Task<LibraryPage> GetPageAsync(LibraryQuery query, CancellationToken cancellationToken = default)
+        {
+            PageCalls++;
+            return Task.FromResult(new LibraryPage([], total));
+        }
+
+        public Task<IReadOnlyList<string>> GetCreatorsAsync(CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>(["C"]);
+        public Task<IReadOnlyList<long>> GetOrderedIdsAsync(LibraryQuery query, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<long>>([]);
     }
 
     private sealed class ThrowingLibrary : ILibraryQueryService
