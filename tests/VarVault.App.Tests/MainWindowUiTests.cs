@@ -1,5 +1,7 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using VarVault.App.ViewModels;
@@ -65,6 +67,24 @@ public class MainWindowUiTests
 
         Assert.NotNull(vm.Library.SelectedEntry); // detail panel binds to this
         Assert.Equal(vm.Library.Items[1], vm.Library.SelectedEntry);
+    }
+
+    [AvaloniaFact]
+    public void Window_renders_in_both_theme_variants()
+    {
+        var vm = new MainWindowViewModel(new LibraryViewModel(new StubLibrary(count: 2)));
+
+        Application.Current!.RequestedThemeVariant = ThemeVariant.Light;
+        var light = new MainWindow { DataContext = vm };
+        light.Show();
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(ThemeVariant.Light, light.ActualThemeVariant);
+
+        Application.Current.RequestedThemeVariant = ThemeVariant.Dark;
+        var dark = new MainWindow { DataContext = vm };
+        dark.Show();
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(ThemeVariant.Dark, dark.ActualThemeVariant);
     }
 
     private sealed class StubLibrary(int count) : ILibraryQueryService

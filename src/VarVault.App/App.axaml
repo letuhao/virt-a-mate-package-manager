@@ -8,9 +8,21 @@
   </Application.Styles>
 
   <Application.Resources>
-    <!-- Minimal design tokens (doc 13). A picked accent, not a default. -->
-    <Color x:Key="AccentColor">#3B6EA5</Color>
-    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
+    <ResourceDictionary>
+      <!-- Accent token tuned per theme variant so it reads well on both grounds. (X.15) -->
+      <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+          <Color x:Key="AccentColor">#2F5E8F</Color>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+          <Color x:Key="AccentColor">#6AA0DC</Color>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Default">
+          <Color x:Key="AccentColor">#3B6EA5</Color>
+        </ResourceDictionary>
+      </ResourceDictionary.ThemeDictionaries>
+      <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}" />
+    </ResourceDictionary>
   </Application.Resources>
 
 </Application>
