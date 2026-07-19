@@ -15,6 +15,7 @@ namespace VarVault.Modules.Repositories;
 internal sealed class RepositoryService(
     IServiceScopeFactory scopeFactory,
     IDriveProfiler driveProfiler,
+    IDriveBenchmark driveBenchmark,
     IClock clock,
     ILogger<RepositoryService> logger) : IRepositoryService
 {
@@ -138,6 +139,27 @@ internal sealed class RepositoryService(
         await store.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         logger.LogInformation("Re-pointed repository {Id} to {Path}", repo.Id, repo.MountPath);
+        return Map(repo);
+    }
+
+    public async Task<RepositoryInfo?> BenchmarkAsync(Guid repositoryId, CancellationToken cancellationToken = default)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IRepositoryStore>();
+        var repo = await store.FindAsync(repositoryId, cancellationToken).ConfigureAwait(false);
+        if (repo is null || !System.IO.Directory.Exists(repo.MountPath))
+            return null;
+
+        var result = await driveBenchmark.MeasureAsync(repo.MountPath, cancellationToken).ConfigureAwait(false);
+        repo.ReadSpeedMBps = result.ReadMBps;
+        repo.WriteSpeedMBps = result.WriteMBps;
+        repo.BenchmarkedAt = clock.UtcNow.UtcDateTime;
+        repo.Tier = _tierPolicy.AssignTier(repo.MediaType, result.ReadMBps); // re-tier from the benchmark (1.6)
+        repo.UpdatedAt = clock.UtcNow.UtcDateTime;
+        await store.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        logger.LogInformation("Benchmarked {Id}: {Read:F0}/{Write:F0} MB/s → tier {Tier}",
+            repo.Id, result.ReadMBps, result.WriteMBps, repo.Tier);
         return Map(repo);
     }
 

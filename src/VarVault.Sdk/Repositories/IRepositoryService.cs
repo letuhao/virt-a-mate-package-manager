@@ -36,4 +36,7 @@ public interface IRepositoryService
     /// (Checklist 1.4/BE-R4, X.10.)
     /// </summary>
     Task<Result<RepositoryInfo>> RepointAsync(Guid repositoryId, string newPath, CancellationToken cancellationToken = default);
+
+    /// <summary>Benchmark the repo's drive, store the speeds, and re-assign its tier from them. (BE-R1/1.5/1.6.)</summary>
+    Task<RepositoryInfo?> BenchmarkAsync(Guid repositoryId, CancellationToken cancellationToken = default);
 }

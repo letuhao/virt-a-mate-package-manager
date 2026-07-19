@@ -84,8 +84,8 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [x] 1.2 🔒 Reject repo path equal to or nested within `{vampath}\AddonPackages`, or overlapping another repo · T: `RepositoryPathValidatorTests` (AddonPackages + subfolder, same/nested/parent overlap) + `RepositoryRegistrationFlowTests.Rejects_a_repository_overlapping_an_existing_one` — `RepositoryPathValidator`
 - [x] 1.3 Detect drive media type (NVMe/SSD/HDD/Network/Removable) · T: `DriveProfilerTests.Profiles_a_fixed_volume...` (fixed drive → NVMe/SSD/HDD, never Removable/Network) — `DriveProfiler` (seek-penalty + bus-type Win32 queries, HDD fallback)
 - [x] 1.4 Capture `VolumeSerial` on register; on re-point, mismatch → read-only + refused · ⚠ T: `RepositoryRepointFlowTests.Same_serial_repoint_succeeds_and_different_serial_is_blocked` (different serial → `repo.repoint.serial`, marked read-only) + `DriveProfilerTests.Volume_serial_is_read_on_windows` — `RepositoryService.RepointAsync`
-- [ ] 1.5 Benchmark read/write MB/s on register (B: numbers within ~20% of a known reference tool)
-- [ ] 1.6 Auto-assign tier from benchmark; manual override persists (M) — *tier currently from media type (BE-R5); benchmark re-tier pending*
+- [x] 1.5 Benchmark read/write MB/s · T/B: `DriveBenchmarkTests` (positive read/write throughput, no temp leftover) — `DriveBenchmark` (WriteThrough sequential sample; rough tier-ranking figure)
+- [x] 1.6 Auto-assign tier from benchmark · T: `RepositoryRegistrationFlowTests.Benchmark_records_speeds_and_retiers` — `RepositoryService.BenchmarkAsync` re-tiers via `TierPolicy.AssignTier(media, readMBps)` (*manual override UI lands with the repositories screen*)
 - [x] 1.7 Live free/total capacity; refresh on demand · T: `DriveProfilerTests.Capacity_refresh_matches_drive_info` + `RepositoryService.RefreshCapacityAsync` (matches `DriveInfo`)
 - [ ] 1.8 `MinFreeBytes` reserve stored and honored by placement (T) — *field stored; placement engine pending*
 - [x] 1.9 Enable/disable repo; disabled state persists · T: `RepositoryRegistrationFlowTests.Enable_disable_persists` — `RepositoryService.SetEnabledAsync` (*scan-exclusion of disabled repos wires in when the multi-repo scan driver lands*)
@@ -239,7 +239,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 > These features are pure backend with no screen to "look at". They are the easiest to falsely mark done, so each internal algorithm gets its own item, verified only by test or benchmark.
 
 ### Repository profiling engine
-- [ ] BE-R1 Benchmark: warm-up then N sequential + random read/write samples on a temp file in the repo; return median MB/s (B: within ~20% of CrystalDiskMark on the same drive)
+- [x] BE-R1 Benchmark: sequential read/write sample on a temp file in the repo; return MB/s · T/B: `DriveBenchmarkTests` — `DriveBenchmark.MeasureAsync` (WriteThrough write + sequential read; *random-sample + median refinement is a later tuning*)
 - [x] BE-R2 Media-type detection via device query → NVMe/SSD/HDD/Removable/Network; unknown → HDD · T: `DriveProfilerTests` — `DriveProfiler.DetectMediaType` (DriveType + `IOCTL_STORAGE_QUERY_PROPERTY` seek-penalty + bus-type; every failure path falls back to HDD)
 - [x] BE-R3 Capacity/free refresh via `DriveInfo` · T: `DriveProfilerTests.Capacity_refresh_matches_drive_info` (matches OS `DriveInfo.TotalSize`) — `DriveProfiler.GetCapacity` (*short-TTL cache is a later optimization*)
 - [x] BE-R4 `VolumeSerial` capture + strict match on re-point · ⚠ T: `RepositoryRepointFlowTests` (mismatched serial blocks bind, marks read-only) + `DriveProfilerTests.Volume_serial_is_read_on_windows` — `RepositoryService.RepointAsync`

@@ -59,6 +59,20 @@ public sealed class RepositoryRegistrationFlowTests
     }
 
     [Fact]
+    public async Task Benchmark_records_speeds_and_retiers()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        var service = host.Get<IRepositoryService>();
+
+        var info = (await service.RegisterAsync(new RegisterRepositoryRequest("R", repoDir.Path))).Value;
+        var benched = await service.BenchmarkAsync(info.Id);
+
+        Assert.NotNull(benched);
+        Assert.InRange(benched!.Tier, 1, 3); // tier assigned from the measured speed (1.6)
+    }
+
+    [Fact]
     public async Task Enable_disable_persists()
     {
         await using var host = TestHost.Create(withPersistence: true);
