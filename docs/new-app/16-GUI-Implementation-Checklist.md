@@ -127,7 +127,10 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
   computes the `.fixed.var` sibling path → `EncodingFixCoordinator`), registered. T:
   `HealthServiceFlowTests.Encoding_groups_then_fix_creates_utf8_var` (GBK group; fix creates UTF-8 sibling,
   original retained).
-- [ ] **BE-N6 · `ITrashQueryService`** (ITrashService/SqliteDatabaseBackup). *Test:* list/restore/purge round-trip; backup+restore.
+- [x] **BE-N6 · `ITrashQueryService`** (ITrashService/SqliteDatabaseBackup). *Done:* SDK `ITrashQueryService`
+  (`TrashItemDto`/`BackupDto`) + `EfTrashQueryService`; added `ITrashService.PurgeAsync` + `FileTrashService`
+  impl (deletes the trash item dir); backup dir derived from the DB path. Registered. T:
+  `TrashQueryServiceFlowTests.List_restore_purge_and_backup_round_trip`.
 - [ ] **BE-N7 · `IProfileService`** (IVamProfileService). *Test:* list profiles; switch repoints one symlink (skip where privilege absent).
 - [ ] **BE-N8 · `IProposalService`** (aggregates N2/N4/N5/stale). *Test:* proposals listed; approve dispatches to the right runner; reject records.
 - [ ] **BE-N9 · `IPackageDetailQuery`** (IDependencyGraph fwd+rev, ContentItem, VarFile lineage, IThumbnailStore). *Test:* detail returns deps closure, content items, copies for a seeded package.

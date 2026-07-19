@@ -133,6 +133,23 @@ public sealed class FileTrashService(string trashRoot, IClock clock, long quotaB
         return entries;
     }
 
+    public Task<Result> PurgeAsync(string trashId, CancellationToken cancellationToken = default)
+    {
+        Guard.NotNullOrWhiteSpace(trashId);
+        var itemDir = Path.Combine(trashRoot, trashId);
+        if (!Directory.Exists(itemDir))
+            return Task.FromResult(Result.Failure("trash.purge.missing", $"Trash item not found: {trashId}"));
+        try
+        {
+            Directory.Delete(itemDir, recursive: true); // hard-delete the trashed copy + manifest
+            return Task.FromResult(Result.Success());
+        }
+        catch (IOException ex)
+        {
+            return Task.FromResult(Result.Failure("trash.purge.io", ex.Message));
+        }
+    }
+
     private static async Task WriteManifestAsync(string itemDir, TrashEntry entry, CancellationToken cancellationToken)
     {
         var path = Path.Combine(itemDir, ManifestName);

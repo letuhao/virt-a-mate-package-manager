@@ -29,4 +29,7 @@ public interface ITrashService
 
     /// <summary>Enumerate trashed items by reading manifests (DB-independent).</summary>
     Task<IReadOnlyList<TrashEntry>> ListAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Permanently remove a trashed item (hard-delete the trashed copy + its manifest).</summary>
+    Task<Result> PurgeAsync(string trashId, CancellationToken cancellationToken = default);
 }
