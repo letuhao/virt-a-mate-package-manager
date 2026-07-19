@@ -2,6 +2,7 @@ using System.IO;
 using System.IO.Compression;
 using VarVault.Common;
 using VarVault.Domain.Content;
+using VarVault.Domain.Dependencies;
 using VarVault.Domain.Entities;
 using VarVault.Domain.Fingerprinting;
 using VarVault.Domain.Indexing;
@@ -25,7 +26,7 @@ public sealed class VarInspector : IVarInspector
         if (read.IsFailure)
         {
             // Structurally unreadable → corrupt, but not an inspection *failure*.
-            return new VarInspection(IntegrityStatus.CorruptZip, [], null, null, null, null);
+            return new VarInspection(IntegrityStatus.CorruptZip, [], null, null, null, null, []);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -36,32 +37,67 @@ public sealed class VarInspector : IVarInspector
         var encoding = EncodingHealthEngine.Detect(entries);
 
         var hasMeta = entries.Any(e => e.IsRootMetaJson);
-        var meta = hasMeta ? ReadMeta(varPath) : null;
+        var (meta, embeddedRefs) = ReadContent(varPath, hasMeta);
         var integrity = hasMeta ? IntegrityStatus.Ok : IntegrityStatus.MissingMeta;
 
-        return new VarInspection(integrity, entries, signatures, classification, encoding, meta);
+        return new VarInspection(integrity, entries, signatures, classification, encoding, meta, embeddedRefs);
     }
 
-    private static VarMeta? ReadMeta(string varPath)
+    // One archive pass: parse meta.json AND harvest embedded package refs from scene/preset JSON. (2.1)
+    private static (VarMeta? Meta, IReadOnlyList<string> EmbeddedRefs) ReadContent(string varPath, bool hasMeta)
     {
+        VarMeta? meta = null;
+        var embedded = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         try
         {
             using var archive = ZipFile.OpenRead(varPath);
-            var entry = archive.GetEntry("meta.json") ?? FindMetaIgnoreCase(archive);
-            if (entry is null)
-                return null;
 
-            using var stream = entry.Open();
-            using var reader = new StreamReader(stream);
-            var text = reader.ReadToEnd();
-            var parsed = VarMetaParser.Parse(text);
-            return parsed.IsSuccess ? parsed.Value : null;
+            if (hasMeta)
+            {
+                var metaEntry = archive.GetEntry("meta.json") ?? FindMetaIgnoreCase(archive);
+                if (metaEntry is not null)
+                {
+                    var parsed = VarMetaParser.Parse(ReadEntry(metaEntry));
+                    if (parsed.IsSuccess)
+                        meta = parsed.Value;
+                }
+            }
+
+            foreach (var entry in archive.Entries)
+            {
+                if (!IsEmbeddedJson(entry.FullName))
+                    continue;
+                foreach (var reference in EmbeddedRefExtractor.Extract(ReadEntry(entry)))
+                {
+                    if (seen.Add(reference))
+                        embedded.Add(reference);
+                }
+            }
         }
         catch (Exception ex) when (ex is InvalidDataException or IOException)
         {
-            // Central directory said meta.json exists but the payload can't be decompressed — rare.
-            return null;
+            // Content unreadable — return what we have (fingerprints/classification already captured).
         }
+
+        return (meta, embedded);
+    }
+
+    private static bool IsEmbeddedJson(string entryName)
+    {
+        if (string.Equals(entryName, "meta.json", StringComparison.OrdinalIgnoreCase))
+            return false;
+        return entryName.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+            || entryName.EndsWith(".vap", StringComparison.OrdinalIgnoreCase)
+            || entryName.EndsWith(".vac", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string ReadEntry(ZipArchiveEntry entry)
+    {
+        using var stream = entry.Open();
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
     }
 
     private static ZipArchiveEntry? FindMetaIgnoreCase(ZipArchive archive)

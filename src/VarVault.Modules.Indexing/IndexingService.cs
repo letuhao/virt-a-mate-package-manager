@@ -146,6 +146,7 @@ internal sealed class IndexingService(
             BrokenEntryCount: encoding?.BrokenEntryCount ?? 0,
             ContentItems: contentItems,
             ContentCounts: counts,
-            DependencyRefsRaw: meta?.DependencyRefs ?? []);
+            DependencyRefsRaw: meta?.DependencyRefs ?? [],
+            EmbeddedRefsRaw: inspection.EmbeddedRefs);
     }
 }

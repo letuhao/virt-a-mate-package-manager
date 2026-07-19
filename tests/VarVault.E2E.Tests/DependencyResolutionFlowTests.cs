@@ -111,6 +111,41 @@ public sealed class DependencyResolutionFlowTests
     }
 
     [Fact]
+    public async Task Embedded_scene_refs_are_harvested_as_dependencies()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+
+        // A scene var whose meta.json has NO dependencies, but the scene JSON embeds a ref.
+        WriteVarWithScene(repoDir, "Author.Scene.1.var",
+            metaCreator: "Author", metaPackage: "Scene",
+            sceneJson: """{ "clothing": "Other.Dress.1:/Custom/Clothing/d.vam" }""");
+        WriteVar(repoDir, "Other.Dress.1.var", Meta("Other", "Dress"), [("Custom/Clothing/d.vam", "x")]);
+
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+
+        var embedded = await db.Dependencies.FirstAsync(d => d.DependsOnRefRaw == "Other.Dress.1");
+        Assert.Equal(RefKind.Embedded, embedded.RefKind); // harvested from the scene, not meta.json
+
+        await scope.ServiceProvider.GetRequiredService<IDependencyResolver>().ResolveAllAsync();
+        var reloaded = await db.Dependencies.FirstAsync(d => d.DependsOnRefRaw == "Other.Dress.1");
+        Assert.False(reloaded.IsMissing); // and it resolves to the present package
+    }
+
+    private static void WriteVarWithScene(TempDirectory dir, string fileName, string metaCreator, string metaPackage, string sceneJson)
+    {
+        var path = Path.Combine(dir.Path, fileName);
+        using var fs = new FileStream(path, FileMode.Create, FileAccess.Write);
+        using var zip = new ZipArchive(fs, ZipArchiveMode.Create);
+        Add(zip, "meta.json", "{\"creatorName\":\"" + metaCreator + "\",\"packageName\":\"" + metaPackage + "\"}");
+        Add(zip, "Saves/scene/main.json", sceneJson);
+    }
+
+    [Fact]
     public async Task Alias_resolves_a_missing_ref_but_a_real_match_outranks_it()
     {
         await using var host = TestHost.Create(withPersistence: true);

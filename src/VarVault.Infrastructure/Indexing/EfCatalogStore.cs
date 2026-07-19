@@ -102,7 +102,7 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false); // ensure varFile.Id
 
         await ReplaceContentItemsAsync(varFile.Id, upsert.ContentItems, cancellationToken).ConfigureAwait(false);
-        await ReplaceDependenciesAsync(varFile.Id, upsert.DependencyRefsRaw, cancellationToken).ConfigureAwait(false);
+        await ReplaceDependenciesAsync(varFile.Id, upsert.DependencyRefsRaw, upsert.EmbeddedRefsRaw, cancellationToken).ConfigureAwait(false);
 
         if (package is not null)
         {
@@ -267,13 +267,22 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task ReplaceDependenciesAsync(long varFileId, IReadOnlyList<string> refsRaw, CancellationToken cancellationToken)
+    private async Task ReplaceDependenciesAsync(long varFileId, IReadOnlyList<string> metaRefs, IReadOnlyList<string> embeddedRefs, CancellationToken cancellationToken)
     {
         var existing = await db.Dependencies.Where(d => d.VarFileId == varFileId).ToListAsync(cancellationToken).ConfigureAwait(false);
         if (existing.Count > 0)
             db.Dependencies.RemoveRange(existing);
 
+        // Meta refs first so a ref present in both keeps RefKind.Meta (the UNIQUE key dedups the rest).
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        AddRefs(varFileId, metaRefs, RefKind.Meta, seen);
+        AddRefs(varFileId, embeddedRefs, RefKind.Embedded, seen);
+
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private void AddRefs(long varFileId, IReadOnlyList<string> refsRaw, RefKind kind, HashSet<string> seen)
+    {
         foreach (var raw in refsRaw)
         {
             var key = IdentityFold.Compute(raw);
@@ -285,12 +294,10 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
                 VarFileId = varFileId,
                 DependsOnRefKey = key,
                 DependsOnRefRaw = raw,
-                RefKind = RefKind.Meta,
-                IsMissing = true, // resolved in Slice 2
+                RefKind = kind,
+                IsMissing = true, // resolved by the dependency resolver
             });
         }
-
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private async Task ReplaceContentCountsAsync(long packageId, IReadOnlyDictionary<ContentType, int> counts, CancellationToken cancellationToken)

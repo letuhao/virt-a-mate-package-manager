@@ -16,7 +16,8 @@ public sealed record VarInspection(
     VarSignatures? Signatures,
     VarContentClassification? Classification,
     EncodingHealthResult? Encoding,
-    VarMeta? Meta)
+    VarMeta? Meta,
+    IReadOnlyList<string> EmbeddedRefs)
 {
     public bool HasMeta => Meta is not null;
 }

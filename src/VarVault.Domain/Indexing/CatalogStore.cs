@@ -43,7 +43,9 @@ public sealed record VarUpsert(
     IReadOnlyList<UpsertContentItem> ContentItems,
     IReadOnlyDictionary<ContentType, int> ContentCounts,
     // dependency ref strings (raw, from meta.json)
-    IReadOnlyList<string> DependencyRefsRaw)
+    IReadOnlyList<string> DependencyRefsRaw,
+    // dependency ref strings harvested from embedded scene/preset JSON (2.1)
+    IReadOnlyList<string> EmbeddedRefsRaw)
 {
     /// <summary>True when meta.json's author names diverge from the filename identity (folded compare).</summary>
     public bool MetaDivergent =>

@@ -146,7 +146,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 
 ## Slice 2 — Dependency engine & missing
 
-- [ ] 2.1 Harvest dependency edges from `meta.json` AND embedded scene/`.vap` JSON (tolerant scan) (T: scene-embedded ref captured)
+- [x] 2.1 Harvest dependency edges from `meta.json` AND embedded scene/`.vap` JSON (tolerant scan) · T: `DependencyResolutionFlowTests.Embedded_scene_refs_are_harvested_as_dependencies` (a scene ref absent from meta.json → `Dependency` with `RefKind.Embedded`, resolves) — `VarInspector` (one archive pass) + `EmbeddedRefExtractor`
 - [x] 2.2 🔒 `SELF` refs resolve to container package, excluded from missing · T: `DependencyRefTests.Self_ref_is_flagged_when_family_matches_container` + `EfDependencyResolver.ResolveOne` (SELF → container, `RefKind.Self`, not missing)
 - [x] 2.3 Unparseable refs recorded (flag), never silently dropped · T: `DependencyRefTests.Rejects_unparseable_refs`; resolver marks them `IsMissing`/`ResolvedVia.None` (row retained)
 - [x] 2.4 `UNIQUE(VarFileId,DependsOnRefKey)`; self-edges excluded from centrality · T: `CatalogSchemaTests.Duplicate_dependency_edge_is_rejected` + resolver skips `target==source` in reverse counts
