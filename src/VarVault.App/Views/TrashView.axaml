@@ -1,0 +1,39 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:VarVault.App.Controls"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             xmlns:lib="clr-namespace:VarVault.Sdk.Library;assembly=VarVault.Sdk"
+             x:Class="VarVault.App.Views.TrashView"
+             x:DataType="vm:TrashViewModel">
+  <DockPanel Margin="18">
+    <TextBlock DockPanel.Dock="Top" Text="Trash &amp; backup" FontSize="21" FontWeight="SemiBold"
+               Foreground="{DynamicResource TextHiBrush}" Margin="0,0,0,4" />
+    <TextBlock DockPanel.Dock="Top" Text="Nothing is hard-deleted · catalog auto-backed-up"
+               Foreground="{DynamicResource TextLoBrush}" Margin="0,0,0,12" />
+    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
+      <Button Content="Back up now" Command="{Binding BackupNowCommand}" />
+      <TextBlock Text="{Binding StatusMessage}" Opacity="0.7" VerticalAlignment="Center" />
+    </StackPanel>
+    <c:Card Header="Trash (recoverable)">
+      <ScrollViewer>
+        <ItemsControl ItemsSource="{Binding Items}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="lib:TrashItemDto">
+              <Grid ColumnDefinitions="*,*,Auto,Auto,Auto" Height="26">
+                <TextBlock Grid.Column="0" Text="{Binding OriginalPath}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <TextBlock Grid.Column="1" Text="{Binding Reason}" VerticalAlignment="Center" Opacity="0.7" />
+                <TextBlock Grid.Column="2" Text="{Binding Bytes}" VerticalAlignment="Center" Opacity="0.7" Margin="0,0,8,0" />
+                <Button Grid.Column="3" Content="Restore"
+                        Command="{Binding ((vm:TrashViewModel)DataContext).RestoreCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding}" />
+                <Button Grid.Column="4" Content="Purge" Margin="6,0,0,0" Foreground="{DynamicResource CritBrush}"
+                        Command="{Binding ((vm:TrashViewModel)DataContext).PurgeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding}" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </c:Card>
+  </DockPanel>
+</UserControl>
