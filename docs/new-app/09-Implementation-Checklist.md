@@ -218,7 +218,7 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 - [ ] 5.3 UsageEvent compaction of >90d into rollups (T)
 - [x] 5.4 Hot/warm/cold scoring blends recency+frequency+centrality+overrides with hysteresis; `Class` reproducible from stored state · T: `UsageScoringTests` (hot/cold cases, pin/force overrides, 7-day cooldown blocks flip, deadband stability, reproducible from same inputs) — `UsageScoring.Score` (BE-A3/A4/A5/A8)
 - [x] 5.5 Placement policy maps Class→tier; misplaced set computed · T: `PlacementPolicyTests` (Hot→1/Warm→2/Cold→3; misplaced when actual≠desired) — `PlacementPolicy` (BE-P1)
-- [ ] 5.6 Migration planner diffs actual vs target → proposals; single-copy & offline-target excluded (⚠ T)
+- [x] 5.6 Migration planner diffs actual vs target → proposals; single-copy & offline & unsafe-target excluded · ⚠ T: `MigrationPlannerTests` (hot-on-cold → propose to tier 1; correctly-placed → none; excludes offline/single-copy/unsafe-target) — `MigrationPlanner.Plan` (propose-only)
 
 ### Migration durability (⚠ every item data-loss-critical)
 - [ ] 5.7 🔒⚠ State machine Planned→Copying→Verifying→Renaming→Deleting→Done, idempotent resume (T: kill at each state, resume correct)
@@ -265,10 +265,10 @@ Legend: 🔒 = load-bearing contract (must match spec exactly) · ⚠ = data-los
 
 ### Placement & migration planner
 - [x] BE-P1 Desired tier = f(class, policy); diff → misplaced set · T: `PlacementPolicyTests` — `PlacementPolicy.DesiredTier`/`IsMisplaced` (actual tier = VarFile→Repo→Tier at call sites)
-- [ ] BE-P2 ⚠ Proposal set excludes single-copy, offline members, and removable/network targets (T)
+- [x] BE-P2 ⚠ Proposal set excludes single-copy, offline members, and removable/network targets · T: `MigrationPlannerTests.Excludes_single_copy_offline_and_unsafe_targets` — `MigrationPlanner`
 - [ ] BE-P3 ⚠ Free-space reservation ledger for concurrent-job capacity safety (T)
 - [ ] BE-P4 ETA estimate from bytes ÷ target write speed (M)
-- [ ] BE-P5 🔒 Propose-only by default; auto-execute is explicit opt-in (T: default config = propose)
+- [x] BE-P5 🔒 Propose-only by default; auto-execute is explicit opt-in · T: `MigrationPlannerTests.Planner_only_proposes_and_never_returns_an_executed_action` — `MigrationPlanner.Plan` returns proposals only; it has no execute path (execution is a separate, explicitly-invoked step)
 
 ### Fingerprint & dedup engine
 - [x] BE-F1 🔒 Central-directory reader: Zip64-aware, raw entry-name bytes, dir-entries excluded · T: `ZipCentralDirectoryReaderTests` (`Same_content_different_compression_and_order...`, `Raw_cjk_entry_names_round_trip_without_decoding`, `Corrupt_zip_is_rejected`, `Empty_file_is_rejected`, real-repo probe) — `ZipCentralDirectoryReader` parses EOCD/Zip64 EOCD, yields raw name bytes; engine drops dir entries
