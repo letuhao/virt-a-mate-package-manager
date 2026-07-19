@@ -153,7 +153,11 @@ are specified in 15-plan §New backend tasks catalog — read that entry before 
   (folds `MissingRefKey` via `IdentityFold` to match dep keys; set/list/remove). The resolver already
   consults `VarAliases`. Registered. T: `AliasServiceFlowTests.Alias_makes_a_missing_dependency_resolve`
   (missing before → set alias → re-resolve → not missing).
-- [ ] **BE-N12 · Library facets** (`ITagService`/`ICollectionService`; extend `LibraryQuery` with PackageName/InstalledOnly/Types/Tiers; saved views). *Test:* each new filter narrows results; tag add/query.
+- [x] **BE-N12 · Library facets** (`ITagService`; extend `LibraryQuery`). *Done:* `LibraryQuery` +
+  `PackageName`/`InstalledOnly`/`SingleCopyOnly`/`Types`/`Tiers` wired in `EfLibraryQueryService`; SDK
+  `ITagService`/`TagInfo` + `EfTagService` (create/tag/untag/list-with-counts/package-ids). Registered. T:
+  `LibraryFacetsTests` (`Facet_filters_narrow_the_page`, `Tag_create_apply_list_and_query`). *(Saved views =
+  client-side query presets; `ICollectionService` follows the same shape at the rail screen.)*
 - [ ] **BE-N13 · Onboarding/add-repo** (Register/Benchmark + reserveBytes + BE-N0). *Test:* register → benchmark → suggested tier → index.
 - [ ] **BE-N14 · Command palette / search** (action registry + `LibraryQuery.SearchText`). *Test:* query returns package hits + nav actions.
 

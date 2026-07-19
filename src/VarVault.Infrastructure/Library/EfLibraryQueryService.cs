@@ -52,6 +52,22 @@ public sealed class EfLibraryQueryService(VarVaultDbContext db) : ILibraryQueryS
             q = q.Where(x => x.IsFavorite);
         if (query.MissingDepsOnly)
             q = q.Where(x => x.HasMissingDeps);
+        if (query.InstalledOnly)
+            q = q.Where(x => x.IsActive);
+        if (query.SingleCopyOnly)
+            q = q.Where(x => x.IsSingleCopy);
+        if (!string.IsNullOrWhiteSpace(query.PackageName))
+            q = q.Where(x => EF.Functions.Like(x.PackageName, $"%{query.PackageName}%"));
+        if (query.Types is { Count: > 0 })
+        {
+            var typeEnums = query.Types
+                .Select(t => Enum.TryParse<Domain.Entities.ContentType>(t, out var e) ? e : (Domain.Entities.ContentType?)null)
+                .Where(e => e is not null).Select(e => e!.Value).ToList();
+            if (typeEnums.Count > 0)
+                q = q.Where(x => typeEnums.Contains(x.PrimaryType));
+        }
+        if (query.Tiers is { Count: > 0 })
+            q = q.Where(x => x.ActualTierMin != null && query.Tiers.Contains(x.ActualTierMin.Value));
         if (!string.IsNullOrWhiteSpace(query.SearchText))
         {
             var text = query.SearchText.Trim();

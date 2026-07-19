@@ -19,7 +19,13 @@ public sealed record LibraryQuery(
     bool FavoritesOnly = false,
     bool MissingDepsOnly = false,
     LibrarySort Sort = LibrarySort.Name,
-    bool Descending = false);
+    bool Descending = false,
+    // Facet extensions (BE-N12).
+    string? PackageName = null,
+    bool InstalledOnly = false,
+    bool SingleCopyOnly = false,
+    IReadOnlyList<string>? Types = null,
+    IReadOnlyList<int>? Tiers = null);
 
 /// <summary>One row the library grid binds to (SDK-safe; no EF entities). </summary>
 public sealed record PackageListEntry(
