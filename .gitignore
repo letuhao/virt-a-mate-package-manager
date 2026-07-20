@@ -63,3 +63,6 @@ docs/new-app/ui-evidence
 *.jpeg
 # Release publish artifacts
 /dist/
+
+# Publish output
+publish/
