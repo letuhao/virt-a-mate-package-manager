@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using VarVault.Common;
 using VarVault.Common.Diagnostics;
 using VarVault.Domain.Content;
 using VarVault.Domain.Entities;
@@ -25,8 +26,21 @@ internal sealed class IndexingService(
     private const int BatchSize = 512;
     /// <summary>Emit a throughput log line every this many indexed vars.</summary>
     private const int ProgressEvery = 5_000;
-    /// <summary>Concurrent inspections. Inspection is CPU-bound (decompress), so scale to cores.</summary>
-    private static readonly int Dop = Math.Max(2, Environment.ProcessorCount);
+
+    /// <summary>
+    /// Concurrent inspections. Inspection decompresses scene JSON (CPU + transient memory), so each in-flight
+    /// inspection holds a var's decompressed payload. We scale to cores but cap at 16: past ~16 threads
+    /// decompression is memory-bandwidth-bound (little extra throughput) while peak RAM keeps climbing — the
+    /// cap keeps the working set bounded on high-core machines. Override with <c>VARVAULT_INDEX_DOP</c>. (perf/RAM.)
+    /// </summary>
+    private static readonly int Dop = ResolveDop();
+
+    private static int ResolveDop()
+    {
+        if (int.TryParse(Environment.GetEnvironmentVariable("VARVAULT_INDEX_DOP"), out var v) && v >= 1)
+            return v;
+        return Math.Clamp(Environment.ProcessorCount, 2, 16);
+    }
 
     /// <summary>One inspected var ready to persist, plus its lane flags. (Returned from the parallel inspect stage.)</summary>
     private readonly record struct InspectResult(VarUpsert Upsert, bool Unrecognized, bool Corrupt);
@@ -34,8 +48,11 @@ internal sealed class IndexingService(
     public async Task<IndexResult> IndexRepositoryAsync(
         Guid repositoryId,
         string repositoryMountPath,
+        IProgressSink? progress = null,
         CancellationToken cancellationToken = default)
     {
+        progress ??= IProgressSink.Null;
+        var repoName = System.IO.Path.GetFileName(repositoryMountPath.TrimEnd('\\', '/'));
         using var activity = Telemetry.StartActivity("index.repository");
         using var scope = scopeFactory.CreateScope();
         var store = scope.ServiceProvider.GetRequiredService<ICatalogStore>();
@@ -50,18 +67,29 @@ internal sealed class IndexingService(
         int indexed = 0, skipped = 0, corrupt = 0, unrecognized = 0;
 
         // Pass-0: enumerate (cheap, metadata only) → the set we've seen (for pruning) + the changed subset that
-        // actually needs a (costly) inspection. Freshness skip avoids opening unchanged files. (IDX-2)
+        // actually needs a (costly) inspection. This is the "count files first" phase — we can't show a
+        // determinate bar until we know the denominator, so report the growing count as an indeterminate
+        // "Scanning…" status, then hand the total to the caller before the slow inspection starts. (IDX-2)
         var toInspect = new List<ScannedVar>();
+        var total = 0;
         foreach (var scanned in enumerator.Enumerate(repositoryMountPath, includeQuarantined: true, cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             seen.Add(scanned.RelativePath);
+            total++;
             if (existing.TryGetValue(scanned.RelativePath, out var ex) &&
                 RepositoryScanRules.IsFresh(ex.SizeBytes, ex.FileMtimeUtc, scanned.SizeBytes, scanned.FileMtimeUtc))
                 skipped++;
             else
                 toInspect.Add(scanned);
+            if (total % 2_000 == 0)
+                progress.Report(new ProgressReport(0, 0, $"Scanning {repoName} — {total:N0} files"));
         }
+
+        // Denominator known: unchanged files are already "done" (skipped instantly); the inspect loop advances
+        // the rest. Report it up front so the bar is determinate the moment the count finishes.
+        long done = skipped;
+        progress.Report(new ProgressReport(done, total, $"Indexing {repoName}"));
 
         // Inspection (open zip + decompress scene/preset JSON for refs + classify) is CPU-heavy and stateless per
         // var, so run a chunk of it across all cores, then write that chunk through the single-writer batch. The
@@ -102,6 +130,8 @@ internal sealed class IndexingService(
             foreach (var id in ids)
                 dirty.MarkPackage(id);
             indexed += batch.Count;
+            done += chunk.Length; // every enumerated var in the chunk is now processed (indexed or unreadable)
+            progress.Report(new ProgressReport(done, total, $"Indexing {repoName}"));
             if (indexed >= ProgressEvery && indexed % ProgressEvery < BatchSize)
                 logger.LogInformation("Indexing {Repo}: {Indexed}/{Total} vars ({Rate:F0}/s, {Dop} threads)",
                     repositoryId, indexed, toInspect.Count, indexed / Math.Max(0.001, sw.Elapsed.TotalSeconds), Dop);
@@ -131,6 +161,7 @@ internal sealed class IndexingService(
         var affected = dirty.Drain();
         if (affected.Count > 0)
         {
+            progress.Report(new ProgressReport(total, total, $"Refreshing catalog ({affected.Count:N0} packages)"));
             var rsw = System.Diagnostics.Stopwatch.StartNew();
             await store.RefreshReadModelAsync(affected, cancellationToken).ConfigureAwait(false);
             Telemetry.IndexRefreshDurationMs.Record(rsw.Elapsed.TotalMilliseconds);
@@ -138,7 +169,10 @@ internal sealed class IndexingService(
 
         // Pass-2: previews/thumbnails fill in afterwards — the gallery already shows type placeholders. (1.23/1.32)
         if (affected.Count > 0)
+        {
+            progress.Report(new ProgressReport(total, total, $"Extracting previews ({affected.Count:N0} packages)"));
             await previews.BuildPreviewsAsync(affected, cancellationToken).ConfigureAwait(false);
+        }
 
         logger.LogInformation(
             "Indexed repository {RepositoryId}: {Indexed} indexed, {Skipped} skipped, {Pruned} pruned, {Corrupt} corrupt, {Unrecognized} unrecognized",

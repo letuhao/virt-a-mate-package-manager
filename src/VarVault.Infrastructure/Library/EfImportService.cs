@@ -588,7 +588,7 @@ public sealed class EfImportService(
             if (!cancelled)
             {
                 if (didImport)
-                    await orchestrator.IndexRepositoryAsync(session.TargetRepositoryId, cancellationToken).ConfigureAwait(false);
+                    await orchestrator.IndexRepositoryAsync(session.TargetRepositoryId, cancellationToken: cancellationToken).ConfigureAwait(false);
 
                 // Optional activate-after (D2/5.9): link the just-imported vars into VaM via the existing preset flow.
                 if (session.ActivateAfter && importedRefs.Count > 0)

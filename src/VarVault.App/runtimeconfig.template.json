@@ -1,0 +1,7 @@
+{
+  "configProperties": {
+    "//": "RAM ceiling. Server GC (set in the csproj) is fast but lazy about releasing memory, so on a big index it can grow the working set toward all physical RAM. These bound it: HeapHardLimitPercent caps the GC heap at a % of total physical memory (the runtime collects harder as it nears the cap instead of climbing to 100%); ConserveMemory (0-9) trades a little throughput to decommit + compact so memory is handed back to the OS. Power users can override at launch with the env vars DOTNET_GCHeapHardLimitPercent (hex, e.g. 0x32 = 50) and DOTNET_GCConserveMemory (0-9).",
+    "System.GC.HeapHardLimitPercent": 75,
+    "System.GC.ConserveMemory": 5
+  }
+}

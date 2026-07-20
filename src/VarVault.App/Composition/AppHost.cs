@@ -135,8 +135,10 @@ public static class AppHost
             return null;
         return queue.Enqueue("Indexing library", async ctx =>
         {
-            var summary = await orchestrator.IndexAllAsync(ctx.Cancellation).ConfigureAwait(false);
-            ctx.Progress.Report(new Common.ProgressReport(summary.Indexed, summary.Indexed,
+            // Pass the job's progress sink straight into the orchestrator so scan/index/resolve status ticks
+            // live in the jobs panel + log-dock — instead of one final update after the whole run. (GA-5.)
+            var summary = await orchestrator.IndexAllAsync(ctx.Progress, ctx.Cancellation).ConfigureAwait(false);
+            ctx.Progress.Report(new Common.ProgressReport(summary.Indexed, Math.Max(1, summary.Indexed),
                 $"Indexed {summary.Indexed} vars across {summary.Repositories} repos"));
         });
     }
@@ -151,8 +153,8 @@ public static class AppHost
             return null;
         return queue.Enqueue("Re-indexing repository", async ctx =>
         {
-            var summary = await orchestrator.IndexRepositoryAsync(repositoryId, ctx.Cancellation).ConfigureAwait(false);
-            ctx.Progress.Report(new Common.ProgressReport(summary.Indexed, summary.Indexed,
+            var summary = await orchestrator.IndexRepositoryAsync(repositoryId, ctx.Progress, ctx.Cancellation).ConfigureAwait(false);
+            ctx.Progress.Report(new Common.ProgressReport(summary.Indexed, Math.Max(1, summary.Indexed),
                 $"Indexed {summary.Indexed} vars ({summary.Skipped} unchanged, {summary.Pruned} pruned)"));
         });
     }

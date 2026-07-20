@@ -32,7 +32,7 @@ public sealed class EfOnboardingService(
             }
         }
 
-        var index = await orchestrator.IndexRepositoryAsync(registered.Value.Id, cancellationToken).ConfigureAwait(false);
+        var index = await orchestrator.IndexRepositoryAsync(registered.Value.Id, cancellationToken: cancellationToken).ConfigureAwait(false);
         return Result.Success(new OnboardingResult(registered.Value, index));
     }
 }

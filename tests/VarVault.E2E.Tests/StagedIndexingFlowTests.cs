@@ -70,6 +70,34 @@ public sealed class StagedIndexingFlowTests
         Assert.Equal("JPEGBYTES", Encoding.UTF8.GetString(bytes!));
     }
 
+    [Fact]
+    public async Task Indexing_reports_a_determinate_count_and_ticks_progress()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        var repoId = await RegisterRepository(host, repoDir.Path);
+        for (var i = 0; i < 5; i++)
+            WriteVar(repoDir, $"A.Pkg{i}.1.var", $$"""{"creatorName":"A","packageName":"Pkg{{i}}"}""", [("Saves/scene/s.json", "{}")]);
+
+        var sink = new CapturingSink();
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path, sink);
+
+        // Progress must be reported *during* the run, not only at the end.
+        Assert.NotEmpty(sink.Reports);
+        // The total (denominator) becomes known — a determinate bar, not "0/0" the whole time.
+        Assert.Contains(sink.Reports, r => r.Total == 5);
+        // Done advances to cover every enumerated var (the bar reaches the end).
+        Assert.Contains(sink.Reports, r => r.Total == 5 && r.Done == 5);
+        // A human-readable phase message rides along (drives the log-dock / job sub-line).
+        Assert.Contains(sink.Reports, r => r.Message is { Length: > 0 });
+    }
+
+    private sealed class CapturingSink : VarVault.Common.IProgressSink
+    {
+        public List<VarVault.Common.ProgressReport> Reports { get; } = new();
+        public void Report(VarVault.Common.ProgressReport report) { lock (Reports) Reports.Add(report); }
+    }
+
     private sealed class BrowsableProbe { public int ListItemsAtPass2 = -1; }
 
     private sealed class SpyPreviewIndexer(VarVaultDbContext db, BrowsableProbe probe) : IPreviewIndexer

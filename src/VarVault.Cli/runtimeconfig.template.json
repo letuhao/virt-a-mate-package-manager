@@ -1,0 +1,7 @@
+{
+  "configProperties": {
+    "//": "RAM ceiling for the CLI/benchmark — mirrors the App. HeapHardLimitPercent caps the GC heap at a % of physical RAM; ConserveMemory (0-9) hands memory back to the OS at a small throughput cost. Override with DOTNET_GCHeapHardLimitPercent (hex) / DOTNET_GCConserveMemory.",
+    "System.GC.HeapHardLimitPercent": 75,
+    "System.GC.ConserveMemory": 5
+  }
+}

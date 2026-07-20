@@ -1,3 +1,5 @@
+using VarVault.Common;
+
 namespace VarVault.Sdk.Indexing;
 
 /// <summary>Outcome of a full index run: enumeration + resolution + usage recompute rolled up.</summary>
@@ -18,9 +20,10 @@ public sealed record IndexRunSummary(
 /// </summary>
 public interface IIndexOrchestrator
 {
-    /// <summary>Index every enabled+online repository, then resolve dependencies and recompute usage.</summary>
-    Task<IndexRunSummary> IndexAllAsync(CancellationToken cancellationToken = default);
+    /// <summary>Index every enabled+online repository, then resolve dependencies and recompute usage.
+    /// <paramref name="progress"/> reports the live per-phase status into the job handle (scan → index → resolve → usage).</summary>
+    Task<IndexRunSummary> IndexAllAsync(IProgressSink? progress = null, CancellationToken cancellationToken = default);
 
     /// <summary>Index one repository, then resolve dependencies and recompute usage.</summary>
-    Task<IndexRunSummary> IndexRepositoryAsync(System.Guid repositoryId, CancellationToken cancellationToken = default);
+    Task<IndexRunSummary> IndexRepositoryAsync(System.Guid repositoryId, IProgressSink? progress = null, CancellationToken cancellationToken = default);
 }

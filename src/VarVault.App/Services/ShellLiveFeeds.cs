@@ -63,9 +63,16 @@ public sealed class ShellLiveFeeds(
                     $"T{t.Tier} {(t.CapacityBytes == 0 ? 0 : t.UsedBytes * 100 / t.CapacityBytes)}%"));
 
             var indexJob = jobQueue.Active.FirstOrDefault(j => j.Name.Contains("Index", StringComparison.OrdinalIgnoreCase));
-            var indexStatus = indexJob is null
-                ? null
-                : $"{indexJob.Name} · {indexJob.Progress.Done}/{indexJob.Progress.Total}";
+            // Prefer the live phase message ("Scanning… 8,000 files", "Indexing MyRepo", "Resolving dependencies…")
+            // over the bare job name so the log-dock reflects the actual step, with the count when determinate.
+            string? indexStatus = null;
+            if (indexJob is { } job)
+            {
+                var p = job.Progress;
+                indexStatus = p.Message is { Length: > 0 }
+                    ? (p.Total > 0 ? $"{p.Message} · {p.Done:N0}/{p.Total:N0}" : p.Message)
+                    : (p.Total > 0 ? $"{job.Name} · {p.Done:N0}/{p.Total:N0}" : job.Name);
+            }
 
             return new ShellLiveSnapshot(
                 ProposalCount: pending.Count,

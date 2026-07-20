@@ -1,3 +1,5 @@
+using VarVault.Common;
+
 namespace VarVault.Sdk.Indexing;
 
 /// <summary>Summary counts from indexing a repository (SDK-safe primitives only).</summary>
@@ -10,9 +12,14 @@ public sealed record IndexResult(int Indexed, int Skipped, int Pruned, int Corru
 /// </summary>
 public interface IIndexingService
 {
-    /// <summary>Index (or incrementally re-index) the repository at <paramref name="repositoryMountPath"/>.</summary>
+    /// <summary>
+    /// Index (or incrementally re-index) the repository at <paramref name="repositoryMountPath"/>.
+    /// <paramref name="progress"/> receives a determinate count once the file scan finishes, then ticks per
+    /// batch (drives the jobs panel / log-dock live status). Pass <c>null</c> for no reporting.
+    /// </summary>
     Task<IndexResult> IndexRepositoryAsync(
         Guid repositoryId,
         string repositoryMountPath,
+        IProgressSink? progress = null,
         CancellationToken cancellationToken = default);
 }
