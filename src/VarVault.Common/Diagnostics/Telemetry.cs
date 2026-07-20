@@ -21,6 +21,11 @@ public static class Telemetry
     public static readonly Counter<long> WritesFailed = Meter.CreateCounter<long>("varvault.writes.failed");
     public static readonly Histogram<double> WriteDurationMs = Meter.CreateHistogram<double>("varvault.write.duration", unit: "ms");
 
+    // Indexing (scan → upsert pipeline)
+    public static readonly Counter<long> IndexVarsIndexed = Meter.CreateCounter<long>("varvault.index.vars_indexed");
+    public static readonly Histogram<double> IndexScanDurationMs = Meter.CreateHistogram<double>("varvault.index.scan.duration", unit: "ms");
+    public static readonly Histogram<double> IndexResolveDurationMs = Meter.CreateHistogram<double>("varvault.index.resolve.duration", unit: "ms");
+
     // Background jobs
     public static readonly Counter<long> JobsStarted = Meter.CreateCounter<long>("varvault.jobs.started");
     public static readonly Counter<long> JobsCompleted = Meter.CreateCounter<long>("varvault.jobs.completed");

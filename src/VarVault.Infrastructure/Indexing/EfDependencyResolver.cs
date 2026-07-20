@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using VarVault.Common.Diagnostics;
 using VarVault.Domain.Dependencies;
 using VarVault.Domain.Entities;
 using VarVault.Domain.Identity;
@@ -17,6 +18,8 @@ public sealed class EfDependencyResolver(VarVaultDbContext db) : IDependencyReso
 
     public async Task<DependencyResolutionResult> ResolveAllAsync(CancellationToken cancellationToken = default)
     {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        using var activity = Telemetry.StartActivity("index.resolve");
         // Family map: folded Creator.Package → its available versions.
         var packages = await db.Packages
             .Select(p => new { p.Id, p.Creator, p.PackageName, p.VersionSort })
@@ -84,6 +87,7 @@ public sealed class EfDependencyResolver(VarVaultDbContext db) : IDependencyReso
         await UpdateHasMissingDepsAsync(dependencies, cancellationToken).ConfigureAwait(false);
 
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        Telemetry.IndexResolveDurationMs.Record(sw.Elapsed.TotalMilliseconds);
         return new DependencyResolutionResult(dependencies.Count - missing, missing, foundational);
     }
 

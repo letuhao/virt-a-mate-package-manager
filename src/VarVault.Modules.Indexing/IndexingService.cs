@@ -21,6 +21,11 @@ internal sealed class IndexingService(
     IVarInspector inspector,
     ILogger<IndexingService> logger) : IIndexingService
 {
+    /// <summary>Vars per write transaction. Big enough to amortize commit cost, small enough to bound the WAL.</summary>
+    private const int BatchSize = 512;
+    /// <summary>Emit a throughput log line every this many indexed vars.</summary>
+    private const int ProgressEvery = 5_000;
+
     public async Task<IndexResult> IndexRepositoryAsync(
         Guid repositoryId,
         string repositoryMountPath,
@@ -38,6 +43,25 @@ internal sealed class IndexingService(
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var dirty = new ReadModelDirtySet(); // base-table writes mark packages; drained into one refresh (0.26)
         int indexed = 0, skipped = 0, corrupt = 0, unrecognized = 0;
+
+        // Buffer upserts and flush in batches: one transaction per batch (not per var), so a full index doesn't
+        // pay a commit + a growing change-tracker per var. (perf.)
+        var batch = new List<VarUpsert>(BatchSize);
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        async Task FlushAsync()
+        {
+            if (batch.Count == 0)
+                return;
+            var ids = await store.ApplyBatchAsync(batch, cancellationToken).ConfigureAwait(false);
+            foreach (var id in ids)
+                dirty.MarkPackage(id);
+            indexed += batch.Count;
+            batch.Clear();
+            if (indexed % ProgressEvery == 0)
+                logger.LogInformation("Indexing {Repo}: {Indexed} vars ({Rate:F0}/s)", repositoryId, indexed,
+                    indexed / Math.Max(0.001, sw.Elapsed.TotalSeconds));
+        }
 
         foreach (var scanned in enumerator.Enumerate(repositoryMountPath, includeQuarantined: true, cancellationToken))
         {
@@ -62,10 +86,14 @@ internal sealed class IndexingService(
             if (wasUnrecognized) unrecognized++;
             if (wasCorrupt) corrupt++;
 
-            var packageId = await store.ApplyAsync(upsert, cancellationToken).ConfigureAwait(false);
-            dirty.MarkPackage(packageId);
-            indexed++;
+            batch.Add(upsert);
+            if (batch.Count >= BatchSize)
+                await FlushAsync().ConfigureAwait(false);
         }
+        await FlushAsync().ConfigureAwait(false);
+
+        Telemetry.IndexVarsIndexed.Add(indexed);
+        Telemetry.IndexScanDurationMs.Record(sw.Elapsed.TotalMilliseconds);
 
         // Prune vanished files — only when the repository is confirmed online (offline ≠ gone). (1.28 ⚠)
         var pruned = 0;

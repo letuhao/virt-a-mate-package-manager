@@ -34,7 +34,44 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
             .ConfigureAwait(false);
     }
 
-    public async Task<long?> ApplyAsync(VarUpsert upsert, CancellationToken cancellationToken = default)
+    public Task<long?> ApplyAsync(VarUpsert upsert, CancellationToken cancellationToken = default) =>
+        ApplyOneAsync(upsert, cancellationToken);
+
+    /// <summary>
+    /// Bulk upsert a batch of vars in ONE transaction, clearing the change tracker after each so EF's change
+    /// detection stays O(rows-per-var) instead of O(all-tracked) — the fix for indexing that got quadratically
+    /// slower as the run went on, and for committing a separate transaction per var. (perf.)
+    /// </summary>
+    public async Task<IReadOnlyList<long?>> ApplyBatchAsync(IReadOnlyList<VarUpsert> upserts, CancellationToken cancellationToken = default)
+    {
+        Guard.NotNull(upserts);
+        var ids = new List<long?>(upserts.Count);
+        if (upserts.Count == 0)
+            return ids;
+
+        var transaction = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            foreach (var upsert in upserts)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                ids.Add(await ApplyOneAsync(upsert, cancellationToken).ConfigureAwait(false));
+            }
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+            throw;
+        }
+        finally
+        {
+            await transaction.DisposeAsync().ConfigureAwait(false);
+        }
+        return ids;
+    }
+
+    private async Task<long?> ApplyOneAsync(VarUpsert upsert, CancellationToken cancellationToken = default)
     {
         Guard.NotNull(upsert);
         var now = clock.UtcNow.UtcDateTime;
@@ -76,6 +113,7 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
             .FirstOrDefaultAsync(v => v.RepositoryId == upsert.RepositoryId && v.RelativePath == upsert.RelativePath, cancellationToken)
             .ConfigureAwait(false);
 
+        var varFileIsNew = varFile is null;
         if (varFile is null)
         {
             varFile = new VarFile
@@ -101,9 +139,10 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
 
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false); // ensure varFile.Id
 
-        await ReplaceContentItemsAsync(varFile.Id, upsert.ContentItems, cancellationToken).ConfigureAwait(false);
-        await ReplaceDependenciesAsync(varFile.Id, upsert.DependencyRefsRaw, upsert.EmbeddedRefsRaw, cancellationToken).ConfigureAwait(false);
+        await ReplaceContentItemsAsync(varFile.Id, varFileIsNew, upsert.ContentItems, cancellationToken).ConfigureAwait(false);
+        await ReplaceDependenciesAsync(varFile.Id, varFileIsNew, upsert.DependencyRefsRaw, upsert.EmbeddedRefsRaw, cancellationToken).ConfigureAwait(false);
 
+        var packageId = package?.Id;
         if (package is not null)
         {
             // Elect a canonical copy if the package has none yet; content counts follow the canonical.
@@ -117,7 +156,10 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        return package?.Id;
+        // Bound the change tracker: everything for this var is now persisted, so detach it. Keeps EF's per-var
+        // DetectChanges cheap no matter how many vars the run touches. (perf — the O(N^2) fix.)
+        db.ChangeTracker.Clear();
+        return packageId;
     }
 
     public async Task<int> RemoveVarFilesAsync(IReadOnlyCollection<long> varFileIds, CancellationToken cancellationToken = default)
@@ -281,11 +323,14 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
         return $"{package.Creator} {package.PackageName} {package.VarName} {typeWords}".Trim();
     }
 
-    private async Task ReplaceContentItemsAsync(long varFileId, IReadOnlyList<UpsertContentItem> items, CancellationToken cancellationToken)
+    private async Task ReplaceContentItemsAsync(long varFileId, bool varFileIsNew, IReadOnlyList<UpsertContentItem> items, CancellationToken cancellationToken)
     {
-        var existing = await db.ContentItems.Where(c => c.VarFileId == varFileId).ToListAsync(cancellationToken).ConfigureAwait(false);
-        if (existing.Count > 0)
-            db.ContentItems.RemoveRange(existing);
+        if (!varFileIsNew) // a brand-new varfile has no existing rows — skip the pointless SELECT + delete
+        {
+            var existing = await db.ContentItems.Where(c => c.VarFileId == varFileId).ToListAsync(cancellationToken).ConfigureAwait(false);
+            if (existing.Count > 0)
+                db.ContentItems.RemoveRange(existing);
+        }
 
         foreach (var i in items)
         {
@@ -303,11 +348,14 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task ReplaceDependenciesAsync(long varFileId, IReadOnlyList<string> metaRefs, IReadOnlyList<string> embeddedRefs, CancellationToken cancellationToken)
+    private async Task ReplaceDependenciesAsync(long varFileId, bool varFileIsNew, IReadOnlyList<string> metaRefs, IReadOnlyList<string> embeddedRefs, CancellationToken cancellationToken)
     {
-        var existing = await db.Dependencies.Where(d => d.VarFileId == varFileId).ToListAsync(cancellationToken).ConfigureAwait(false);
-        if (existing.Count > 0)
-            db.Dependencies.RemoveRange(existing);
+        if (!varFileIsNew) // brand-new varfile → nothing to replace
+        {
+            var existing = await db.Dependencies.Where(d => d.VarFileId == varFileId).ToListAsync(cancellationToken).ConfigureAwait(false);
+            if (existing.Count > 0)
+                db.Dependencies.RemoveRange(existing);
+        }
 
         // Meta refs first so a ref present in both keeps RefKind.Meta (the UNIQUE key dedups the rest).
         var seen = new HashSet<string>(StringComparer.Ordinal);

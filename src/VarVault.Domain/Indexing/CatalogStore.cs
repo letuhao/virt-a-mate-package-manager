@@ -76,6 +76,12 @@ public interface ICatalogStore
     /// <summary>Upsert one var (package + varfile + content items + deps + counts) and return its Package id (if any).</summary>
     Task<long?> ApplyAsync(VarUpsert upsert, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Upsert a batch of vars in ONE transaction (bounded change tracker). The scalable path for a full index —
+    /// use this instead of many <see cref="ApplyAsync"/> calls. Returns each var's Package id, in order.
+    /// </summary>
+    Task<IReadOnlyList<long?>> ApplyBatchAsync(IReadOnlyList<VarUpsert> upserts, CancellationToken cancellationToken = default);
+
     /// <summary>Remove VarFiles that vanished from an online repository (re-electing canonicals as needed).</summary>
     Task<int> RemoveVarFilesAsync(IReadOnlyCollection<long> varFileIds, CancellationToken cancellationToken = default);
 

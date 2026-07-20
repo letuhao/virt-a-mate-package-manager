@@ -65,6 +65,8 @@ public class ReadModelDirtySetTests
             Task.FromResult<IReadOnlyList<Domain.Indexing.ExistingVarFile>>([]);
         public Task<long?> ApplyAsync(Domain.Indexing.VarUpsert upsert, CancellationToken cancellationToken = default) =>
             Task.FromResult<long?>(null);
+        public Task<IReadOnlyList<long?>> ApplyBatchAsync(IReadOnlyList<Domain.Indexing.VarUpsert> upserts, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<long?>>([.. upserts.Select(_ => (long?)null)]);
         public Task<int> RemoveVarFilesAsync(IReadOnlyCollection<long> varFileIds, CancellationToken cancellationToken = default) =>
             Task.FromResult(0);
     }
