@@ -5,9 +5,12 @@ using VarVault.Sdk.Library;
 
 namespace VarVault.App.ViewModels;
 
-/// <summary>Missing-deps screen: unresolved refs with needed-by counts. (Checklist 2.14; 28-checklist D1 triage.)</summary>
+/// <summary>Missing-deps screen: unresolved refs with needed-by counts, plus a "paste a VaM error log" repair that
+/// resolves the missing packages (incl. <c>.latest</c>) against the library and activates the ones we have — with
+/// their dependency closure — into VaM. (Checklist 2.14; 28-checklist D1 triage; QoL log-repair.)</summary>
 public sealed partial class MissingDepsViewModel(
-    IMissingDepsQuery query, Services.IDialogLauncher? launcher = null) : ObservableObject, ILoadableScreen
+    IMissingDepsQuery query, Services.IDialogLauncher? launcher = null, IMissingLogResolver? logResolver = null)
+    : ObservableObject, ILoadableScreen
 {
     /// <summary>Initial render cap — a large library can reference thousands of missing packages; showing them all
     /// up-front is slow and overwhelming. Most-needed-first + a "show all" toggle keeps triage fast. (D1.2)</summary>
@@ -97,4 +100,84 @@ public sealed partial class MissingDepsViewModel(
     public void ExportLinks() =>
         LastExportText = string.Join(System.Environment.NewLine,
             _all.OrderByDescending(i => i.NeededByCount).Select(i => i.Ref));
+
+    // ── VaM-log repair (QoL) ─────────────────────────────────────────────────────────────────────────────
+    /// <summary>Raw VaM error-log text pasted by the user (bound to a TextBox).</summary>
+    [ObservableProperty] private string _logText = "";
+
+    /// <summary>One row per package the log asked for, resolved against the library.</summary>
+    public ObservableCollection<MissingLogEntry> LogEntries { get; } = [];
+
+    [ObservableProperty] private bool _isAnalyzingLog;
+    [ObservableProperty] private string? _logStatus;
+    [ObservableProperty] private string? _activationStatus;
+
+    public bool HasLogResult => LogEntries.Count > 0;
+    public int LogFoundCount => LogEntries.Count(e => e.InLibrary);
+    public int LogMissingCount => LogEntries.Count(e => !e.InLibrary);
+    public bool CanActivateFound => logResolver is not null && LogFoundCount > 0 && !IsAnalyzingLog;
+
+    /// <summary>Parse the pasted log → resolve each ref (incl. <c>.latest</c>) against the library. (QoL)</summary>
+    [RelayCommand]
+    public async Task AnalyzeLogAsync()
+    {
+        if (logResolver is null || string.IsNullOrWhiteSpace(LogText))
+            return;
+        IsAnalyzingLog = true;
+        ActivationStatus = null;
+        NotifyLogState();
+        try
+        {
+            var analysis = await logResolver.AnalyzeAsync(LogText).ConfigureAwait(true);
+            LogEntries.Clear();
+            foreach (var e in analysis.Entries.OrderByDescending(e => e.InLibrary).ThenBy(e => e.Ref, StringComparer.OrdinalIgnoreCase))
+                LogEntries.Add(e);
+            LogStatus = analysis.Parsed == 0
+                ? "Không tìm thấy tên package nào trong log."
+                : $"Đọc được {analysis.Parsed} package · có trong thư viện {analysis.InLibrary} · còn thiếu {analysis.NotInLibrary}.";
+        }
+        finally
+        {
+            IsAnalyzingLog = false;
+            NotifyLogState();
+        }
+    }
+
+    /// <summary>Activate the in-library subset (+ their dependency closure) into the active VaM profile. (QoL)</summary>
+    [RelayCommand]
+    public async Task ActivateFoundAsync()
+    {
+        if (logResolver is null)
+            return;
+        var names = LogEntries.Where(e => e.InLibrary && e.ResolvedVarName is not null)
+            .Select(e => e.ResolvedVarName!).ToList();
+        if (names.Count == 0)
+            return;
+        IsAnalyzingLog = true;
+        NotifyLogState();
+        try
+        {
+            var r = await logResolver.ActivateAsync(names).ConfigureAwait(true);
+            ActivationStatus = r.PrivilegeFailures > 0
+                ? "Cần Developer Mode/quyền admin để tạo symlink — chưa activate được. Bật Developer Mode rồi thử lại."
+                : r.LinksCreated == 0
+                    ? "Chưa activate được — kiểm tra đã đặt đường dẫn VaM (Settings) và có profile đang hoạt động."
+                    : $"Đã activate {r.MembersActivated} package + phụ thuộc ({r.LinksCreated} link). Còn thiếu {r.StillMissing} package (cần import/Hub).";
+        }
+        finally
+        {
+            IsAnalyzingLog = false;
+            NotifyLogState();
+        }
+    }
+
+    private void NotifyLogState()
+    {
+        OnPropertyChanged(nameof(HasLogResult));
+        OnPropertyChanged(nameof(LogFoundCount));
+        OnPropertyChanged(nameof(LogMissingCount));
+        OnPropertyChanged(nameof(CanActivateFound));
+        AnalyzeLogCommand.NotifyCanExecuteChanged();
+        ActivateFoundCommand.NotifyCanExecuteChanged();
+    }
 }

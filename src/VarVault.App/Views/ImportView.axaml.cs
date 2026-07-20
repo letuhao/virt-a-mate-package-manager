@@ -1,7 +1,11 @@
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
+using Avalonia.Platform.Storage;
 using VarVault.App.ViewModels;
 
 namespace VarVault.App.Views;
@@ -14,6 +18,47 @@ public partial class ImportView : UserControl
         AvaloniaXamlLoader.Load(this);
         // Tunnel so the mapped keys win before the ListBox's type-ahead search / Del handling. (6.6)
         AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
+        DataContextChanged += OnDataContextChanged;
+    }
+
+    /// <summary>Wire the native OS folder/archive pickers (Avalonia StorageProvider — no extra library). (QoL)</summary>
+    private void OnDataContextChanged(object? sender, System.EventArgs e)
+    {
+        if (DataContext is not ImportViewModel vm)
+            return;
+        vm.FolderPicker = PickFoldersAsync;
+        vm.ArchivePicker = PickArchivesAsync;
+    }
+
+    private async Task<IReadOnlyList<string>> PickFoldersAsync()
+    {
+        var top = TopLevel.GetTopLevel(this);
+        if (top is null)
+            return [];
+        var folders = await top.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Chọn folder chứa .var để import",
+            AllowMultiple = true,
+        }).ConfigureAwait(true);
+        return folders.Select(f => f.Path.LocalPath).ToList();
+    }
+
+    private async Task<IReadOnlyList<string>> PickArchivesAsync()
+    {
+        var top = TopLevel.GetTopLevel(this);
+        if (top is null)
+            return [];
+        var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Chọn archive (zip / 7z / rar / tar) chứa .var",
+            AllowMultiple = true,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("Archives") { Patterns = ["*.zip", "*.7z", "*.rar", "*.tar", "*.gz"] },
+                FilePickerFileTypes.All,
+            ],
+        }).ConfigureAwait(true);
+        return files.Select(f => f.Path.LocalPath).ToList();
     }
 
     /// <summary>

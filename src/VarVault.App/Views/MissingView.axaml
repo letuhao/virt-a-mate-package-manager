@@ -11,6 +11,45 @@
                  Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center" />
       <Button Grid.Column="1" Content="Export links txt" Command="{Binding ExportLinksCommand}" />
     </Grid>
+    <!-- QoL · Repair from a VaM error log: paste → resolve (incl. .latest) → activate found + deps -->
+    <c:Card DockPanel.Dock="Top" Header="Sửa từ log lỗi VaM (paste log → activate cái đã có + phụ thuộc)" Margin="0,0,0,12">
+      <StackPanel Spacing="8">
+        <TextBox Text="{Binding LogText}" AcceptsReturn="True" MinHeight="80" MaxHeight="140"
+                 FontFamily="{DynamicResource MonoFont}" FontSize="11.5" TextWrapping="NoWrap"
+                 Watermark="Dán log lỗi VaM vào đây (vd: 'Missing addon package Creator.Package.latest')…" />
+        <Grid ColumnDefinitions="Auto,Auto,*">
+          <Button Grid.Column="0" Content="🔎 Phân tích" Command="{Binding AnalyzeLogCommand}" Margin="0,0,8,0" />
+          <Button Grid.Column="1" Content="🔗 Activate cái đã có (+ phụ thuộc)" Command="{Binding ActivateFoundCommand}"
+                  IsEnabled="{Binding CanActivateFound}" Background="{DynamicResource AccentBrush}" Foreground="White" Margin="0,0,8,0" />
+          <TextBlock Grid.Column="2" Text="{Binding LogStatus}" Opacity="0.7" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap" />
+        </Grid>
+        <TextBlock Text="{Binding ActivationStatus}" Foreground="{DynamicResource GoodBrush}" FontSize="12"
+                   TextWrapping="Wrap" IsVisible="{Binding ActivationStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="2"
+                MaxHeight="180" IsVisible="{Binding HasLogResult}">
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding LogEntries}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="lib:MissingLogEntry">
+                  <Grid ColumnDefinitions="*,Auto,Auto" Height="24" Margin="6,0">
+                    <TextBlock Grid.Column="0" Text="{Binding Ref}" VerticalAlignment="Center"
+                               FontFamily="{DynamicResource MonoFont}" FontSize="11.5" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="11" Margin="0,0,8,0" Opacity="0.7"
+                               Text="{Binding ResolvedVarName, StringFormat='→ {0}'}"
+                               IsVisible="{Binding InLibrary}" />
+                    <c:Tag Grid.Column="2" Kind="Good" VerticalAlignment="Center" IsVisible="{Binding InLibrary}"
+                           Content="{Binding RepositoryName, StringFormat='có · {0}'}" />
+                    <c:Tag Grid.Column="2" Kind="Crit" VerticalAlignment="Center" Content="thiếu — cần import"
+                           IsVisible="{Binding !InLibrary}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Border>
+      </StackPanel>
+    </c:Card>
+
     <!-- 28-checklist D1.1/D1.3 · contextual summary so the count reads as "downloads you still need", not a bug -->
     <TextBlock DockPanel.Dock="Top" Text="{Binding HeaderSummary}" Opacity="0.75" FontSize="12"
                TextWrapping="Wrap" Margin="0,0,0,10" IsVisible="{Binding !IsEmpty}" />

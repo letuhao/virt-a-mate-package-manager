@@ -112,8 +112,11 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
     [ObservableProperty] private bool _historyOpen;
     [ObservableProperty] private string? _statusMessage;
 
-    /// <summary>Folder/archive picker hook set by the view (real StorageProvider). Returns chosen paths.</summary>
-    public Func<Task<IReadOnlyList<string>>>? SourcePicker { get; set; }
+    /// <summary>Folder picker hook set by the view (real Avalonia StorageProvider). Returns chosen folder paths.</summary>
+    public Func<Task<IReadOnlyList<string>>>? FolderPicker { get; set; }
+
+    /// <summary>Archive-file picker hook set by the view (real Avalonia StorageProvider). Returns chosen archive paths.</summary>
+    public Func<Task<IReadOnlyList<string>>>? ArchivePicker { get; set; }
 
     // Triage counts (recomputed after scan / decision changes).
     public int TotalScanned => _all.Count;
@@ -165,13 +168,26 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
         NotifyGate();
     }
 
+    /// <summary>"+ Folder…" — pick one or more source folders via the native OS dialog. (QoL)</summary>
     [RelayCommand]
-    private async Task AddSourceAsync()
+    private async Task AddFolderAsync()
     {
-        if (SourcePicker is null)
-            return;
-        foreach (var p in await SourcePicker().ConfigureAwait(true))
-            if (!SourcePaths.Contains(p))
+        if (FolderPicker is not null)
+            AddPaths(await FolderPicker().ConfigureAwait(true));
+    }
+
+    /// <summary>"+ Archive…" — pick one or more archive files (zip/7z/rar/tar) via the native OS dialog. (QoL)</summary>
+    [RelayCommand]
+    private async Task AddArchiveAsync()
+    {
+        if (ArchivePicker is not null)
+            AddPaths(await ArchivePicker().ConfigureAwait(true));
+    }
+
+    private void AddPaths(IReadOnlyList<string> paths)
+    {
+        foreach (var p in paths)
+            if (!string.IsNullOrWhiteSpace(p) && !SourcePaths.Contains(p))
                 SourcePaths.Add(p);
         NotifyGate();
     }

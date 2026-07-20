@@ -46,7 +46,7 @@ public static class AppHost
             ["dupes"] = new DupesViewModel(services.GetRequiredService<IReclaimService>(), launcher),
             ["import"] = new ImportViewModel(services.GetRequiredService<Sdk.Import.IImportService>(), services.GetRequiredService<Sdk.Repositories.IRepositoryService>()),
             ["history"] = new ActivityViewModel(services.GetRequiredService<IActivityLog>()),
-            ["missing"] = new MissingDepsViewModel(services.GetRequiredService<IMissingDepsQuery>(), launcher),
+            ["missing"] = new MissingDepsViewModel(services.GetRequiredService<IMissingDepsQuery>(), launcher, services.GetService<Sdk.Library.IMissingLogResolver>()),
             ["proposals"] = new ProposalsViewModel(services.GetRequiredService<IProposalService>(), launcher),
             ["health"] = new HealthViewModel(services.GetRequiredService<IHealthService>(), launcher),
             ["trash"] = new TrashViewModel(services.GetRequiredService<ITrashQueryService>()),
