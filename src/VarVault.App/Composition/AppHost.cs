@@ -213,8 +213,7 @@ public static class AppHost
         return new Services.ShellLiveFeeds(scopeFactory, jobQueue);
     }
 
-    private static string DefaultDataDir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VarVault");
+    private static string DefaultDataDir => AppDataLocation.Resolve();
 
     /// <summary>
     /// Compose the app host + shell, or return a startup-error view-model on failure — never a null result that
@@ -254,8 +253,7 @@ public static class AppHost
     {
         try
         {
-            var dataDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VarVault");
+            var dataDir = AppDataLocation.Resolve();
             Directory.CreateDirectory(dataDir);
             var host = Bootstrap.BuildApp(dataDir);
             var scope = host.Services.CreateScope();

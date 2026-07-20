@@ -48,7 +48,7 @@ public sealed class MissingLogResolverE2ETests(ITestOutputHelper log)
         foreach (var e in analysis.Entries)
             log.WriteLine(e.InLibrary
                 ? $"  ✓ {e.Ref}  →  {e.ResolvedVarName}  ({e.RepositoryName} T{e.Tier})"
-                : $"  ✗ {e.Ref}  — thiếu, cần import");
+                : $"  ✗ {e.Ref}  — missing, need import");
 
         // The parser must not mistake the depender (Bodysuit_RW) for a missing item.
         Assert.Equal(5, analysis.Parsed);

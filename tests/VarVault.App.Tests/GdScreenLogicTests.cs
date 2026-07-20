@@ -92,16 +92,17 @@ public class GdScreenLogicTests
             var vm = new SettingsViewModel(store);
             await vm.LoadCommand.ExecuteAsync(null); // real flow: navigation loads Settings before the user edits (G-0)
             vm.VamPath = vamDir;
-            vm.CatalogDbPath = "C:\\catalog.db";
             vm.FixOnImport = "Auto (high-confidence)";
             Assert.Equal(3, vm.FixOnImportOptions.Count);
             Assert.True(vm.IsVamPathValid);
+            // The data folder is resolved (never blank) and shown read-only, not a persisted setting. (data-location)
+            Assert.False(string.IsNullOrWhiteSpace(vm.DataDirectory));
+            Assert.EndsWith("catalog.db", vm.CatalogDbFile);
             await vm.SaveCommand.ExecuteAsync(null);
 
             var reloaded = new SettingsViewModel(store);
             await reloaded.LoadCommand.ExecuteAsync(null);
             Assert.Equal(vamDir, reloaded.VamPath);
-            Assert.Equal("C:\\catalog.db", reloaded.CatalogDbPath);
             Assert.Equal("Auto (high-confidence)", reloaded.FixOnImport);
         }
         finally

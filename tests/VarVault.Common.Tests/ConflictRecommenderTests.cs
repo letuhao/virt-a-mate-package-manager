@@ -16,7 +16,7 @@ public class ConflictRecommenderTests
     {
         var r = ConflictRecommender.Recommend(incoming: Side(valid: true), existing: Side(valid: false));
         Assert.Equal(KeepChoice.KeepIncoming, r.Choice);
-        Assert.Contains("hỏng", r.Reason);
+        Assert.Contains("corrupt", r.Reason);
     }
 
     [Fact]
@@ -29,7 +29,7 @@ public class ConflictRecommenderTests
     {
         var r = ConflictRecommender.Recommend(Side(valid: false), Side(valid: false));
         Assert.Equal(KeepChoice.KeepExisting, r.Choice);
-        Assert.Contains("Cả hai", r.Reason);
+        Assert.Contains("Both copies are corrupt", r.Reason);
     }
 
     [Fact]
@@ -47,7 +47,7 @@ public class ConflictRecommenderTests
     {
         var r = ConflictRecommender.Recommend(Side(entries: 137), Side(entries: 41));
         Assert.Equal(KeepChoice.KeepIncoming, r.Choice);
-        Assert.Contains("entry", r.Reason);
+        Assert.Contains("more entries", r.Reason);
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public class ConflictRecommenderTests
         // Everything else equal -> newer file wins, but only here at the bottom of the ladder.
         var r = ConflictRecommender.Recommend(Side(mtime: T2024), Side(mtime: T2023));
         Assert.Equal(KeepChoice.KeepIncoming, r.Choice);
-        Assert.Contains("tham khảo", r.Reason);
+        Assert.Contains("reference", r.Reason);
     }
 
     [Fact]

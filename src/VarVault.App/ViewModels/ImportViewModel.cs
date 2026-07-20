@@ -35,17 +35,17 @@ public sealed partial class ImportItemViewModel(ImportItem item) : ObservableObj
 
     // Naming lane: filename-derived identity vs the var's own meta.json identity (G2 · D3).
     public string FilenameIdentity => Model.Signals.FilenameIdentity;
-    public string MetaIdentityLabel => Model.Signals.MetaIdentity ?? "(không đọc được)";
+    public string MetaIdentityLabel => Model.Signals.MetaIdentity ?? "(unreadable)";
     public bool HasExisting => Existing is not null;
     public string IntegrityStatus => Model.Signals.IntegrityStatus;
     public int EntryCount => Model.Signals.EntryCount;
 
     /// <summary>Decision-state pill for the list (draft): auto lanes show the lane; review lanes show decided/pending.</summary>
-    public string ListPillText => NeedsReview ? (IsResolved ? "✓ " + DecisionLabel : "cần review") : LaneLabel;
+    public string ListPillText => NeedsReview ? (IsResolved ? "✓ " + DecisionLabel : "needs review") : LaneLabel;
     public string LaneLabel => Lane switch
     {
-        ImportLane.New => "Mới", ImportLane.Exact => "Trùng", ImportLane.Cjk => "CJK",
-        ImportLane.Conflict => "Xung đột", ImportLane.Naming => "Tên≠meta", _ => "Hỏng",
+        ImportLane.New => "New", ImportLane.Exact => "Exact", ImportLane.Cjk => "CJK",
+        ImportLane.Conflict => "Conflict", ImportLane.Naming => "Name≠meta", _ => "Corrupt",
     };
 
     /// <summary>Absolute path of the preview image extracted from the incoming var (null → placeholder). (6.3)</summary>
@@ -74,9 +74,9 @@ public sealed partial class ImportItemViewModel(ImportItem item) : ObservableObj
     public string DecisionLabel => Decision switch
     {
         ImportDecision.Import => "Import", ImportDecision.ImportAndFix => "Import + fix",
-        ImportDecision.KeepIncoming => "Giữ mới", ImportDecision.KeepExisting => "Giữ cũ",
-        ImportDecision.KeepBoth => "Giữ cả hai", ImportDecision.RenameToMeta => "Đổi tên theo meta",
-        ImportDecision.Skip => "Bỏ qua", ImportDecision.Discard => "Loại", _ => "",
+        ImportDecision.KeepIncoming => "Keep new", ImportDecision.KeepExisting => "Keep existing",
+        ImportDecision.KeepBoth => "Keep both", ImportDecision.RenameToMeta => "Rename to meta",
+        ImportDecision.Skip => "Skip", ImportDecision.Discard => "Discard", _ => "",
     };
 }
 
@@ -132,7 +132,7 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
     public double ReviewProgress => ReviewTotal == 0 ? 1 : (double)ReviewResolved / ReviewTotal;
     public bool HasSession => _session is not null;
 
-    /// <summary>Sources strip summary line (draft): "N folder · M archive · K lỗi/mật khẩu". </summary>
+    /// <summary>Sources strip summary line: "N folder(s) · M archive(s) extracted · K failed/password". </summary>
     public string SourcesSummary
     {
         get
@@ -140,12 +140,12 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
             var folders = Sources.Count(s => s.Kind == ImportSourceKind.Folder);
             var archives = Sources.Count(s => s.Kind == ImportSourceKind.Archive && s.Status == ImportSourceStatus.Ok);
             var failed = Sources.Count(s => s.Status != ImportSourceStatus.Ok);
-            var s = $"{folders} folder · {archives} archive giải nén";
-            return failed > 0 ? s + $" · 🔒 {failed} lỗi/mật khẩu (ghi vào History)" : s;
+            var s = $"{folders} folder(s) · {archives} archive(s) extracted";
+            return failed > 0 ? s + $" · 🔒 {failed} failed/password (logged to History)" : s;
         }
     }
 
-    // Live apply plan (draft action-bar note "Copy N · fix M · bỏ qua K · loại L"). (G8)
+    // Live apply plan (action-bar note "Copy N · fix M · skip K · discard L"). (G8)
     private static readonly ImportDecision[] CopyDecisions =
         [ImportDecision.Import, ImportDecision.ImportAndFix, ImportDecision.KeepIncoming, ImportDecision.KeepBoth, ImportDecision.RenameToMeta];
     public int CopyPlanned => _all.Count(i => CopyDecisions.Contains(i.Decision));
@@ -154,7 +154,7 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
     public int SkipPlanned => _all.Count(i => i.Decision is ImportDecision.Skip or ImportDecision.KeepExisting or ImportDecision.None);
     public int DiscardPlanned => _all.Count(i => i.Decision == ImportDecision.Discard);
     public string ApplyPlanSummary =>
-        $"Copy {CopyPlanned} · fix {FixPlanned} · bỏ qua {SkipPlanned} · loại {DiscardPlanned}";
+        $"Copy {CopyPlanned} · fix {FixPlanned} · skip {SkipPlanned} · discard {DiscardPlanned}";
     public bool CanApply => _session is not null && ReviewRemaining == 0 && !IsApplying && !IsScanning && _all.Count > 0;
     public bool CanScan => TargetRepo is not null && SourcePaths.Count > 0 && !IsScanning && !IsApplying;
 
@@ -226,12 +226,12 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
             OnPropertyChanged(nameof(SourcesSummary));
             OnPropertyChanged(nameof(HasWarnings));
             ApplyFilter();
-            StatusMessage = $"Đã quét {_all.Count} var · {ReviewRemaining} cần review";
+            StatusMessage = $"Scanned {_all.Count} vars · {ReviewRemaining} need review";
         }
         catch (Exception ex)
         {
             _session = null;
-            StatusMessage = $"Lỗi khi quét nguồn: {ex.Message}";
+            StatusMessage = $"Scan failed: {ex.Message}";
         }
         finally
         {
@@ -274,8 +274,8 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
         try
         {
             var r = await import.ApplyAsync(_session).ConfigureAwait(true);
-            StatusMessage = $"Xong: copy {r.Copied} · fix {r.Fixed} · đổi tên {r.Renamed} · bỏ qua {r.Skipped} · loại {r.Discarded}"
-                            + (r.Failed > 0 ? $" · lỗi {r.Failed}" : "");
+            StatusMessage = $"Done: copied {r.Copied} · fixed {r.Fixed} · renamed {r.Renamed} · skipped {r.Skipped} · discarded {r.Discarded}"
+                            + (r.Failed > 0 ? $" · failed {r.Failed}" : "");
             _session = null;
             _all.Clear();
             Items.Clear();
@@ -286,13 +286,13 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
         }
         catch (OperationCanceledException)
         {
-            StatusMessage = "Đã huỷ import — phần đã copy vẫn được giữ, phần còn lại bỏ qua (ghi vào History).";
+            StatusMessage = "Import cancelled — copied items are kept, the rest skipped (logged to History).";
             await RefreshHistoryAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
         {
             // §11: target offline/full and other apply failures surface as a clear message, not a crash.
-            StatusMessage = $"Không thể import: {ex.Message}";
+            StatusMessage = $"Can't import: {ex.Message}";
         }
         finally
         {

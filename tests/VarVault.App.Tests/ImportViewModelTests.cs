@@ -57,7 +57,7 @@ public sealed class ImportViewModelTests
 
         await vm.ApplyCommand.ExecuteAsync(null);
         Assert.True(File.Exists(Path.Combine(targetDir.Path, "Fresh.New.1.var")));   // New imported
-        Assert.Contains("copy", vm.StatusMessage ?? "");
+        Assert.Contains("copied", vm.StatusMessage ?? "");
         Assert.Single(vm.History);                 // run recorded
     }
 
@@ -145,11 +145,11 @@ public sealed class ImportViewModelTests
         var fresh = vm.Items.First(i => i.FileName == "Fresh.New.1.var");
         Assert.True(fresh.IsNew);
         Assert.False(fresh.NeedsReview);
-        Assert.Equal("Mới", fresh.ListPillText);                        // auto lane → lane label
+        Assert.Equal("New", fresh.ListPillText);                        // auto lane → lane label
 
         // Apply-plan summary reflects the auto decisions (New→Import copy, Exact→Skip).
         Assert.Contains("Copy 1", vm.ApplyPlanSummary);
-        Assert.Contains("bỏ qua 1", vm.ApplyPlanSummary);
+        Assert.Contains("skip 1", vm.ApplyPlanSummary);
 
         // Search filters the visible list.
         vm.SearchText = "Fresh";

@@ -1,6 +1,7 @@
 using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VarVault.App.Composition;
 using VarVault.Domain.Activation;
 using VarVault.Sdk.Settings;
 
@@ -15,9 +16,17 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
     [ObservableProperty] private int _selectedTabIndex;
 
     [ObservableProperty] private string? _vamPath;
-    [ObservableProperty] private string? _catalogDbPath;
     [ObservableProperty] private string? _fixOnImport;
     [ObservableProperty] private string? _statusMessage;
+
+    // Data-folder location (catalog.db etc.) — resolved before the DB opens, so it's shown here read-only with a
+    // folder picker to relocate. See Composition.AppDataLocation.
+    [ObservableProperty] private string _dataDirectory = "";
+    [ObservableProperty] private string _catalogDbFile = "";
+    [ObservableProperty] private bool _dataDirEnvOverride;
+
+    /// <summary>Folder-picker hook the view sets to the real StorageProvider, for the data folder. </summary>
+    public Func<Task<string?>>? DataFolderPicker { get; set; }
 
     /// <summary>Validation message for the VaM path (null when valid/blank). (T6.3a)</summary>
     [ObservableProperty] private string? _vamPathValidationMessage;
@@ -43,6 +52,49 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
     {
         VamPathValidationMessage = ValidateVamPath(value);
         OnPropertyChanged(nameof(IsVamPathValid));
+    }
+
+    /// <summary>Show the effective data folder + catalog DB path (resolved before the DB opens).</summary>
+    private void RefreshDataLocation()
+    {
+        DataDirectory = AppDataLocation.Resolve();
+        CatalogDbFile = AppDataLocation.CatalogDbPath;
+        DataDirEnvOverride = AppDataLocation.IsOverriddenByEnv;
+    }
+
+    /// <summary>"Change folder…" → pick a new data directory. Applied on next launch (the live DB isn't moved).</summary>
+    [RelayCommand]
+    public async Task ChangeDataFolderAsync()
+    {
+        if (DataFolderPicker is null || DataDirEnvOverride)
+            return;
+        var picked = await DataFolderPicker().ConfigureAwait(true);
+        if (string.IsNullOrWhiteSpace(picked))
+            return;
+
+        var old = DataDirectory;
+        if (!AppDataLocation.SetDataDir(picked))
+        {
+            StatusMessage = "Couldn't save the data-folder choice (is the location writable?).";
+            return;
+        }
+        RefreshDataLocation();
+        StatusMessage = string.Equals(picked.TrimEnd(Path.DirectorySeparatorChar),
+                old.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase)
+            ? "Data folder unchanged."
+            : $"Data folder set to “{picked}”. Restart VarVault to use it. Your current catalog stays in “{old}” — "
+              + "copy catalog.db and thumbnails.db there if you want to keep it.";
+    }
+
+    /// <summary>"Reset to default" → clear the override so the data folder returns to %LOCALAPPDATA%\\VarVault.</summary>
+    [RelayCommand]
+    public void ResetDataFolder()
+    {
+        if (DataDirEnvOverride)
+            return;
+        AppDataLocation.SetDataDir(null);
+        RefreshDataLocation();
+        StatusMessage = $"Data folder reset to default ({AppDataLocation.DefaultDir}). Restart VarVault to apply.";
     }
 
     /// <summary>Null = valid (or blank); otherwise a human-readable reason. Accepts VaM.exe OR AddonPackages OR
@@ -89,7 +141,6 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
     // NOTE: the former "Symlink strategy" dropdown was removed (T6.3b) — it was written to `symlink.type`
     // but never read. Activation always uses both mechanisms: profile-directory switch + per-var links.
 
-    private const string CatalogDbKey = "catalog.db_path";
     private const string HotDaysKey = "tiers.hot_threshold_days";
     private const string AutoRebalanceKey = "automation.auto_rebalance";
     private const string PresetExtractKey = "import.preset_extraction_dir";
@@ -101,7 +152,7 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
     {
         VamPath = await settings.GetAsync(SettingKeys.VamPath, cancellationToken).ConfigureAwait(true);
         FixOnImport = await settings.GetAsync(SettingKeys.FixOnImport, cancellationToken).ConfigureAwait(true) ?? "Flag only";
-        CatalogDbPath = await settings.GetAsync(CatalogDbKey, cancellationToken).ConfigureAwait(true);
+        RefreshDataLocation();
         HotThresholdDays = await settings.GetAsync(HotDaysKey, cancellationToken).ConfigureAwait(true) ?? "30";
         AutoRebalance = await settings.GetBoolAsync(AutoRebalanceKey, false, cancellationToken).ConfigureAwait(true);
         PresetExtractionDir = await settings.GetAsync(PresetExtractKey, cancellationToken).ConfigureAwait(true);
@@ -126,7 +177,6 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
         // VamPathValidationMessage (red hint); activation is guarded defensively in EfActivationService. (T6.3a)
         await settings.SetAsync(SettingKeys.VamPath, VamPath ?? string.Empty, cancellationToken).ConfigureAwait(true);
         await settings.SetAsync(SettingKeys.FixOnImport, FixOnImport ?? "Flag only", cancellationToken).ConfigureAwait(true);
-        await settings.SetAsync(CatalogDbKey, CatalogDbPath ?? string.Empty, cancellationToken).ConfigureAwait(true);
         await settings.SetAsync(HotDaysKey, HotThresholdDays ?? "30", cancellationToken).ConfigureAwait(true);
         await settings.SetBoolAsync(AutoRebalanceKey, AutoRebalance, cancellationToken).ConfigureAwait(true);
         await settings.SetAsync(PresetExtractKey, PresetExtractionDir ?? string.Empty, cancellationToken).ConfigureAwait(true);

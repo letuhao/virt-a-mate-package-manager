@@ -155,14 +155,14 @@ public sealed class EfImportService(
 
         var warnings = new List<string>();
         foreach (var r in repos.Where(r => !r.IsOnline))
-            warnings.Add($"Repo '{r.Name}' đang offline — kiểm tra trùng lặp có thể bỏ sót bản đã có ở đó.");
+            warnings.Add($"Repo '{r.Name}' is offline — the duplicate check may miss copies already there.");
 
         var target = repos.FirstOrDefault(r => r.Id == targetRepoId);
         if (target is not null
             && catalog.All(c => c.RepositoryId != targetRepoId)
             && TargetHasVarsOnDisk(target.MountPath))
         {
-            warnings.Add($"Repo đích '{target.Name}' chưa được index — bản đã có trong repo có thể bị coi là 'Mới' và bị copy trùng. Hãy index repo trước khi import.");
+            warnings.Add($"Target repo '{target.Name}' isn't indexed yet — existing copies may be treated as 'New' and duplicated. Index the repo before importing.");
         }
 
         return warnings;
@@ -221,7 +221,7 @@ public sealed class EfImportService(
         {
             var badSignals = UnknownSignals(varPath, fileName);
             return Item(fileName, sourcePath, label, badSignals, ImportLane.Corrupt, ImportDecision.Discard,
-                "Không đọc được file (khoá/mất).", null, []);
+                "Couldn't read the file (locked / missing).", null, []);
         }
 
         var insp = inspection.Value;
@@ -233,7 +233,7 @@ public sealed class EfImportService(
         // 4.2 · intra-batch dedup: the same content twice in this import → keep the first, skip the rest.
         if (!string.IsNullOrEmpty(contentSig) && !batchSigs.Add(contentSig) && insp.Integrity == IntegrityStatus.Ok)
             return Item(fileName, sourcePath, label, signals, ImportLane.Exact, ImportDecision.Skip,
-                "Trùng với một file khác trong cùng đợt import — sẽ bỏ qua.", null, []);
+                "Duplicate of another file in this same import — will be skipped.", null, []);
 
         // E1: fold(MetaCreator.MetaPackage.<filenameVersion>) — meta.json has no version, so borrow the filename's.
         // Only when the filename parses (we need a version to form a full identity key to match the catalog).
@@ -260,21 +260,21 @@ public sealed class EfImportService(
         return lane switch
         {
             ImportLane.New => Item(fileName, sourcePath, label, signals, lane, ImportDecision.Import,
-                "File mới — sẽ import vào repo.", null, [], incomingPath: varPath),
+                "New file — will be imported into the repo.", null, [], incomingPath: varPath),
 
             ImportLane.Exact => ExactItem(fileName, sourcePath, label, signals, insp, catalog, varPath),
 
             ImportLane.Cjk => Item(fileName, sourcePath, label, signals, lane, ImportDecision.ImportAndFix,
-                $"Var hợp lệ, {signals.GbkEntryCount} entry tên mã GBK — sẽ import và tự fix Unicode.", null, [], incomingPath: varPath),
+                $"Valid var with {signals.GbkEntryCount} GBK-encoded entry name(s) — will import and auto-fix to Unicode.", null, [], incomingPath: varPath),
 
             ImportLane.Conflict => ConflictItem(fileName, sourcePath, label, signals, insp, conflictKey!, catalog, varPath, ct),
 
             ImportLane.Naming => Item(fileName, sourcePath, label, signals, lane, ImportDecision.RenameToMeta,
-                signals.MetaIdentity is { } m ? $"Tên file không khớp meta.json (meta: {m})." : "Tên file không đọc được.",
+                signals.MetaIdentity is { } m ? $"Filename doesn't match meta.json (meta: {m})." : "Filename couldn't be parsed.",
                 null, [], decision: ImportDecision.None, incomingPath: varPath),
 
             _ /* Corrupt */ => Item(fileName, sourcePath, label, signals, ImportLane.Corrupt, ImportDecision.Discard,
-                $"File hỏng ({signals.IntegrityStatus}) — nên loại.", null, [], decision: ImportDecision.None, incomingPath: varPath),
+                $"Corrupt file ({signals.IntegrityStatus}) — recommend discarding.", null, [], decision: ImportDecision.None, incomingPath: varPath),
         };
     }
 
@@ -283,8 +283,8 @@ public sealed class EfImportService(
     {
         var match = catalog.FirstOrDefault(c => Sig(c.ContentSignature) == Sig(insp.Signatures?.ContentSignature));
         var reason = match is null
-            ? "Đã có trong thư viện — sẽ bỏ qua."
-            : $"Đã có trong repo '{match.RepositoryName}' (T{match.Tier}) — sẽ bỏ qua.";
+            ? "Already in the library — will be skipped."
+            : $"Already in repo '{match.RepositoryName}' (T{match.Tier}) — will be skipped.";
         var existing = match is null ? null
             : new ExistingRef(match.VarFileId, match.Tier, match.RepositoryName, match.AbsolutePath, signals);
         return Item(fileName, sourcePath, label, signals, ImportLane.Exact, ImportDecision.Skip, reason, existing, [], incomingPath: varPath);
@@ -507,12 +507,12 @@ public sealed class EfImportService(
         var target = await db.Repositories.Where(r => r.Id == session.TargetRepositoryId)
             .Select(r => new { r.MountPath, r.IsOnline }).FirstOrDefaultAsync(CancellationToken.None).ConfigureAwait(false);
         if (target is null || string.IsNullOrEmpty(target.MountPath) || !target.IsOnline || !Directory.Exists(target.MountPath))
-            throw new InvalidOperationException("Repo đích không sẵn sàng (offline hoặc không tìm thấy) — không thể import.");
+            throw new InvalidOperationException("Target repo isn't available (offline or not found) — can't import.");
         var mount = target.MountPath;
         var plannedBytes = session.Items.Where(i => IsCopyDecision(i.Decision))
             .Sum(i => Math.Max(0, i.Signals.SizeBytes));
         if (!HasFreeSpace(mount, plannedBytes))
-            throw new InvalidOperationException("Repo đích không đủ dung lượng trống cho lần import này — hãy giải phóng bớt hoặc chọn repo khác.");
+            throw new InvalidOperationException("Target repo doesn't have enough free space for this import — free some space or choose another repo.");
 
         var sw = Stopwatch.StartNew();
         using var activity = Telemetry.StartActivity("import.apply");

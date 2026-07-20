@@ -133,8 +133,8 @@ public sealed partial class MissingDepsViewModel(
             foreach (var e in analysis.Entries.OrderByDescending(e => e.InLibrary).ThenBy(e => e.Ref, StringComparer.OrdinalIgnoreCase))
                 LogEntries.Add(e);
             LogStatus = analysis.Parsed == 0
-                ? "Không tìm thấy tên package nào trong log."
-                : $"Đọc được {analysis.Parsed} package · có trong thư viện {analysis.InLibrary} · còn thiếu {analysis.NotInLibrary}.";
+                ? "No package names found in the log."
+                : $"Parsed {analysis.Parsed} packages · in library {analysis.InLibrary} · missing {analysis.NotInLibrary}.";
         }
         finally
         {
@@ -159,10 +159,10 @@ public sealed partial class MissingDepsViewModel(
         {
             var r = await logResolver.ActivateAsync(names).ConfigureAwait(true);
             ActivationStatus = r.PrivilegeFailures > 0
-                ? "Cần Developer Mode/quyền admin để tạo symlink — chưa activate được. Bật Developer Mode rồi thử lại."
+                ? "Symlink creation needs Developer Mode / admin — nothing activated. Enable Developer Mode and retry."
                 : r.LinksCreated == 0
-                    ? "Chưa activate được — kiểm tra đã đặt đường dẫn VaM (Settings) và có profile đang hoạt động."
-                    : $"Đã activate {r.MembersActivated} package + phụ thuộc ({r.LinksCreated} link). Còn thiếu {r.StillMissing} package (cần import/Hub).";
+                    ? "Nothing activated — check the VaM path is set (Settings) and a profile is active."
+                    : $"Activated {r.MembersActivated} packages + dependencies ({r.LinksCreated} links). {r.StillMissing} still missing (need import / Hub).";
         }
         finally
         {

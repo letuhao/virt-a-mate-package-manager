@@ -17,8 +17,23 @@
         <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding VamPathValidationMessage}"
                    Foreground="{DynamicResource CritBrush}" FontSize="12" Margin="0,0,0,10"
                    IsVisible="{Binding VamPathValidationMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
-        <TextBlock Grid.Row="2" Grid.Column="0" Text="Catalog DB location" VerticalAlignment="Center" Opacity="0.8" Margin="0,0,14,10" />
-        <TextBox Grid.Row="2" Grid.Column="1" Name="PART_CatalogDb" Text="{Binding CatalogDbPath}" Margin="0,0,0,10" />
+        <TextBlock Grid.Row="2" Grid.Column="0" Text="Data folder" VerticalAlignment="Top" Opacity="0.8" Margin="0,6,14,10" />
+        <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4" Margin="0,0,0,10">
+          <Grid ColumnDefinitions="*,Auto,Auto">
+            <TextBox Grid.Column="0" Name="PART_DataDir" Text="{Binding DataDirectory}" IsReadOnly="True"
+                     IsEnabled="{Binding !DataDirEnvOverride}" />
+            <Button Grid.Column="1" Content="Change folder…" Margin="6,0,0,0"
+                    Command="{Binding ChangeDataFolderCommand}" IsEnabled="{Binding !DataDirEnvOverride}" />
+            <Button Grid.Column="2" Content="Reset" Margin="6,0,0,0"
+                    Command="{Binding ResetDataFolderCommand}" IsEnabled="{Binding !DataDirEnvOverride}" />
+          </Grid>
+          <TextBlock Text="{Binding CatalogDbFile, StringFormat='Catalog DB: {0}'}" Opacity="0.6" FontSize="11"
+                     FontFamily="{DynamicResource MonoFont}" TextTrimming="CharacterEllipsis" />
+          <TextBlock Text="Changing the folder takes effect after a restart; your existing catalog isn't moved automatically."
+                     Opacity="0.55" FontSize="11" TextWrapping="Wrap" IsVisible="{Binding !DataDirEnvOverride}" />
+          <TextBlock Text="Data folder is fixed by the VARVAULT_DATA_DIR environment variable." Foreground="{DynamicResource WarnBrush}"
+                     FontSize="11" TextWrapping="Wrap" IsVisible="{Binding DataDirEnvOverride}" />
+        </StackPanel>
         <TextBlock Grid.Row="3" Grid.Column="0" Text="Fix-on-import" VerticalAlignment="Center" Opacity="0.8" Margin="0,0,14,0" />
         <ComboBox Grid.Row="3" Grid.Column="1" Name="PART_FixOnImport" HorizontalAlignment="Stretch"
                   ItemsSource="{Binding FixOnImportOptions}" SelectedItem="{Binding FixOnImport}" />

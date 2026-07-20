@@ -37,7 +37,7 @@ public partial class ImportView : UserControl
             return [];
         var folders = await top.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
-            Title = "Chọn folder chứa .var để import",
+            Title = "Select folders containing .var files",
             AllowMultiple = true,
         }).ConfigureAwait(true);
         return folders.Select(f => f.Path.LocalPath).ToList();
@@ -50,7 +50,7 @@ public partial class ImportView : UserControl
             return [];
         var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = "Chọn archive (zip / 7z / rar / tar) chứa .var",
+            Title = "Select archives (zip / 7z / rar / tar)",
             AllowMultiple = true,
             FileTypeFilter =
             [

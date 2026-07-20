@@ -13,7 +13,7 @@
         <TextBlock Grid.Column="0" Text="Import &amp; review" FontSize="21" FontWeight="SemiBold"
                    Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center" />
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,8,0">
-          <TextBlock Text="Import vào" Opacity="0.6" VerticalAlignment="Center" FontSize="12" />
+          <TextBlock Text="Import into" Opacity="0.6" VerticalAlignment="Center" FontSize="12" />
           <ComboBox ItemsSource="{Binding Repositories}" SelectedItem="{Binding TargetRepo}" MinWidth="180">
             <ComboBox.ItemTemplate>
               <DataTemplate x:DataType="repo:RepositoryInfo">
@@ -28,7 +28,7 @@
         <Button Grid.Column="2" Content="📁 + Folder…" Command="{Binding AddFolderCommand}" Margin="0,0,6,0" />
         <Button Grid.Column="3" Content="🗜 + Archive…" Command="{Binding AddArchiveCommand}" Margin="0,0,6,0" />
         <Button Grid.Column="4" Content="🕘 History" Command="{Binding OpenHistoryCommand}" Margin="0,0,6,0" />
-        <Button Grid.Column="5" Content="Quét" Command="{Binding ScanCommand}"
+        <Button Grid.Column="5" Content="Scan" Command="{Binding ScanCommand}"
                 Background="{DynamicResource AccentBrush}" Foreground="White" />
       </Grid>
 
@@ -77,9 +77,9 @@
 
       <!-- Stepper: Sources → Scan → Review → Apply -->
       <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10" IsVisible="{Binding HasSession}">
-        <c:Tag Content="① Nguồn" />
+        <c:Tag Content="① Sources" />
         <TextBlock Text="›" Opacity="0.4" VerticalAlignment="Center" />
-        <c:Tag Content="② Quét &amp; giải nén" />
+        <c:Tag Content="② Scan &amp; extract" />
         <TextBlock Text="›" Opacity="0.4" VerticalAlignment="Center" />
         <c:Tag Content="③ Review" Kind="Warn" />
         <TextBlock Text="›" Opacity="0.4" VerticalAlignment="Center" />
@@ -89,16 +89,16 @@
       <!-- Triage chips + worknote -->
       <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10" IsVisible="{Binding HasSession}">
         <WrapPanel Grid.Column="0">
-          <Button Command="{Binding FilterCommand}" CommandParameter="all" Margin="0,0,8,0"><TextBlock Text="{Binding TotalScanned, StringFormat='Tất cả {0}'}" /></Button>
-          <Button Command="{Binding FilterCommand}" CommandParameter="New" Margin="0,0,8,0"><TextBlock Text="{Binding NewCount, StringFormat='Mới {0}'}" Foreground="{DynamicResource GoodBrush}" /></Button>
+          <Button Command="{Binding FilterCommand}" CommandParameter="all" Margin="0,0,8,0"><TextBlock Text="{Binding TotalScanned, StringFormat='All {0}'}" /></Button>
+          <Button Command="{Binding FilterCommand}" CommandParameter="New" Margin="0,0,8,0"><TextBlock Text="{Binding NewCount, StringFormat='New {0}'}" Foreground="{DynamicResource GoodBrush}" /></Button>
           <Button Command="{Binding FilterCommand}" CommandParameter="Cjk" Margin="0,0,8,0"><TextBlock Text="{Binding CjkCount, StringFormat='CJK {0}'}" Foreground="{DynamicResource ColdBrush}" /></Button>
-          <Button Command="{Binding FilterCommand}" CommandParameter="Exact" Margin="0,0,8,0"><TextBlock Text="{Binding ExactCount, StringFormat='Trùng {0}'}" Opacity="0.7" /></Button>
-          <Button Command="{Binding FilterCommand}" CommandParameter="Naming" Margin="0,0,8,0"><TextBlock Text="{Binding NamingCount, StringFormat='Tên≠meta {0}'}" Foreground="{DynamicResource WarnBrush}" /></Button>
-          <Button Command="{Binding FilterCommand}" CommandParameter="Conflict" Margin="0,0,8,0"><TextBlock Text="{Binding ConflictCount, StringFormat='Xung đột {0}'}" Foreground="{DynamicResource WarnBrush}" /></Button>
-          <Button Command="{Binding FilterCommand}" CommandParameter="Corrupt" Margin="0,0,8,0"><TextBlock Text="{Binding CorruptCount, StringFormat='Hỏng {0}'}" Foreground="{DynamicResource CritBrush}" /></Button>
+          <Button Command="{Binding FilterCommand}" CommandParameter="Exact" Margin="0,0,8,0"><TextBlock Text="{Binding ExactCount, StringFormat='Exact {0}'}" Opacity="0.7" /></Button>
+          <Button Command="{Binding FilterCommand}" CommandParameter="Naming" Margin="0,0,8,0"><TextBlock Text="{Binding NamingCount, StringFormat='Name≠meta {0}'}" Foreground="{DynamicResource WarnBrush}" /></Button>
+          <Button Command="{Binding FilterCommand}" CommandParameter="Conflict" Margin="0,0,8,0"><TextBlock Text="{Binding ConflictCount, StringFormat='Conflict {0}'}" Foreground="{DynamicResource WarnBrush}" /></Button>
+          <Button Command="{Binding FilterCommand}" CommandParameter="Corrupt" Margin="0,0,8,0"><TextBlock Text="{Binding CorruptCount, StringFormat='Corrupt {0}'}" Foreground="{DynamicResource CritBrush}" /></Button>
         </WrapPanel>
         <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="12" Opacity="0.7" TextAlignment="Right"
-                   Text="{Binding ReviewRemaining, StringFormat='Chỉ {0} mục cần bạn quyết'}" />
+                   Text="{Binding ReviewRemaining, StringFormat='Only {0} item(s) need your decision'}" />
       </Grid>
 
       <!-- Action bar (bottom) -->
@@ -109,15 +109,15 @@
             <TextBlock VerticalAlignment="Center" Opacity="0.7" FontSize="12"
                        Text="{Binding ReviewResolved, StringFormat='{}{0} /'}" />
             <TextBlock VerticalAlignment="Center" Opacity="0.7" FontSize="12"
-                       Text="{Binding ReviewTotal, StringFormat='{}{0} đã review'}" />
+                       Text="{Binding ReviewTotal, StringFormat='{}{0} reviewed'}" />
             <ProgressBar Minimum="0" Maximum="1" Value="{Binding ReviewProgress}" Width="120" Height="6"
                          VerticalAlignment="Center" />
           </StackPanel>
           <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="12" Opacity="0.75"
                      Text="{Binding ApplyPlanSummary}" />
           <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" Margin="0,0,12,0">
-            <Button Content="✨ Chấp nhận mọi gợi ý" Command="{Binding AcceptAllCommand}" />
-            <CheckBox Content="Activate vào VaM sau import" IsChecked="{Binding ActivateAfter}" VerticalAlignment="Center" />
+            <Button Content="✨ Accept all recommendations" Command="{Binding AcceptAllCommand}" />
+            <CheckBox Content="Activate into VaM after import" IsChecked="{Binding ActivateAfter}" VerticalAlignment="Center" />
           </StackPanel>
           <Button Grid.Column="4" Content="Apply →" Command="{Binding ApplyCommand}"
                   Background="{DynamicResource AccentBrush}" Foreground="White" FontWeight="SemiBold" />
@@ -128,9 +128,9 @@
       <Grid ColumnDefinitions="*,1.1*">
         <DockPanel Grid.Column="0">
           <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,6">
-            <TextBox Grid.Column="0" Text="{Binding SearchText}" Watermark="Lọc theo tên / creator…"
+            <TextBox Grid.Column="0" Text="{Binding SearchText}" Watermark="Filter by name / creator…"
                      FontSize="12" Margin="0,0,8,0" />
-            <TextBlock Grid.Column="1" Text="{Binding Items.Count, StringFormat='{}{0} mục'}" Opacity="0.6" FontSize="12"
+            <TextBlock Grid.Column="1" Text="{Binding Items.Count, StringFormat='{}{0} items'}" Opacity="0.6" FontSize="12"
                        VerticalAlignment="Center" Margin="0,0,8,0" />
             <Button Grid.Column="2" Content="▤ / ▦" Command="{Binding ToggleViewCommand}" />
           </Grid>
@@ -197,7 +197,7 @@
         </DockPanel>
 
         <!-- Resolver -->
-        <c:Card Grid.Column="1" Margin="14,0,0,0" Header="Chi tiết"
+        <c:Card Grid.Column="1" Margin="14,0,0,0" Header="Details"
                 IsVisible="{Binding Selected, Converter={x:Static ObjectConverters.IsNotNull}}">
           <ScrollViewer>
             <StackPanel Spacing="10" DataContext="{Binding Selected}" x:DataType="vm:ImportItemViewModel">
@@ -213,9 +213,9 @@
 
               <!-- Naming lane: filename identity vs meta.json identity (G2 · D3) -->
               <Grid ColumnDefinitions="120,*,*" RowDefinitions="Auto,Auto" IsVisible="{Binding IsNaming}">
-                <TextBlock Grid.Row="0" Grid.Column="1" Text="Theo tên file" Foreground="{DynamicResource WarnBrush}" FontWeight="SemiBold" FontSize="12" />
-                <TextBlock Grid.Row="0" Grid.Column="2" Text="Theo meta.json" Foreground="{DynamicResource ColdBrush}" FontWeight="SemiBold" FontSize="12" />
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="Định danh" Opacity="0.6" FontSize="12" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="By filename" Foreground="{DynamicResource WarnBrush}" FontWeight="SemiBold" FontSize="12" />
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="By meta.json" Foreground="{DynamicResource ColdBrush}" FontWeight="SemiBold" FontSize="12" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Identity" Opacity="0.6" FontSize="12" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding FilenameIdentity}" FontFamily="{DynamicResource MonoFont}" FontSize="11.5" TextWrapping="Wrap" />
                 <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding MetaIdentityLabel}" FontFamily="{DynamicResource MonoFont}" FontSize="11.5" FontWeight="SemiBold" TextWrapping="Wrap" />
               </Grid>
@@ -223,15 +223,15 @@
               <!-- Conflict side-by-side signal grid -->
               <Grid ColumnDefinitions="120,*,*" IsVisible="{Binding HasExisting}"
                     RowDefinitions="Auto,Auto,Auto,Auto,Auto">
-                <TextBlock Grid.Row="0" Grid.Column="1" Text="Bản mới" Foreground="{DynamicResource GoodBrush}" FontWeight="SemiBold" FontSize="12" />
-                <TextBlock Grid.Row="0" Grid.Column="2" Text="Trong repo" Foreground="{DynamicResource ColdBrush}" FontWeight="SemiBold" FontSize="12" />
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="Zip hợp lệ" Opacity="0.6" FontSize="12" />
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Incoming" Foreground="{DynamicResource GoodBrush}" FontWeight="SemiBold" FontSize="12" />
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="In repo" Foreground="{DynamicResource ColdBrush}" FontWeight="SemiBold" FontSize="12" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Valid zip" Opacity="0.6" FontSize="12" />
                 <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding IntegrityStatus}" FontSize="12" />
                 <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Existing.Signals.IntegrityStatus}" FontSize="12" />
-                <TextBlock Grid.Row="2" Grid.Column="0" Text="Dung lượng" Opacity="0.6" FontSize="12" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Size" Opacity="0.6" FontSize="12" />
                 <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SizeLabel}" FontSize="12" />
                 <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding Existing.Signals.SizeBytes, Converter={StaticResource BytesToSize}}" FontSize="12" />
-                <TextBlock Grid.Row="3" Grid.Column="0" Text="Số entry" Opacity="0.6" FontSize="12" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Entries" Opacity="0.6" FontSize="12" />
                 <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding EntryCount}" FontSize="12" />
                 <TextBlock Grid.Row="3" Grid.Column="2" Text="{Binding Existing.Signals.EntryCount}" FontSize="12" />
                 <TextBlock Grid.Row="4" Grid.Column="0" Text="Repo" Opacity="0.6" FontSize="12" />
@@ -250,45 +250,45 @@
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
 
-              <TextBlock Text="Quyết định:" Opacity="0.6" FontSize="12" Margin="0,4,0,0" />
+              <TextBlock Text="Decision:" Opacity="0.6" FontSize="12" Margin="0,4,0,0" />
 
               <!-- New / Exact: import vs skip -->
               <WrapPanel IsVisible="{Binding IsNew}">
                 <Button Content="✅ Import" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
-                <Button Content="⤫ Bỏ qua" Command="{Binding ChooseCommand}" CommandParameter="Skip" Margin="0,0,6,6" />
+                <Button Content="⤫ Skip" Command="{Binding ChooseCommand}" CommandParameter="Skip" Margin="0,0,6,6" />
               </WrapPanel>
               <WrapPanel IsVisible="{Binding IsExact}">
-                <Button Content="⤫ Bỏ qua (đã có)" Command="{Binding ChooseCommand}" CommandParameter="Skip" Margin="0,0,6,6" />
-                <Button Content="✅ Import bản sao" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
+                <Button Content="⤫ Skip (already have)" Command="{Binding ChooseCommand}" CommandParameter="Skip" Margin="0,0,6,6" />
+                <Button Content="✅ Import a copy" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
               </WrapPanel>
               <!-- CJK: import+fix vs skip -->
               <WrapPanel IsVisible="{Binding IsCjk}">
                 <Button Content="🈶 Import + fix Unicode" Command="{Binding ChooseCommand}" CommandParameter="ImportAndFix" Margin="0,0,6,6" />
-                <Button Content="✅ Import (không fix)" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
-                <Button Content="⤫ Bỏ qua" Command="{Binding ChooseCommand}" CommandParameter="Skip" Margin="0,0,6,6" />
+                <Button Content="✅ Import (no fix)" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
+                <Button Content="⤫ Skip" Command="{Binding ChooseCommand}" CommandParameter="Skip" Margin="0,0,6,6" />
               </WrapPanel>
               <!-- Naming: rename to meta / keep filename / discard -->
               <WrapPanel IsVisible="{Binding IsNaming}">
-                <Button Content="🏷 Đổi tên theo meta" Command="{Binding ChooseCommand}" CommandParameter="RenameToMeta" Margin="0,0,6,6" />
-                <Button Content="✅ Giữ tên file" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
-                <Button Content="🗑 Loại" Command="{Binding ChooseCommand}" CommandParameter="Discard" Margin="0,0,6,6" />
+                <Button Content="🏷 Rename to meta" Command="{Binding ChooseCommand}" CommandParameter="RenameToMeta" Margin="0,0,6,6" />
+                <Button Content="✅ Keep filename" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
+                <Button Content="🗑 Discard" Command="{Binding ChooseCommand}" CommandParameter="Discard" Margin="0,0,6,6" />
               </WrapPanel>
               <!-- Conflict: keep new / keep old / both / discard -->
               <WrapPanel IsVisible="{Binding IsConflict}">
-                <Button Content="✅ Giữ mới" Command="{Binding ChooseCommand}" CommandParameter="KeepIncoming" Margin="0,0,6,6" />
-                <Button Content="↩︎ Giữ cũ" Command="{Binding ChooseCommand}" CommandParameter="KeepExisting" Margin="0,0,6,6" />
-                <Button Content="🔀 Cả hai" Command="{Binding ChooseCommand}" CommandParameter="KeepBoth" Margin="0,0,6,6" />
-                <Button Content="🗑 Loại" Command="{Binding ChooseCommand}" CommandParameter="Discard" Margin="0,0,6,6" />
+                <Button Content="✅ Keep new" Command="{Binding ChooseCommand}" CommandParameter="KeepIncoming" Margin="0,0,6,6" />
+                <Button Content="↩︎ Keep existing" Command="{Binding ChooseCommand}" CommandParameter="KeepExisting" Margin="0,0,6,6" />
+                <Button Content="🔀 Keep both" Command="{Binding ChooseCommand}" CommandParameter="KeepBoth" Margin="0,0,6,6" />
+                <Button Content="🗑 Discard" Command="{Binding ChooseCommand}" CommandParameter="Discard" Margin="0,0,6,6" />
               </WrapPanel>
               <!-- Corrupt: discard / import anyway -->
               <WrapPanel IsVisible="{Binding IsCorrupt}">
-                <Button Content="🗑 Loại (khuyến nghị)" Command="{Binding ChooseCommand}" CommandParameter="Discard" Margin="0,0,6,6" />
-                <Button Content="⚠ Vẫn import" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
+                <Button Content="🗑 Discard (recommended)" Command="{Binding ChooseCommand}" CommandParameter="Discard" Margin="0,0,6,6" />
+                <Button Content="⚠ Import anyway" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
               </WrapPanel>
 
-              <TextBlock Text="{Binding DecisionLabel, StringFormat='Đã chọn: {0}'}" Foreground="{DynamicResource GoodBrush}"
+              <TextBlock Text="{Binding DecisionLabel, StringFormat='Selected: {0}'}" Foreground="{DynamicResource GoodBrush}"
                          FontSize="12" IsVisible="{Binding IsResolved}" />
-              <TextBlock Text="J/K chuyển · ] chọn 1 · [ chọn 2 · \ cả hai · Del loại" Opacity="0.5" FontSize="11"
+              <TextBlock Text="J/K move · ] choice 1 · [ choice 2 · \ both · Del discard" Opacity="0.5" FontSize="11"
                          IsVisible="{Binding NeedsReview}" Margin="0,4,0,0" />
             </StackPanel>
           </ScrollViewer>
@@ -325,7 +325,7 @@
                               <TextBlock Grid.Column="0" FontSize="11" Foreground="{DynamicResource CritBrush}" VerticalAlignment="Center">
                                 <Run Text="🔒" /><Run Text="{Binding Path}" /><Run Text=" — " /><Run Text="{Binding Reason}" />
                               </TextBlock>
-                              <Button Grid.Column="1" Content="Thử lại…" FontSize="11" Padding="8,2"
+                              <Button Grid.Column="1" Content="Retry…" FontSize="11" Padding="8,2"
                                       Command="{Binding $parent[UserControl].((vm:ImportViewModel)DataContext).RetryFailedSourceCommand}"
                                       CommandParameter="{Binding Path}" />
                             </Grid>

@@ -17,17 +17,20 @@ public partial class SettingsView : UserControl
     private void OnDataContextChanged(object? sender, System.EventArgs e)
     {
         if (DataContext is SettingsViewModel vm)
-            vm.FolderPicker = PickFolderAsync;
+        {
+            vm.FolderPicker = () => PickFolderAsync("Select the VaM install folder");
+            vm.DataFolderPicker = () => PickFolderAsync("Select the VarVault data folder");
+        }
     }
 
-    private async System.Threading.Tasks.Task<string?> PickFolderAsync()
+    private async System.Threading.Tasks.Task<string?> PickFolderAsync(string title)
     {
         var top = TopLevel.GetTopLevel(this);
         if (top is null)
             return null;
         var folders = await top.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
-            Title = "Select the VaM install folder",
+            Title = title,
             AllowMultiple = false,
         }).ConfigureAwait(true);
         return folders.Count > 0 ? folders[0].Path.LocalPath : null;
