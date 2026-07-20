@@ -11,6 +11,14 @@
                  Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center" />
       <Button Grid.Column="1" Content="Export links txt" Command="{Binding ExportLinksCommand}" />
     </Grid>
+    <!-- 28-checklist D1.1/D1.3 · contextual summary so the count reads as "downloads you still need", not a bug -->
+    <TextBlock DockPanel.Dock="Top" Text="{Binding HeaderSummary}" Opacity="0.75" FontSize="12"
+               TextWrapping="Wrap" Margin="0,0,0,10" IsVisible="{Binding !IsEmpty}" />
+    <!-- 28-checklist D1.2 · cap status + show-all toggle -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,8" IsVisible="{Binding CanToggle}">
+      <TextBlock Grid.Column="0" Text="{Binding CapLabel}" Opacity="0.6" FontSize="11" VerticalAlignment="Center" />
+      <Button Grid.Column="1" Content="{Binding ToggleLabel}" Command="{Binding ToggleShowAllCommand}" />
+    </Grid>
     <c:Card Header="Referenced packages not in your library">
       <ScrollViewer>
         <ItemsControl ItemsSource="{Binding Items}">

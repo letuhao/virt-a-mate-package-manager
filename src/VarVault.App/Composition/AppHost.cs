@@ -42,7 +42,7 @@ public static class AppHost
                 services.GetService<IReclaimService>(), services.GetService<IActivityLog>()),
             ["repos"] = new RepositoriesViewModel(services.GetRequiredService<Sdk.Repositories.IRepositoryService>(), launcher),
             ["presets"] = new PresetsViewModel(services.GetRequiredService<Sdk.Presets.IPresetService>(), services.GetService<IProfileService>(), launcher, services.GetService<Sdk.Activation.IActivationService>(), services.GetService<Sdk.Settings.ISettingsService>()),
-            ["tiering"] = new TieringViewModel(services.GetRequiredService<ITieringService>(), launcher),
+            ["tiering"] = new TieringViewModel(services.GetRequiredService<ITieringService>(), launcher, services.GetService<Sdk.Repositories.IRepositoryService>()),
             ["dupes"] = new DupesViewModel(services.GetRequiredService<IReclaimService>(), launcher, services.GetService<IIntakeService>()),
             ["history"] = new ActivityViewModel(services.GetRequiredService<IActivityLog>()),
             ["missing"] = new MissingDepsViewModel(services.GetRequiredService<IMissingDepsQuery>(), launcher),
@@ -58,12 +58,14 @@ public static class AppHost
 
         var jobQueue = services.GetService<Sdk.Threading.IJobQueue>();
         var feeds = TryBuildFeeds(services, jobQueue);
-        var shell = new ShellViewModel(screens, initial: "library", dialogs: dialogs, jobQueue: jobQueue, feeds: feeds);
+        var shell = new ShellViewModel(screens, initial: "dashboard", dialogs: dialogs, jobQueue: jobQueue, feeds: feeds);
         shellRef = shell; // wires the launcher toast callback above
 
         // GA-6 · top-bar handlers → open the matching dialog through the launcher.
         shell.AddRepoHandler = launcher.OpenAddRepo;
         shell.RescueHandler = () => { launcher.OpenRescue(); return System.Threading.Tasks.Task.CompletedTask; };
+        // C1.2 · first-run onboarding opens through the same launcher (the window triggers it on load).
+        shell.OnboardingHandler = launcher.OpenOnboarding;
 
         // GD-1/GD-2 · let the dashboard + library navigate the shell.
         if (screens["dashboard"] is DashboardViewModel dash)
@@ -123,6 +125,39 @@ public static class AppHost
         });
     }
 
+    private const string OnboardingSeenKey = "onboarding.seen";
+
+    /// <summary>
+    /// C1.1/C1.3 · First-run detection: true when no repositories are registered AND the onboarding wizard hasn't
+    /// been dismissed before. Uses its own scope (never shares the shell's DbContext). Persists the "seen" flag so a
+    /// user who dismisses the wizard without adding a repo isn't nagged on every launch. Returns false on any error
+    /// (never block startup on this). (28-checklist C1.)
+    /// </summary>
+    public static async Task<bool> NeedsOnboardingAsync(IServiceProvider rootServices)
+    {
+        try
+        {
+            using var scope = rootServices.CreateScope();
+            var repos = scope.ServiceProvider.GetService<Sdk.Repositories.IRepositoryService>();
+            if (repos is null)
+                return false;
+            var list = await repos.ListAsync().ConfigureAwait(false);
+            if (list.Count > 0)
+                return false; // already set up
+            var settings = scope.ServiceProvider.GetService<Sdk.Settings.ISettingsService>();
+            if (settings is null)
+                return true;
+            var seen = await settings.GetBoolAsync(OnboardingSeenKey, false).ConfigureAwait(false);
+            if (!seen)
+                await settings.SetBoolAsync(OnboardingSeenKey, true).ConfigureAwait(false); // show once
+            return !seen;
+        }
+        catch (Exception)
+        {
+            return false; // best-effort — a detection failure must never block launch
+        }
+    }
+
     /// <summary>Reconcile Profile rows with on-disk profile dirs at launch (derive active, prune vanished). (T3.3)</summary>
     private static void ReconcileProfiles(IServiceProvider rootServices)
     {
@@ -172,6 +207,8 @@ public static class AppHost
             var host = Bootstrap.BuildApp(dataDir);
             var scope = host.Services.CreateScope(); // app-lifetime scope backing the shell's read services
             var shell = CreateShell(scope.ServiceProvider);
+            // C1.1 · a zero-repository install (that hasn't dismissed the wizard) opens onboarding on load.
+            shell.ShowOnboardingOnLoad = NeedsOnboardingAsync(host.Services).GetAwaiter().GetResult();
             ReconcileProfiles(host.Services); // T3.3: sync Profile rows with on-disk profile dirs (own scope)
             EnqueueIndexAll(scope.ServiceProvider); // GA-5: populate the catalog in the background on launch
             return (shell, null);

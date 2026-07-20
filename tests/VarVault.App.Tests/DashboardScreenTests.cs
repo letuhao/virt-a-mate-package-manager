@@ -49,6 +49,6 @@ public class DashboardScreenTests
         Assert.Contains("Hot", texts);
         Assert.Contains("8410", texts);
         // Attention row is now a clickable navigation button (GD-1) → count + arrow.
-        Assert.Contains(texts, t => t is not null && t.StartsWith("1203 missing dependencies"));
+        Assert.Contains(texts, t => t is not null && t.StartsWith("1203 packages need dependencies"));
     }
 }

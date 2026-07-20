@@ -24,7 +24,7 @@ public sealed partial class ProposalRowViewModel(Proposal proposal) : Observable
     {
         ProposalKind.Dedup => "verified",
         ProposalKind.EncodingFix => "high conf.",
-        _ => $"{Proposal.AffectedBytes / (1L << 30)} GB",
+        _ => Common.Formatting.ByteSize.Humanize(Proposal.AffectedBytes),
     };
 }
 

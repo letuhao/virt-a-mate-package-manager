@@ -34,6 +34,10 @@ public sealed partial class DashboardViewModel(
     /// <summary>Screen-head "Setup wizard" → onboarding dialog. (GD-1)</summary>
     [RelayCommand] private void SetupWizard() => launcher?.OpenOnboarding();
 
+    /// <summary>Quick-action "+ Add repository" → the Add-Repo dialog, matching the top-bar/Repos button so the same
+    /// label always does the same thing. (28-checklist F2 · M3.)</summary>
+    [RelayCommand] private void AddRepo() => launcher?.OpenAddRepo();
+
     /// <summary>Screen-head / attention "Rescue" → rescue dialog. (GD-1)</summary>
     [RelayCommand] private void Rescue() => launcher?.OpenRescue();
 

@@ -1,5 +1,6 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:VarVault.App.Converters"
              x:Class="VarVault.App.App"
              RequestedThemeVariant="Default">
 
@@ -137,6 +138,9 @@
       <x:Double x:Key="FsLg">16</x:Double>
       <x:Double x:Key="FsXl">21</x:Double>
       <FontFamily x:Key="MonoFont">Cascadia Code,Consolas,monospace</FontFamily>
+
+      <!-- Converters (28-checklist A1.2): raw bytes → humanized "GB/TB" size string -->
+      <conv:BytesToSizeConverter x:Key="BytesToSize" />
     </ResourceDictionary>
   </Application.Resources>
 

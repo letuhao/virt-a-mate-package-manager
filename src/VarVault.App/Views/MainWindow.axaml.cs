@@ -19,6 +19,11 @@ public partial class MainWindow : Window
     protected override void OnLoaded(RoutedEventArgs e)
     {
         base.OnLoaded(e);
+
+        // C1.2 · first-run: a zero-repo install opens the onboarding wizard once so a newcomer is guided.
+        if (DataContext is ShellViewModel s)
+            s.MaybeShowOnboarding();
+
         _pollTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(750) };
         _pollTimer.Tick += async (_, _) =>
         {

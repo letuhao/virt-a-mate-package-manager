@@ -26,9 +26,7 @@ public sealed partial class GalleryCardViewModel(PackageListEntry entry, Thumbna
     public bool HasMissingDeps => entry.HasMissingDeps;
     public bool IsActive => entry.IsActive;
     public string TierLabel => entry.Tier is { } t ? $"T{t}" : "";
-    public string SizeText => entry.TotalSize >= 1L << 30
-        ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{entry.TotalSize / (double)(1L << 30):F1} GB")
-        : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{entry.TotalSize / (double)(1L << 20):F0} MB");
+    public string SizeText => Common.Formatting.ByteSize.Humanize(entry.TotalSize);
 
     [ObservableProperty] private Bitmap? _thumbnail;
 

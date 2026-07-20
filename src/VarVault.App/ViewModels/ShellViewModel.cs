@@ -172,6 +172,22 @@ public sealed partial class ShellViewModel : ObservableObject
     public System.Func<System.Threading.Tasks.Task>? RescueHandler { get; set; }
     /// <summary>Hook to open the add-repository dialog (wired in AppHost, SH-6).</summary>
     public System.Action? AddRepoHandler { get; set; }
+    /// <summary>Hook to open the first-run onboarding wizard (wired in AppHost). (28-checklist C1.2.)</summary>
+    public System.Action? OnboardingHandler { get; set; }
+
+    /// <summary>True when the app started with no repositories (or the wizard hasn't been dismissed) — the window
+    /// opens onboarding once on load so a newcomer is guided instead of landing on an empty catalog. (28-checklist C1.)</summary>
+    [ObservableProperty] private bool _showOnboardingOnLoad;
+    private bool _onboardingShown;
+
+    /// <summary>Invoked by the window once shown: open onboarding at most once when the first-run flag is set.</summary>
+    public void MaybeShowOnboarding()
+    {
+        if (_onboardingShown || !ShowOnboardingOnLoad)
+            return;
+        _onboardingShown = true;
+        OnboardingHandler?.Invoke();
+    }
 
     /// <summary>Live background jobs shown in the panel (refreshed from IJobQueue by the shell). (SH-4)</summary>
     public System.Collections.ObjectModel.ObservableCollection<Sdk.Threading.JobHandle> ActiveJobs { get; } = new();

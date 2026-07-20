@@ -11,9 +11,7 @@ public sealed class SpaceRowViewModel(string group, long bytes, long max)
     public string Group => group;
     public long TotalBytes => bytes;
     public double Fraction => max > 0 ? Math.Clamp(bytes / (double)max, 0, 1) : 0;
-    public string SizeLabel => bytes >= 1L << 40
-        ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{bytes / (double)(1L << 40):F1} TB")
-        : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{bytes / (double)(1L << 30):F0} GB");
+    public string SizeLabel => Common.Formatting.ByteSize.Humanize(bytes);
 }
 
 /// <summary>Analytics screen: where space goes, by creator/type/tier, with bars. (Checklist 5.16 / GD-14.)</summary>
