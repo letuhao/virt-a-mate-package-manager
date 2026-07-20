@@ -33,13 +33,11 @@ public class StartupIndexTests
         Assert.Contains("Index", handle!.Name, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Theory]
-    [InlineData(@"D:\VarVault_test_repo")]
-    public async Task Startup_index_over_a_real_repo_populates_the_library(string repoPath)
+    [Fact]
+    public async Task Startup_index_over_a_real_repo_populates_the_library()
     {
-        if (!Directory.Exists(repoPath) ||
-            !Directory.EnumerateFiles(repoPath, "*.var", SearchOption.AllDirectories).Any())
-            return; // repo not mounted in this environment
+        if (TestCorpus.Primary is not { } repoPath)
+            return;
 
         await using var host = TestHost.Create(withPersistence: true);
         var scope = host.Host.Services.CreateScope();

@@ -25,7 +25,7 @@ namespace VarVault.App.Tests;
 /// </summary>
 public class FullAppWalkthroughE2ETests
 {
-    private const string Corpus = @"D:\VarVault_test_repo";
+    private static string Corpus => TestCorpus.Primary ?? "";
 
     [AvaloniaFact]
     public async Task Walk_every_screen_and_dialog_over_the_real_corpus()

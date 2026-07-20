@@ -25,14 +25,14 @@ namespace VarVault.App.Tests;
 /// </summary>
 public class RealRepoE2ETests
 {
-    private const string Corpus = @"D:\VarVault_test_repo";
-    private const string MoveTarget = @"E:\VarVault_test_repo_01";
+    private static string Corpus => TestCorpus.Primary ?? "";
+    private static string? MoveTarget => TestCorpus.Secondary;
 
     [AvaloniaFact]
     public async Task Index_real_corpus_browse_and_cross_drive_move()
     {
         if (!Directory.Exists(Corpus))
-            return; // environment without the real corpus — skip
+            return;
 
         // A scratch var we own, placed under the corpus repo, so mutations never touch the real corpus.
         var scratchDir = Path.Combine(Corpus, "__vv_ui_e2e__");

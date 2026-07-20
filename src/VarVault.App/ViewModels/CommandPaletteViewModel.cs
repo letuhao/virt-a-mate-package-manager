@@ -38,6 +38,10 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         IsOpen = false;
     }
 
+    /// <summary>Esc / backdrop → dismiss without invoking. (24-checklist E9)</summary>
+    [RelayCommand]
+    public void Close() => IsOpen = false;
+
     partial void OnQueryChanged(string value) => Filter();
 
     private void Filter()

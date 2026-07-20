@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:c="clr-namespace:VarVault.App.Controls"
              xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             xmlns:act="clr-namespace:VarVault.Sdk.Activation;assembly=VarVault.Sdk"
              x:Class="VarVault.App.Views.DashboardView"
              x:DataType="vm:DashboardViewModel">
   <ScrollViewer Padding="18">
@@ -33,11 +34,23 @@
           </ItemsControl>
         </c:Card>
 
-        <c:Card Header="Classification" Width="320" Margin="0,0,14,14" DataContext="{Binding Summary}" x:CompileBindings="False">
-          <StackPanel Spacing="4">
-            <TextBlock Text="{Binding HotCount, StringFormat='hot {0}'}" />
-            <TextBlock Text="{Binding WarmCount, StringFormat='warm {0}'}" />
-            <TextBlock Text="{Binding ColdCount, StringFormat='cold {0}'}" />
+        <c:Card Header="Classification" Width="320" Margin="0,0,14,14">
+          <StackPanel Spacing="6">
+            <Grid ColumnDefinitions="46,*,Auto">
+              <TextBlock Grid.Column="0" Text="Hot" Foreground="{DynamicResource HotBrush}" />
+              <c:MeterBar Grid.Column="1" Margin="6,0" VerticalAlignment="Center" Value="{Binding HotFraction}" Fill="{DynamicResource HotBrush}" Height="8" />
+              <TextBlock Grid.Column="2" Text="{Binding Summary.HotCount}" Opacity="0.7" />
+            </Grid>
+            <Grid ColumnDefinitions="46,*,Auto">
+              <TextBlock Grid.Column="0" Text="Warm" Foreground="{DynamicResource WarmBrush}" />
+              <c:MeterBar Grid.Column="1" Margin="6,0" VerticalAlignment="Center" Value="{Binding WarmFraction}" Fill="{DynamicResource WarmBrush}" Height="8" />
+              <TextBlock Grid.Column="2" Text="{Binding Summary.WarmCount}" Opacity="0.7" />
+            </Grid>
+            <Grid ColumnDefinitions="46,*,Auto">
+              <TextBlock Grid.Column="0" Text="Cold" Foreground="{DynamicResource ColdBrush}" />
+              <c:MeterBar Grid.Column="1" Margin="6,0" VerticalAlignment="Center" Value="{Binding ColdFraction}" Fill="{DynamicResource ColdBrush}" Height="8" />
+              <TextBlock Grid.Column="2" Text="{Binding Summary.ColdCount}" Opacity="0.7" />
+            </Grid>
           </StackPanel>
         </c:Card>
 
@@ -56,14 +69,28 @@
         <!-- Reclaimable space -->
         <c:Card Header="Reclaimable space" Width="320" Margin="0,0,14,14">
           <StackPanel Spacing="6">
-            <TextBlock Text="Duplicate copies · cold-on-SSD · orphans" Opacity="0.7" FontSize="12" />
-            <Button Content="Open reclaim wizard →" Command="{Binding GoCommand}" CommandParameter="dupes" HorizontalAlignment="Left" />
+            <TextBlock Text="{Binding ReclaimableBytes, StringFormat='{}{0} bytes'}" FontSize="24" Foreground="{DynamicResource AccentBrush}" />
+            <TextBlock Text="Redundant duplicate copies (exact, hash-verified)" Opacity="0.7" FontSize="12" />
+            <Button Content="Open reclaim →" Command="{Binding GoCommand}" CommandParameter="dupes" HorizontalAlignment="Left" />
           </StackPanel>
         </c:Card>
 
         <!-- Recent activity -->
         <c:Card Header="Recent activity" Width="320" Margin="0,0,14,14">
-          <Button Content="Full history →" Command="{Binding GoCommand}" CommandParameter="history" HorizontalAlignment="Left" />
+          <StackPanel Spacing="6">
+            <ItemsControl ItemsSource="{Binding RecentActivity}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="act:ActivityRecord">
+                  <Grid ColumnDefinitions="Auto,*" Height="22">
+                    <TextBlock Grid.Column="0" Text="{Binding Kind}" Opacity="0.85" Margin="0,0,8,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding Description}" Opacity="0.65" TextTrimming="CharacterEllipsis" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="No recent activity." Opacity="0.6" FontSize="12" IsVisible="{Binding !HasRecentActivity}" />
+            <Button Content="Full history →" Command="{Binding GoCommand}" CommandParameter="history" HorizontalAlignment="Left" />
+          </StackPanel>
         </c:Card>
 
         <!-- Quick actions -->

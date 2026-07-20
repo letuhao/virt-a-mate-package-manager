@@ -14,6 +14,7 @@ public class FixDialogTests
         public Task<Result<long>> FixAsync(long id, CancellationToken ct = default) => Task.FromResult(Result.Success(99L));
         public Task<IReadOnlyList<EncodingGroup>> EncodingGroupsAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<EncodingGroup>>([]);
         public Task<IReadOnlyList<IntegrityIssue>> IntegrityAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<IntegrityIssue>>([]);
+        public Task<IReadOnlyList<IntegrityIssue>> MissingMetaAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<IntegrityIssue>>([]);
     }
 
     [Fact]

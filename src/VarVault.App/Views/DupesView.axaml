@@ -12,41 +12,95 @@
                Text="{Binding ReclaimableBytes, StringFormat='{}{0} bytes reclaimable'}" />
     <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
 
-    <!-- Reclaim summary cards (AC-15) -->
-    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-      <c:Card Header="Duplicate copies" Width="200" Margin="0,0,10,0">
-        <StackPanel Spacing="2">
-          <TextBlock Text="{Binding RedundantCopies}" FontSize="24" Foreground="{DynamicResource AccentBrush}" />
-          <TextBlock Text="{Binding ReclaimableBytes, StringFormat='{}{0} bytes reclaimable'}" Opacity="0.7" FontSize="11" />
-          <Button Content="Review groups below" Command="{Binding LoadCommand}" />
-        </StackPanel>
-      </c:Card>
-      <c:Card Header="Duplicate groups" Width="200">
-        <TextBlock Text="{Binding GroupCount}" FontSize="24" Foreground="{DynamicResource WarmBrush}" />
-      </c:Card>
-    </WrapPanel>
+    <!-- One panel per tab; only the active tab renders. (24-checklist A1/A8) -->
+    <Grid>
+      <!-- Reclaim space (tab 0): summary cards -->
+      <StackPanel IsVisible="{Binding IsReclaimTab}">
+        <WrapPanel Margin="0,0,0,12">
+          <c:Card Header="Duplicate copies" Width="200" Margin="0,0,10,0">
+            <StackPanel Spacing="2">
+              <TextBlock Text="{Binding RedundantCopies}" FontSize="24" Foreground="{DynamicResource AccentBrush}" />
+              <TextBlock Text="{Binding ReclaimableBytes, StringFormat='{}{0} bytes reclaimable'}" Opacity="0.7" FontSize="11" />
+            </StackPanel>
+          </c:Card>
+          <c:Card Header="Duplicate groups" Width="200">
+            <TextBlock Text="{Binding GroupCount}" FontSize="24" Foreground="{DynamicResource WarmBrush}" />
+          </c:Card>
+        </WrapPanel>
+        <TextBlock Text="Open the 'Exact duplicates' tab to review and reclaim each group." Opacity="0.6" />
+      </StackPanel>
 
-    <c:Card Header="Exact duplicate groups">
-      <ScrollViewer>
-        <ItemsControl ItemsSource="{Binding Groups}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="lib:DuplicateGroup">
-              <Grid ColumnDefinitions="*,80,90,Auto,Auto" Height="28">
-                <TextBlock Grid.Column="0" Text="{Binding IdentityKey}" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Text="{Binding Copies.Count, StringFormat='{}{0} copies'}" VerticalAlignment="Center" Opacity="0.7" />
-                <TextBlock Grid.Column="2" Text="{Binding Copies.Count, StringFormat='{}{0} loc'}" VerticalAlignment="Center" Opacity="0.6" FontSize="11" />
-                <Button Grid.Column="3" Content="Reclaim"
-                        Command="{Binding ((vm:DupesViewModel)DataContext).TrashGroupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                        CommandParameter="{Binding}" />
-                <Button Grid.Column="4" Content="Review" Margin="6,0,0,0"
-                        Command="{Binding ((vm:DupesViewModel)DataContext).ReviewCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                        CommandParameter="{Binding}" />
-              </Grid>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </ScrollViewer>
-    </c:Card>
-    <TextBlock DockPanel.Dock="Top" Text="No duplicate groups found." Opacity="0.6" IsVisible="{Binding IsEmpty}" Margin="0,8,0,0" />
+      <!-- Exact duplicates (tab 1): groups table -->
+      <DockPanel IsVisible="{Binding IsExactTab}">
+        <TextBlock DockPanel.Dock="Bottom" Text="No duplicate groups found." Opacity="0.6" IsVisible="{Binding IsEmpty}" Margin="0,8,0,0" />
+        <c:Card Header="Exact duplicate groups">
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding Groups}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="lib:DuplicateGroup">
+                  <Grid ColumnDefinitions="*,80,90,Auto,Auto" Height="28">
+                    <TextBlock Grid.Column="0" Text="{Binding IdentityKey}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding Copies.Count, StringFormat='{}{0} copies'}" VerticalAlignment="Center" Opacity="0.7" />
+                    <TextBlock Grid.Column="2" Text="{Binding Copies.Count, StringFormat='{}{0} loc'}" VerticalAlignment="Center" Opacity="0.6" FontSize="11" />
+                    <Button Grid.Column="3" Content="Reclaim"
+                            Command="{Binding ((vm:DupesViewModel)DataContext).TrashGroupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}" />
+                    <Button Grid.Column="4" Content="Review" Margin="6,0,0,0"
+                            Command="{Binding ((vm:DupesViewModel)DataContext).ReviewCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </c:Card>
+      </DockPanel>
+
+      <!-- Near-duplicates (tab 2): same payload, different identity (24-checklist A9) -->
+      <DockPanel IsVisible="{Binding IsNearTab}">
+        <TextBlock DockPanel.Dock="Bottom" Text="No near-duplicates found." Opacity="0.6" IsVisible="{Binding NearIsEmpty}" Margin="0,8,0,0" />
+        <c:Card Header="Near-duplicates — same content payload, different name / meta.json">
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding NearGroups}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="lib:NearDuplicateGroup">
+                  <Grid ColumnDefinitions="120,*,80" Height="26">
+                    <TextBlock Grid.Column="0" Text="{Binding PayloadSignature}" VerticalAlignment="Center" Opacity="0.6" FontFamily="{DynamicResource MonoFont}" FontSize="11" />
+                    <TextBlock Grid.Column="1" Text="{Binding Names}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="2" Text="{Binding Members.Count, StringFormat='{}{0} vars'}" VerticalAlignment="Center" Opacity="0.7" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </c:Card>
+      </DockPanel>
+
+      <!-- Download intake (tab 3): classify a folder against the catalog (24-checklist A10) -->
+      <DockPanel IsVisible="{Binding IsIntakeTab}">
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
+          <TextBox Grid.Column="0" Watermark="Folder of incoming .var files…" Text="{Binding IntakeFolder}" Margin="0,0,8,0" />
+          <Button Grid.Column="1" Content="Classify" Command="{Binding ClassifyIntakeCommand}"
+                  Background="{DynamicResource AccentBrush}" Foreground="White" />
+        </Grid>
+        <TextBlock DockPanel.Dock="Bottom" Opacity="0.6" IsVisible="{Binding IntakeIsEmpty}" Margin="0,8,0,0"
+                   Text="Enter a download folder and Classify to sort each var vs. the catalog (exact-dup / same-name / near-dup / new)." />
+        <c:Card Header="Intake classification">
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding IntakeItems}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="lib:IntakeItem">
+                  <Grid ColumnDefinitions="*,180,160" Height="24">
+                    <TextBlock Grid.Column="0" Text="{Binding FileName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="1" Text="{Binding Classification}" VerticalAlignment="Center" Opacity="0.85" />
+                    <TextBlock Grid.Column="2" Text="{Binding SuggestedAction}" VerticalAlignment="Center" Opacity="0.6" FontSize="11" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </c:Card>
+      </DockPanel>
+    </Grid>
   </DockPanel>
 </UserControl>

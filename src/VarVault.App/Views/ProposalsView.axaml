@@ -17,7 +17,7 @@
                Text="Nothing runs unattended. The analyzer proposes; you approve." />
     <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
     <ScrollViewer>
-      <ItemsControl ItemsSource="{Binding Pending}">
+      <ItemsControl ItemsSource="{Binding VisibleProposals}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:ProposalRowViewModel">
             <c:Card Margin="0,0,0,10">

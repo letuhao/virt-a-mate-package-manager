@@ -53,6 +53,7 @@ public static class PersistenceRegistration
         services.AddScoped<Sdk.Library.ITieringService, Library.EfTieringService>();
         services.AddScoped<Sdk.Library.IMigrationService, Library.EfMigrationService>();
         services.AddScoped<Sdk.Library.IReclaimService, Library.EfReclaimService>();
+        services.AddScoped<Sdk.Library.IIntakeService, Library.EfIntakeService>();
         services.AddScoped<Sdk.Library.IHealthService, Library.EfHealthService>();
         services.AddScoped<SqliteDatabaseBackup>();
         services.AddScoped<Sdk.Library.ITrashQueryService, Library.EfTrashQueryService>();

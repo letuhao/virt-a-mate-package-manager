@@ -14,6 +14,7 @@ public class DupeReviewDialogTests
         public Task<ReclaimResult> TrashRedundantAsync(long keep, IReadOnlyList<long> trash, CancellationToken ct = default)
         { Keep = keep; Trash = trash; return Task.FromResult(new ReclaimResult(trash.Count, 0)); }
         public Task<IReadOnlyList<DuplicateGroup>> ExactGroupsAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<DuplicateGroup>>([]);
+        public Task<IReadOnlyList<NearDuplicateGroup>> NearDuplicateGroupsAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<NearDuplicateGroup>>([]);
     }
 
     [Fact]

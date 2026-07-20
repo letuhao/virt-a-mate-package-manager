@@ -43,6 +43,18 @@ public sealed partial class ProposalsViewModel(
 
     public ObservableCollection<ProposalRowViewModel> Pending { get; } = [];
 
+    /// <summary>Proposals filtered by the active category tab (All/Migrations/Duplicates/Encoding/Stale). (24-checklist A2)</summary>
+    public IEnumerable<ProposalRowViewModel> VisibleProposals => SelectedTabIndex switch
+    {
+        1 => Pending.Where(p => p.Proposal.Kind == ProposalKind.Rebalance),
+        2 => Pending.Where(p => p.Proposal.Kind == ProposalKind.Dedup),
+        3 => Pending.Where(p => p.Proposal.Kind == ProposalKind.EncodingFix),
+        4 => Pending.Where(p => p.Proposal.Kind == ProposalKind.RetireStale),
+        _ => Pending,
+    };
+
+    partial void OnSelectedTabIndexChanged(int value) => OnPropertyChanged(nameof(VisibleProposals));
+
     [ObservableProperty] private string? _statusMessage;
 
     public int PendingCount => Pending.Count;
@@ -54,6 +66,7 @@ public sealed partial class ProposalsViewModel(
         foreach (var p in await proposals.ListAsync(cancellationToken).ConfigureAwait(true))
             Pending.Add(new ProposalRowViewModel(p));
         OnPropertyChanged(nameof(PendingCount));
+        OnPropertyChanged(nameof(VisibleProposals));
     }
 
     /// <summary>Screen-head "Reject all" → reject every pending proposal. (GD-13)</summary>
@@ -64,6 +77,7 @@ public sealed partial class ProposalsViewModel(
             await proposals.RejectAsync(row.Proposal, cancellationToken).ConfigureAwait(true);
         Pending.Clear();
         OnPropertyChanged(nameof(PendingCount));
+        OnPropertyChanged(nameof(VisibleProposals));
     }
 
     /// <summary>Screen-head "Approve selected" → approve the checked proposals. (GD-13)</summary>
@@ -77,6 +91,7 @@ public sealed partial class ProposalsViewModel(
             Pending.Remove(row);
         }
         OnPropertyChanged(nameof(PendingCount));
+        OnPropertyChanged(nameof(VisibleProposals));
     }
 
     /// <summary>Per-card "Review…" → the matching dialog for the proposal kind. (GD-13)</summary>
@@ -101,6 +116,7 @@ public sealed partial class ProposalsViewModel(
         StatusMessage = result.Message;
         Pending.Remove(row);
         OnPropertyChanged(nameof(PendingCount));
+        OnPropertyChanged(nameof(VisibleProposals));
     }
 
     [RelayCommand]
@@ -111,5 +127,6 @@ public sealed partial class ProposalsViewModel(
         await proposals.RejectAsync(row.Proposal, cancellationToken).ConfigureAwait(true);
         Pending.Remove(row);
         OnPropertyChanged(nameof(PendingCount));
+        OnPropertyChanged(nameof(VisibleProposals));
     }
 }

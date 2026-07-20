@@ -131,7 +131,7 @@
                  IsVisible="{Binding IsTableView}">
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="lib:PackageListEntry">
-              <Grid ColumnDefinitions="28,*,140,90,70,50,60,40,60,60,70" Height="26">
+              <Grid ColumnDefinitions="28,*,140,90,70,50,60,40,60,60,70,130" Height="26">
                 <CheckBox Grid.Column="0" VerticalAlignment="Center" MinWidth="0"
                           Command="{Binding ((vm:LibraryViewModel)DataContext).ToggleSelectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                           CommandParameter="{Binding}" />
@@ -151,6 +151,9 @@
                 <Button Grid.Column="10" Content="Detail" Padding="6,2" FontSize="11"
                         Command="{Binding ((vm:LibraryViewModel)DataContext).OpenDetailCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                         CommandParameter="{Binding}" />
+                <!-- Per-content-type breakdown (Sc/Lk/Cl/Hr/Pl/Mo). Data from PackageContentCount. (24-checklist E4) -->
+                <TextBlock Grid.Column="11" Text="{Binding ContentSummary}" VerticalAlignment="Center" Opacity="0.7"
+                           FontSize="11" FontFamily="{DynamicResource MonoFont}" ToolTip.Tip="Content-type counts" />
               </Grid>
             </DataTemplate>
           </ListBox.ItemTemplate>
@@ -197,6 +200,8 @@
             <c:Tag Content="★ favorite" Kind="Warn" IsVisible="{Binding IsFavorite}" />
           </StackPanel>
           <TextBlock Text="{Binding PrimaryType, StringFormat='Type: {0}'}" Opacity="0.8" />
+          <TextBlock Text="{Binding ContentSummary, StringFormat='Contents: {0}'}" Opacity="0.8"
+                     IsVisible="{Binding ContentSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
           <TextBlock Text="{Binding OnlineInstanceCount, StringFormat='Online copies: {0}'}" Opacity="0.8" />
           <TextBlock Text="Single copy — protected" Opacity="0.8" IsVisible="{Binding IsSingleCopy}" Foreground="{DynamicResource WarnBrush}" />
           <TextBlock Text="Missing dependencies" Foreground="{DynamicResource CritBrush}" IsVisible="{Binding HasMissingDeps}" />

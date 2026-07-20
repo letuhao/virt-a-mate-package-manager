@@ -29,6 +29,14 @@ Design for a **new** VaM `.var` manager (working name **VarVault**) — a tiered
 
 Project-root **[CLAUDE.md](../../CLAUDE.md)** is the quick-start for coding sessions. The built foundation lives in `/src` + `/tests`.
 
+### Gap analysis & remediation specs (legacy→VarVault)
+- **[20 · Legacy Feature Gap Analysis](./20-Legacy-Feature-Gap-Analysis.md)** — source-verified diff vs. `varManager v1.0.1.0`; prioritized gaps/deviations (G1–G7, D1–D4).
+- **[21 · Activation & Symlink-Install Spec](./21-Activation-Symlink-Install-Spec.md)** — fixes **G2** (preset activation currently a filesystem no-op; make it materialize VaM-correct per-var symlinks).
+- **[22 · Activation & Symlink-Install Implementation Checklist](./22-Activation-Symlink-Install-Implementation-Checklist.md)** — granular, evidence-gated build tasks (T1.1–T7.5) for spec 21.
+- **[23 · Full-Stack Completeness Audit](./23-Full-Stack-Completeness-Audit.md)** — doc-independent ground-truth audit (BE + GUI + tests vs. mockups); backend real, GUI ≈65–75% parity; findings F-1…F-14 + remediation R-1…R-12.
+- **[24 · Gap Remediation Implementation Checklist](./24-Gap-Remediation-Implementation-Checklist.md)** — granular, evidence-gated build tasks (A1…E12 + Z-1) for audit 23; each task names the exact SDK bind-target or flags ⛔ backend gaps.
+- *25 · Usage Feed & VaM-Log Import (fixes G1)* — planned next.
+
 ## Interactive drafts
 - **Full prototype** (all screens, clickable): [`mockups/prototype.html`](./mockups/prototype.html)
 - **Detailed Library window**: [`mockups/main-window.html`](./mockups/main-window.html)

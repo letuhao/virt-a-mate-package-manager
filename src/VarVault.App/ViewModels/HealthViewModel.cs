@@ -14,6 +14,18 @@ public sealed partial class HealthViewModel(
         [new("Encoding"), new("Integrity / corrupt"), new("Missing meta")];
     [ObservableProperty] private int _selectedTabIndex;
 
+    // Per-tab visibility so switching a tab actually swaps content. (24-checklist A1/A3)
+    public bool IsEncodingTab => SelectedTabIndex == 0;
+    public bool IsIntegrityTab => SelectedTabIndex == 1;
+    public bool IsMissingMetaTab => SelectedTabIndex == 2;
+
+    partial void OnSelectedTabIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsEncodingTab));
+        OnPropertyChanged(nameof(IsIntegrityTab));
+        OnPropertyChanged(nameof(IsMissingMetaTab));
+    }
+
     /// <summary>Per-group "Fix group…" → fix-encoding dialog for the codepage. (GD-11)</summary>
     [RelayCommand]
     private void FixGroup(EncodingGroup group)
@@ -36,6 +48,9 @@ public sealed partial class HealthViewModel(
     public bool IsEmpty => EncodingGroups.Count == 0;
     public ObservableCollection<IntegrityIssue> Integrity { get; } = [];
 
+    /// <summary>Vars missing a parseable meta.json, for the Missing-meta tab. (24-checklist A4)</summary>
+    public ObservableCollection<IntegrityIssue> MissingMeta { get; } = [];
+
     [ObservableProperty] private string? _statusMessage;
 
     [RelayCommand]
@@ -51,6 +66,9 @@ public sealed partial class HealthViewModel(
         Integrity.Clear();
         foreach (var i in await health.IntegrityAsync(cancellationToken).ConfigureAwait(true))
             Integrity.Add(i);
+        MissingMeta.Clear();
+        foreach (var i in await health.MissingMetaAsync(cancellationToken).ConfigureAwait(true))
+            MissingMeta.Add(i);
     }
 
     [RelayCommand]

@@ -64,14 +64,11 @@ public sealed class IndexOrchestratorFlowTests
 
     // D: exercise the orchestrator against a real repo when present (loop repos).
     [Theory]
-    [InlineData(@"D:\VarVault_test_repo")]
-    [InlineData(@"E:\VarVault_test_repo_01")]
-    [InlineData(@"F:\VarVault_test_repo_02")]
-    [InlineData(@"G:\VarVault_test_repo_03")]
+    [MemberData(nameof(TestCorpus.ConfiguredRoots), MemberType = typeof(TestCorpus))]
     public async Task Index_all_on_a_real_repo(string repoPath)
     {
-        if (!Directory.Exists(repoPath) || !Directory.EnumerateFiles(repoPath, "*.var", SearchOption.AllDirectories).Any())
-            return; // repo not mounted or empty in this environment
+        if (string.IsNullOrEmpty(repoPath))
+            return; // no VARVAULT_TEST_CORPUS* configured
 
         await using var host = TestHost.Create(withPersistence: true);
         using (var scope = host.Host.Services.CreateScope())

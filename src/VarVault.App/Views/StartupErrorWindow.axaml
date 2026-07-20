@@ -1,0 +1,20 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+        x:Class="VarVault.App.Views.StartupErrorWindow"
+        x:DataType="vm:StartupErrorViewModel"
+        Width="660" Height="440" Title="VarVault — startup error"
+        Background="{DynamicResource Bg0Brush}">
+  <DockPanel Margin="24">
+    <TextBlock DockPanel.Dock="Top" Text="{Binding Message}" FontSize="18" FontWeight="SemiBold"
+               Foreground="{DynamicResource TextHiBrush}" TextWrapping="Wrap" />
+    <TextBlock DockPanel.Dock="Top" Text="Details (select + copy for a bug report):" Opacity="0.7" Margin="0,12,0,4" />
+    <Button DockPanel.Dock="Bottom" Content="Exit" HorizontalAlignment="Right" Margin="0,12,0,0" Click="OnExit" />
+    <Border BorderBrush="{DynamicResource Bg3Brush}" BorderThickness="1" CornerRadius="4" Padding="10">
+      <ScrollViewer>
+        <SelectableTextBlock Text="{Binding Detail}" FontFamily="{DynamicResource MonoFont}" FontSize="11"
+                             TextWrapping="Wrap" Foreground="{DynamicResource TextLoBrush}" />
+      </ScrollViewer>
+    </Border>
+  </DockPanel>
+</Window>

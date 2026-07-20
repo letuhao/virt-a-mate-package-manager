@@ -8,6 +8,10 @@
         Width="1280" Height="820" Title="VarVault"
         Background="{DynamicResource Bg0Brush}">
 
+  <Window.KeyBindings>
+    <KeyBinding Gesture="Ctrl+K" Command="{Binding ShowCommandPaletteCommand}" />
+  </Window.KeyBindings>
+
   <Window.DataTemplates>
     <!-- Map each screen view-model to its view (POL-4 shell hosting). -->
     <DataTemplate DataType="vm:DashboardViewModel"><views:DashboardView /></DataTemplate>
@@ -59,5 +63,8 @@
     <!-- Toast (bottom-center) -->
     <c:Toast Message="{Binding ToastMessage}" IsOpen="{Binding ToastVisible}" HasUndo="{Binding ToastHasUndo}"
              HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,24" />
+
+    <!-- Command palette overlay (Ctrl-K) — 24-checklist E9 -->
+    <views:CommandPaletteView DataContext="{Binding CommandPalette}" IsVisible="{Binding IsOpen}" />
   </Panel>
 </Window>

@@ -45,7 +45,9 @@ public class DashboardScreenTests
 
         var texts = view.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
         Assert.Contains("69660 packages", texts);
-        Assert.Contains("hot 8410", texts);
+        // Classification is now a labeled stacked bar (24-checklist E8): "Hot" label + the count separately.
+        Assert.Contains("Hot", texts);
+        Assert.Contains("8410", texts);
         // Attention row is now a clickable navigation button (GD-1) → count + arrow.
         Assert.Contains(texts, t => t is not null && t.StartsWith("1203 missing dependencies"));
     }

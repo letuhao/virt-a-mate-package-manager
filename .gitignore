@@ -58,3 +58,6 @@ varManager-MMDLoader_v1.0.1.0/
 
 .vscode/
 docs/new-app/ui-evidence
+*.png
+*.jpg
+*.jpeg

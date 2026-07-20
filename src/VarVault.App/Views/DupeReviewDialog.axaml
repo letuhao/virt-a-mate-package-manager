@@ -6,8 +6,9 @@
              x:DataType="vm:DupeReviewViewModel">
   <StackPanel Spacing="10" MinWidth="440">
     <TextBlock Text="Review duplicate — keep one" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
-    <ItemsControl ItemsSource="{Binding Copies}">
-      <ItemsControl.ItemTemplate>
+    <TextBlock Text="Select the copy to KEEP — the rest are trashed." Opacity="0.7" FontSize="12" />
+    <ListBox ItemsSource="{Binding Copies}" SelectedItem="{Binding SelectedCopy}" MaxHeight="220">
+      <ListBox.ItemTemplate>
         <DataTemplate x:DataType="lib:DuplicateCopy">
           <Grid ColumnDefinitions="Auto,*,Auto" Height="24">
             <TextBlock Grid.Column="0" Text="{Binding Tier, StringFormat='T{0}'}" VerticalAlignment="Center" Margin="0,0,8,0" />
@@ -15,8 +16,8 @@
             <TextBlock Grid.Column="2" Text="verified ✓" Foreground="{DynamicResource GoodBrush}" VerticalAlignment="Center" FontSize="11" />
           </Grid>
         </DataTemplate>
-      </ItemsControl.ItemTemplate>
-    </ItemsControl>
+      </ListBox.ItemTemplate>
+    </ListBox>
     <TextBlock Text="Deletes verified with full hash first." Opacity="0.7" />
     <StackPanel Orientation="Horizontal" Spacing="8">
       <Button Content="Keep one, trash rest" Command="{Binding KeepAndTrashCommand}" Background="{DynamicResource AccentBrush}" Foreground="White" />

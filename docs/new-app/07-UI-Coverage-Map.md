@@ -51,8 +51,8 @@ Far-left **icon nav** switches top-level screens; each screen owns its sub-layou
 | Scan & index (staged) | Onboarding + Repositories `Rescan`; **log dock** progress | ✅ log / 🔨 |
 | Identity parse / unrecognized bucket | Library · "Unrecognized" smart view | 🔨 |
 | Incremental re-index | Repositories `Rescan`; automatic | ▫ |
-| Content-type counts | **Library table** count columns | ✅ |
-| Preview images / thumbnails | Library gallery + detail preview strip | ✅ |
+| Content-type counts | **Library table** count columns | ❌ not built — read model has only `PrimaryType`; tracked as 24-checklist E1–E4 |
+| Preview images / thumbnails | Library gallery ✅ + detail preview strip ❌ | ⚠ partial — gallery thumbnails exist; the detail preview strip is not built (24-checklist E5) |
 | Rich metadata | Library **detail panel** + Var Detail modal | ✅ / 🔨 |
 | Dependency graph (fwd/rev) | Detail deps list; **Var Detail modal** graph tab | ✅ / 🔨 |
 | Version resolution / substitution | Detail deps (substituted state) | ✅ |

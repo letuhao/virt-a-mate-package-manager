@@ -14,12 +14,12 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            // Compose the backend host and resolve the shell. Kept resilient: a composition failure
-            // still shows a window rather than crashing on start.
-            desktop.MainWindow = new MainWindow
-            {
-                DataContext = AppHost.TryCreateShell(),
-            };
+            // Compose the backend host and resolve the shell. On composition failure show a real error window
+            // (copyable message + detail), never a blank window bound to nothing. (24-checklist C1.)
+            var (shell, error) = AppHost.TryCreateShellOrError();
+            desktop.MainWindow = error is not null
+                ? new StartupErrorWindow { DataContext = error }
+                : new MainWindow { DataContext = shell };
         }
 
         base.OnFrameworkInitializationCompleted();

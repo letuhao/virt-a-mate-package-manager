@@ -21,14 +21,31 @@ public sealed class EfLibraryQueryService(VarVaultDbContext db) : ILibraryQueryS
 
         q = ApplySort(q, query.Sort, query.Descending);
 
-        var rows = await q
+        var page = await q
             .Skip(Math.Max(0, query.Skip))
             .Take(Math.Clamp(query.Take, 1, 1000))
-            .Select(x => new PackageListEntry(
+            .Select(x => new
+            {
+                x.PackageId, x.VarName, x.Creator, x.PackageName, x.VersionToken,
+                x.PrimaryType, x.TotalSize, x.OnlineInstanceCount, x.TotalInstanceCount,
+                x.IsSingleCopy, x.IsFavorite, x.Class, x.HasMissingDeps, x.LastUsedAt, x.ActualTierMin,
+            })
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        // Per-content-type counts for the page's packages — already materialized in PackageContentCount. (24-checklist E3)
+        var ids = page.Select(p => p.PackageId).ToList();
+        var countsByPkg = (await db.PackageContentCounts.AsNoTracking()
+                .Where(c => ids.Contains(c.PackageId))
+                .Select(c => new { c.PackageId, c.Type, c.Count })
+                .ToListAsync(cancellationToken).ConfigureAwait(false))
+            .GroupBy(c => c.PackageId)
+            .ToDictionary(g => g.Key, g => (IReadOnlyDictionary<string, int>)g.ToDictionary(c => c.Type.ToString(), c => c.Count));
+
+        var rows = page.Select(x => new PackageListEntry(
                 x.PackageId, x.VarName, x.Creator, x.PackageName, x.VersionToken,
                 x.PrimaryType.ToString(), x.TotalSize, x.OnlineInstanceCount, x.TotalInstanceCount,
-                x.IsSingleCopy, x.IsFavorite, x.Class.ToString(), x.HasMissingDeps, x.LastUsedAt, x.ActualTierMin))
-            .ToListAsync(cancellationToken).ConfigureAwait(false);
+                x.IsSingleCopy, x.IsFavorite, x.Class.ToString(), x.HasMissingDeps, x.LastUsedAt, x.ActualTierMin,
+                countsByPkg.GetValueOrDefault(x.PackageId))).ToList();
 
         return new LibraryPage(rows, total);
     }

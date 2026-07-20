@@ -18,6 +18,9 @@ public interface IHealthService
     Task<IReadOnlyList<EncodingGroup>> EncodingGroupsAsync(CancellationToken cancellationToken = default);
     Task<IReadOnlyList<IntegrityIssue>> IntegrityAsync(CancellationToken cancellationToken = default);
 
+    /// <summary>Vars missing a parseable <c>meta.json</c> (IntegrityStatus.MissingMeta). (24-checklist A4.)</summary>
+    Task<IReadOnlyList<IntegrityIssue>> MissingMetaAsync(CancellationToken cancellationToken = default);
+
     /// <summary>Fix one broken var → a new UTF-8 var; returns the new VarFile id.</summary>
     Task<Result<long>> FixAsync(long varFileId, CancellationToken cancellationToken = default);
 }

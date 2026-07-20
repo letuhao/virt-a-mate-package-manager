@@ -82,8 +82,7 @@ public sealed class RepositoryEnumeratorTests
     [Fact]
     public void Real_repo_tags_quarantine_and_finds_live_vars()
     {
-        const string repo = @"D:\VarVault_test_repo";
-        if (!Directory.Exists(repo))
+        if (TestCorpus.Primary is not { } repo)
             return;
 
         var all = _sut.Enumerate(repo).ToList();

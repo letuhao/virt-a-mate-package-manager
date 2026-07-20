@@ -60,6 +60,13 @@ public sealed partial class ShellViewModel : ObservableObject
         Navigate(initial);
     }
 
+    /// <summary>Command palette (Ctrl-K), built by the composition root with navigation + action commands. (24-checklist E9)</summary>
+    public CommandPaletteViewModel? CommandPalette { get; set; }
+
+    /// <summary>Ctrl-K → open the command palette overlay. (24-checklist E9)</summary>
+    [RelayCommand]
+    private void ShowCommandPalette() => CommandPalette?.Open();
+
     private readonly Services.IShellLiveFeeds? _feeds;
 
     /// <summary>

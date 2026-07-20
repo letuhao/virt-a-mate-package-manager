@@ -135,8 +135,7 @@ public sealed class IndexingFlowTests
     [Fact]
     public async Task Indexes_the_real_repository_corpus()
     {
-        const string repo = @"D:\VarVault_test_repo";
-        if (!Directory.Exists(repo))
+        if (TestCorpus.Primary is not { } repo)
             return;
 
         await using var host = TestHost.Create(withPersistence: true);
@@ -146,7 +145,10 @@ public sealed class IndexingFlowTests
         var result = await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repo);
         var elapsedMs = Environment.TickCount64 - started;
 
-        Assert.True(result.Indexed > 50, $"expected a substantial corpus, indexed {result.Indexed}");
+        // Derive the expectation from the real corpus (no magic number): a regression dropping vars fails here.
+        var expectedVarCount = Directory.GetFiles(repo, "*.var", SearchOption.AllDirectories).Length;
+        Assert.True(result.Indexed >= expectedVarCount * 0.9,
+            $"expected to index ≥90% of {expectedVarCount} real vars, indexed {result.Indexed}");
 
         using var scope = host.Host.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
@@ -156,8 +158,7 @@ public sealed class IndexingFlowTests
         var listItems = await db.PackageListItems.CountAsync();
 
         Assert.True(packages > 0);
-        Assert.Equal(varFiles - await db.VarFiles.CountAsync(v => v.PackageId == null),
-            await db.VarFiles.CountAsync(v => v.PackageId != null)); // sanity
+        Assert.Equal(result.Indexed, varFiles); // every indexed var produced exactly one VarFile row
         Assert.True(listItems > 0);
         Assert.True(quarantined > 0, "the corpus has ___VarRedundant____ quarantine dirs");
 

@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using System.Linq;
+
 namespace VarVault.Sdk.Library;
 
 /// <summary>Sort orders for the library grid (each backed by a composite index). (Data-arch §5.8.)</summary>
@@ -43,7 +46,23 @@ public sealed record PackageListEntry(
     string StorageClass,
     bool HasMissingDeps,
     DateTime? LastUsedAt,
-    int? Tier = null);
+    int? Tier = null,
+    IReadOnlyDictionary<string, int>? ContentCounts = null)
+{
+    /// <summary>Compact per-content-type breakdown for the grid/detail, e.g. "Sc 3  Lk 1  Pl 2". (24-checklist E3/E4)</summary>
+    public string ContentSummary => ContentCounts is null || ContentCounts.Count == 0
+        ? ""
+        : string.Join("  ", ContentCounts.Where(kv => kv.Value > 0)
+            .OrderByDescending(kv => kv.Value)
+            .Take(5)
+            .Select(kv => $"{Abbrev(kv.Key)} {kv.Value}"));
+
+    private static string Abbrev(string type) => type switch
+    {
+        "Scene" => "Sc", "Look" => "Lk", "Clothing" => "Cl", "Hairstyle" => "Hr",
+        "Morph" => "Mo", "Plugin" => "Pl", _ => type.Length >= 2 ? type[..2] : type,
+    };
+}
 
 /// <summary>A page of results plus the total match count (for the scrollbar / counts).</summary>
 public sealed record LibraryPage(IReadOnlyList<PackageListEntry> Items, int TotalCount);

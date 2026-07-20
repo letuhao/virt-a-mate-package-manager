@@ -16,7 +16,7 @@ namespace VarVault.Infrastructure.Tests;
 [Trait("Category", TestCategories.Integration)]
 public sealed class RealRepoDedupTests
 {
-    private const string Root = @"D:\VarVault_test_repo";
+    private static string Root => TestCorpus.Primary ?? "";
     private readonly Sha256FileHasher _hasher = new();
 
     [Fact]
@@ -40,6 +40,10 @@ public sealed class RealRepoDedupTests
 
         Assert.NotEmpty(facts);
         var analysis = DedupGrouping.Analyze(facts);
+
+        // This corpus intentionally contains ___VarRedundant____ copies, so real within-identity dupes must exist —
+        // a regression producing zero groups now fails here instead of passing silently. (24-checklist D6.)
+        Assert.NotEmpty(analysis.WithinIdentity);
 
         // The analysis must be self-consistent: every within-identity group shares one identity + signature.
         foreach (var group in analysis.WithinIdentity)

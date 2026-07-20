@@ -14,6 +14,8 @@ public class MigrateDialogTests
         public Task<IReadOnlyList<MisplacedItem>> MisplacedAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<MisplacedItem>>([]);
         public Task<TierMigrationPlan> BuildPlanAsync(CancellationToken ct = default) =>
             Task.FromResult(new TierMigrationPlan([new TierMoveProposal(1, 3, 1), new TierMoveProposal(2, 3, 1)], ExcludedCount: 2));
+        public Task<TierPolicy> PolicyAsync(CancellationToken ct = default) => Task.FromResult(new TierPolicy([]));
+        public Task<IReadOnlyList<StaleVersion>> StaleVersionsAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<StaleVersion>>([]);
     }
 
     [Fact]

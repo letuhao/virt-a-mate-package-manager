@@ -70,11 +70,9 @@ public sealed class VarInspectorTests
     [Fact]
     public void Inspects_real_repo_vars()
     {
-        const string repo = @"D:\VarVault_test_repo\Vam_Installer_notSameContentFiles1";
-        if (!Directory.Exists(repo))
+        if (TestCorpus.Primary is not { } repo)
             return;
-
-        var vars = Directory.GetFiles(repo, "*.var").Take(20).ToArray();
+        var vars = Directory.GetFiles(repo, "*.var", SearchOption.AllDirectories).Take(20).ToArray();
         Assert.NotEmpty(vars);
 
         var withMeta = 0;

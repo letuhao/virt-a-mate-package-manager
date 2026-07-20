@@ -15,47 +15,103 @@
     </Grid>
     <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
 
-    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-      <c:Card Header="Hot" Width="150" Margin="0,0,10,0">
-        <StackPanel Spacing="6">
-          <TextBlock Text="{Binding Counts.Hot}" FontSize="24" Foreground="{DynamicResource HotBrush}" />
-          <c:MeterBar Value="{Binding HotFraction}" Fill="{DynamicResource HotBrush}" Height="6" />
-        </StackPanel>
-      </c:Card>
-      <c:Card Header="Warm" Width="150" Margin="0,0,10,0">
-        <StackPanel Spacing="6">
-          <TextBlock Text="{Binding Counts.Warm}" FontSize="24" Foreground="{DynamicResource WarmBrush}" />
-          <c:MeterBar Value="{Binding WarmFraction}" Fill="{DynamicResource WarmBrush}" Height="6" />
-        </StackPanel>
-      </c:Card>
-      <c:Card Header="Cold" Width="150">
-        <StackPanel Spacing="6">
-          <TextBlock Text="{Binding Counts.Cold}" FontSize="24" Foreground="{DynamicResource ColdBrush}" />
-          <c:MeterBar Value="{Binding ColdFraction}" Fill="{DynamicResource ColdBrush}" Height="6" />
-        </StackPanel>
-      </c:Card>
-    </WrapPanel>
+    <!-- One panel per tab; only the active tab renders. (24-checklist A1/A5-A7) -->
+    <Grid>
+      <!-- Overview (tab 0): class cards + misplaced list -->
+      <DockPanel IsVisible="{Binding IsOverviewTab}">
+        <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+          <c:Card Header="Hot" Width="150" Margin="0,0,10,0">
+            <StackPanel Spacing="6">
+              <TextBlock Text="{Binding Counts.Hot}" FontSize="24" Foreground="{DynamicResource HotBrush}" />
+              <c:MeterBar Value="{Binding HotFraction}" Fill="{DynamicResource HotBrush}" Height="6" />
+            </StackPanel>
+          </c:Card>
+          <c:Card Header="Warm" Width="150" Margin="0,0,10,0">
+            <StackPanel Spacing="6">
+              <TextBlock Text="{Binding Counts.Warm}" FontSize="24" Foreground="{DynamicResource WarmBrush}" />
+              <c:MeterBar Value="{Binding WarmFraction}" Fill="{DynamicResource WarmBrush}" Height="6" />
+            </StackPanel>
+          </c:Card>
+          <c:Card Header="Cold" Width="150">
+            <StackPanel Spacing="6">
+              <TextBlock Text="{Binding Counts.Cold}" FontSize="24" Foreground="{DynamicResource ColdBrush}" />
+              <c:MeterBar Value="{Binding ColdFraction}" Fill="{DynamicResource ColdBrush}" Height="6" />
+            </StackPanel>
+          </c:Card>
+        </WrapPanel>
+        <TextBlock DockPanel.Dock="Bottom" Text="No misplaced packages — tiering is balanced." Opacity="0.6" IsVisible="{Binding IsEmpty}" Margin="0,8,0,0" />
+        <c:Card Header="Misplaced — proposals awaiting approval">
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding Misplaced}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="lib:MisplacedItem">
+                  <Grid ColumnDefinitions="*,80,80,80,90,*,Auto" Height="26">
+                    <TextBlock Grid.Column="0" Text="{Binding VarName}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding StorageClass}" VerticalAlignment="Center" Opacity="0.85" />
+                    <TextBlock Grid.Column="2" Text="{Binding CurrentTier, StringFormat='T{0}'}" VerticalAlignment="Center" Opacity="0.85" />
+                    <TextBlock Grid.Column="3" Text="{Binding DesiredTier, StringFormat='→ T{0}'}" VerticalAlignment="Center" Opacity="0.85" />
+                    <TextBlock Grid.Column="4" Text="{Binding SizeBytes}" VerticalAlignment="Center" Opacity="0.7" HorizontalAlignment="Right" FontFamily="{DynamicResource MonoFont}" />
+                    <TextBlock Grid.Column="5" Text="{Binding Why}" VerticalAlignment="Center" Opacity="0.7" Margin="8,0,0,0" />
+                    <Button Grid.Column="6" Content="Plan…"
+                            Command="{Binding ((vm:TieringViewModel)DataContext).PlanCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </c:Card>
+      </DockPanel>
 
-    <c:Card Header="Misplaced — proposals awaiting approval">
-      <ScrollViewer>
-        <ItemsControl ItemsSource="{Binding Misplaced}">
+      <!-- Lifecycle rules (tab 1): usage class → placement (read-only) -->
+      <c:Card IsVisible="{Binding IsLifecycleTab}" Header="Lifecycle rules — usage class → placement">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Usage classifies each package Hot/Warm/Cold from access patterns; these rules place each class on its tier. Read-only." Opacity="0.7" TextWrapping="Wrap" />
+          <ItemsControl ItemsSource="{Binding Policy}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="lib:TierPolicyEntry">
+                <Grid ColumnDefinitions="120,*" Height="26">
+                  <TextBlock Grid.Column="0" Text="{Binding StorageClass}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="{Binding DesiredTier, StringFormat='→ tier {0}'}" VerticalAlignment="Center" Opacity="0.8" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </c:Card>
+
+      <!-- Placement policy (tab 2): class → desired tier -->
+      <c:Card IsVisible="{Binding IsPlacementTab}" Header="Placement policy — class → tier">
+        <ItemsControl ItemsSource="{Binding Policy}">
           <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="lib:MisplacedItem">
-              <Grid ColumnDefinitions="*,80,80,80,90,*,Auto" Height="26">
-                <TextBlock Grid.Column="0" Text="{Binding VarName}" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Text="{Binding StorageClass}" VerticalAlignment="Center" Opacity="0.85" />
-                <TextBlock Grid.Column="2" Text="{Binding CurrentTier, StringFormat='T{0}'}" VerticalAlignment="Center" Opacity="0.85" />
-                <TextBlock Grid.Column="3" Text="{Binding DesiredTier, StringFormat='→ T{0}'}" VerticalAlignment="Center" Opacity="0.85" />
-                <TextBlock Grid.Column="4" Text="{Binding SizeBytes}" VerticalAlignment="Center" Opacity="0.7" HorizontalAlignment="Right" FontFamily="{DynamicResource MonoFont}" />
-                <TextBlock Grid.Column="5" Text="{Binding Why}" VerticalAlignment="Center" Opacity="0.7" Margin="8,0,0,0" />
-                <Button Grid.Column="6" Content="Plan…"
-                        Command="{Binding ((vm:TieringViewModel)DataContext).PlanCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+            <DataTemplate x:DataType="lib:TierPolicyEntry">
+              <Grid ColumnDefinitions="120,*" Height="26">
+                <TextBlock Grid.Column="0" Text="{Binding StorageClass}" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding DesiredTier, StringFormat='desired tier {0}'}" VerticalAlignment="Center" Opacity="0.8" />
               </Grid>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-      </ScrollViewer>
-    </c:Card>
-    <TextBlock DockPanel.Dock="Top" Text="No misplaced packages — tiering is balanced." Opacity="0.6" IsVisible="{Binding IsEmpty}" Margin="0,8,0,0" />
+      </c:Card>
+
+      <!-- Stale / old versions (tab 3): superseded cold versions (24-checklist A7) -->
+      <DockPanel IsVisible="{Binding IsStaleTab}">
+        <TextBlock DockPanel.Dock="Bottom" Text="No stale versions — every cold version is the latest." Opacity="0.6" IsVisible="{Binding StaleIsEmpty}" Margin="0,8,0,0" />
+        <c:Card Header="Stale / superseded cold versions">
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding StaleVersions}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="lib:StaleVersion">
+                  <Grid ColumnDefinitions="*,90,120" Height="24">
+                    <TextBlock Grid.Column="0" Text="{Binding VarName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="1" Text="{Binding StorageClass}" VerticalAlignment="Center" Opacity="0.8" />
+                    <TextBlock Grid.Column="2" Text="{Binding SizeBytes}" VerticalAlignment="Center" Opacity="0.6" HorizontalAlignment="Right" FontFamily="{DynamicResource MonoFont}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </c:Card>
+      </DockPanel>
+    </Grid>
   </DockPanel>
 </UserControl>

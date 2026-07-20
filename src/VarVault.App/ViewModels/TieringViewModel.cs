@@ -14,6 +14,20 @@ public sealed partial class TieringViewModel(
         [new("Overview"), new("Lifecycle rules"), new("Placement policy"), new("Stale / old versions")];
     [ObservableProperty] private int _selectedTabIndex;
 
+    // Per-tab visibility so switching a tab actually swaps content. (24-checklist A1/A5-A7)
+    public bool IsOverviewTab => SelectedTabIndex == 0;
+    public bool IsLifecycleTab => SelectedTabIndex == 1;
+    public bool IsPlacementTab => SelectedTabIndex == 2;
+    public bool IsStaleTab => SelectedTabIndex == 3;
+
+    partial void OnSelectedTabIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsOverviewTab));
+        OnPropertyChanged(nameof(IsLifecycleTab));
+        OnPropertyChanged(nameof(IsPlacementTab));
+        OnPropertyChanged(nameof(IsStaleTab));
+    }
+
     /// <summary>Per-row "Plan…" / screen-head "Review migration plan" → migrate dialog. (GD-9)</summary>
     [RelayCommand] private void Plan() => launcher?.OpenMigratePlan();
 
@@ -21,6 +35,12 @@ public sealed partial class TieringViewModel(
     [RelayCommand] private void Simulate() => launcher?.OpenMigratePlan();
 
     public ObservableCollection<MisplacedItem> Misplaced { get; } = [];
+
+    /// <summary>Active class→tier placement policy for the Placement/Lifecycle tabs. (24-checklist A6)</summary>
+    public ObservableCollection<TierPolicyEntry> Policy { get; } = [];
+    /// <summary>Superseded cold versions for the Stale tab. (24-checklist A7)</summary>
+    public ObservableCollection<StaleVersion> StaleVersions { get; } = [];
+    public bool StaleIsEmpty => StaleVersions.Count == 0;
 
     /// <summary>Explicit empty-state flag for the misplaced list. (GF-2)</summary>
     public bool IsEmpty => Misplaced.Count == 0;
@@ -49,6 +69,14 @@ public sealed partial class TieringViewModel(
         foreach (var m in await tiering.MisplacedAsync(cancellationToken).ConfigureAwait(true))
             Misplaced.Add(m);
         OnPropertyChanged(nameof(IsEmpty));
+
+        Policy.Clear();
+        foreach (var p in (await tiering.PolicyAsync(cancellationToken).ConfigureAwait(true)).Placements)
+            Policy.Add(p);
+        StaleVersions.Clear();
+        foreach (var s in await tiering.StaleVersionsAsync(cancellationToken).ConfigureAwait(true))
+            StaleVersions.Add(s);
+        OnPropertyChanged(nameof(StaleIsEmpty));
     }
 
     [RelayCommand]

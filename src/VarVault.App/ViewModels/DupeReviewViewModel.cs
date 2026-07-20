@@ -13,12 +13,22 @@ public sealed partial class DupeReviewViewModel(IReclaimService reclaim) : Obser
     [ObservableProperty] private long _keepId;
     [ObservableProperty] private string? _resultMessage;
 
+    /// <summary>The copy the user chose to keep; drives <see cref="KeepId"/> so the user can pick which survives. (24-checklist A11)</summary>
+    [ObservableProperty] private DuplicateCopy? _selectedCopy;
+
+    partial void OnSelectedCopyChanged(DuplicateCopy? value)
+    {
+        if (value is not null)
+            KeepId = value.VarFileId;
+    }
+
     public void SetGroup(DuplicateGroup group)
     {
         Copies.Clear();
         foreach (var c in group.Copies)
             Copies.Add(c);
-        KeepId = group.Copies.Count > 0 ? group.Copies[0].VarFileId : 0;
+        SelectedCopy = group.Copies.Count > 0 ? group.Copies[0] : null; // default keep = first; user can change it
+        KeepId = SelectedCopy?.VarFileId ?? 0;
     }
 
     [RelayCommand]

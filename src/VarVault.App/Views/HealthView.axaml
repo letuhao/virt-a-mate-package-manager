@@ -14,43 +14,79 @@
     </Grid>
     <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
 
-    <!-- Encoding summary cards (AC-16) -->
-    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,12">
-      <c:Card Header="GBK / GB2312" Width="180" Margin="0,0,10,0">
-        <StackPanel Spacing="4">
-          <TextBlock Text="{Binding GbkCount}" FontSize="24" Foreground="{DynamicResource CritBrush}" />
-          <Button Content="Fix GBK…" Command="{Binding FixAllCommand}" />
-        </StackPanel>
-      </c:Card>
-      <c:Card Header="Shift-JIS" Width="180" Margin="0,0,10,0">
-        <StackPanel Spacing="4">
-          <TextBlock Text="{Binding ShiftJisCount}" FontSize="24" Foreground="{DynamicResource WarnBrush}" />
-          <Button Content="Fix Shift-JIS…" Command="{Binding FixAllCommand}" />
-        </StackPanel>
-      </c:Card>
-      <c:Card Header="Other / low-confidence" Width="180">
-        <TextBlock Text="{Binding OtherEncodingCount}" FontSize="24" Foreground="{DynamicResource TextLoBrush}" />
-      </c:Card>
-    </WrapPanel>
+    <!-- One panel per tab; only the active tab renders. (24-checklist A1/A3/A4) -->
+    <Grid>
+      <!-- Encoding (tab 0) -->
+      <DockPanel IsVisible="{Binding IsEncodingTab}">
+        <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+          <c:Card Header="GBK / GB2312" Width="180" Margin="0,0,10,0">
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding GbkCount}" FontSize="24" Foreground="{DynamicResource CritBrush}" />
+              <Button Content="Fix GBK…" Command="{Binding FixAllCommand}" />
+            </StackPanel>
+          </c:Card>
+          <c:Card Header="Shift-JIS" Width="180" Margin="0,0,10,0">
+            <StackPanel Spacing="4">
+              <TextBlock Text="{Binding ShiftJisCount}" FontSize="24" Foreground="{DynamicResource WarnBrush}" />
+              <Button Content="Fix Shift-JIS…" Command="{Binding FixAllCommand}" />
+            </StackPanel>
+          </c:Card>
+          <c:Card Header="Other / low-confidence" Width="180">
+            <TextBlock Text="{Binding OtherEncodingCount}" FontSize="24" Foreground="{DynamicResource TextLoBrush}" />
+          </c:Card>
+        </WrapPanel>
+        <TextBlock DockPanel.Dock="Bottom" Text="No encoding issues detected." Opacity="0.6" IsVisible="{Binding IsEmpty}" Margin="0,8,0,0" />
+        <c:Card Header="Encoding — fixable groups">
+          <StackPanel Spacing="6">
+            <ItemsControl ItemsSource="{Binding EncodingGroups}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="lib:EncodingGroup">
+                  <Grid ColumnDefinitions="*,Auto,Auto" Height="28">
+                    <TextBlock Grid.Column="0" Text="{Binding Codepage}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding Count}" Opacity="0.7" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <Button Grid.Column="2" Content="Fix group…"
+                            Command="{Binding ((vm:HealthViewModel)DataContext).FixGroupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{Binding StatusMessage}" Opacity="0.7" />
+          </StackPanel>
+        </c:Card>
+      </DockPanel>
 
-    <c:Card Header="Encoding — fixable groups">
-      <StackPanel Spacing="6">
-        <ItemsControl ItemsSource="{Binding EncodingGroups}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="lib:EncodingGroup">
-              <Grid ColumnDefinitions="*,Auto,Auto" Height="28">
-                <TextBlock Grid.Column="0" Text="{Binding Codepage}" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Text="{Binding Count}" Opacity="0.7" VerticalAlignment="Center" Margin="0,0,12,0" />
-                <Button Grid.Column="2" Content="Fix group…"
-                        Command="{Binding ((vm:HealthViewModel)DataContext).FixGroupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                        CommandParameter="{Binding}" />
-              </Grid>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-        <TextBlock Text="{Binding StatusMessage}" Opacity="0.7" />
-      </StackPanel>
-    </c:Card>
-    <TextBlock DockPanel.Dock="Top" Text="No encoding issues detected." Opacity="0.6" IsVisible="{Binding IsEmpty}" Margin="0,8,0,0" />
+      <!-- Integrity / corrupt (tab 1) -->
+      <c:Card IsVisible="{Binding IsIntegrityTab}" Header="Integrity / corrupt vars">
+        <ScrollViewer>
+          <ItemsControl ItemsSource="{Binding Integrity}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="lib:IntegrityIssue">
+                <Grid ColumnDefinitions="*,2*" Height="24">
+                  <TextBlock Grid.Column="0" Text="{Binding VarName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="1" Text="{Binding RelativePath}" VerticalAlignment="Center" Opacity="0.6" FontSize="11" TextTrimming="CharacterEllipsis" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </c:Card>
+
+      <!-- Missing meta (tab 2) — 24-checklist A4 -->
+      <c:Card IsVisible="{Binding IsMissingMetaTab}" Header="Missing meta.json">
+        <ScrollViewer>
+          <ItemsControl ItemsSource="{Binding MissingMeta}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="lib:IntegrityIssue">
+                <Grid ColumnDefinitions="*,2*" Height="24">
+                  <TextBlock Grid.Column="0" Text="{Binding VarName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="1" Text="{Binding RelativePath}" VerticalAlignment="Center" Opacity="0.6" FontSize="11" TextTrimming="CharacterEllipsis" />
+                </Grid>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </c:Card>
+    </Grid>
   </DockPanel>
 </UserControl>

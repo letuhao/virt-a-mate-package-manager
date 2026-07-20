@@ -30,6 +30,36 @@ public sealed class EfReclaimService(VarVaultDbContext db, ITrashService trash, 
             .ToList();
     }
 
+    public async Task<IReadOnlyList<NearDuplicateGroup>> NearDuplicateGroupsAsync(CancellationToken cancellationToken = default)
+    {
+        // Near-dup = same content payload (content minus meta.json) across ≥2 distinct identities. The payload
+        // signature is already computed + stored per var; this is a pure catalog query. (24-checklist A9.)
+        var rows = await db.VarFiles
+            .Where(v => v.PackageId != null && v.PayloadSignature != null)
+            .Select(v => new
+            {
+                v.Id,
+                v.Package!.IdentityKey,
+                v.PayloadSignature,
+                v.SizeBytes,
+                Tier = v.Repository!.Tier,
+                v.Repository.IsOnline,
+                v.Repository.MountPath,
+                v.RelativePath,
+            })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return rows
+            .GroupBy(r => r.PayloadSignature!, StringComparer.Ordinal)
+            .Where(g => g.Select(x => x.IdentityKey).Distinct(StringComparer.Ordinal).Count() >= 2)
+            .Select(g => new NearDuplicateGroup(
+                g.Key,
+                string.Join(", ", g.Select(x => x.IdentityKey).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal)),
+                g.Select(x => new DuplicateCopy(x.Id, x.Tier, Path.Combine(x.MountPath, x.RelativePath), x.IsOnline, x.SizeBytes)).ToList()))
+            .ToList();
+    }
+
     public async Task<ReclaimResult> TrashRedundantAsync(long keepVarFileId, IReadOnlyList<long> trashVarFileIds, CancellationToken cancellationToken = default)
     {
         var rows = await LoadRowsAsync(cancellationToken).ConfigureAwait(false);

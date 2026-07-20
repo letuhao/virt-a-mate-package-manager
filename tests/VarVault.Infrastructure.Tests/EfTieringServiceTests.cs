@@ -73,6 +73,58 @@ public sealed class EfTieringServiceTests
         Assert.True(plan.ExcludedCount >= 1); // the single-copy cold var excluded
     }
 
+    [Fact]
+    public async Task Policy_reports_the_active_class_to_tier_map()
+    {
+        using var fx = new SqliteTestDatabase();
+        using var read = fx.NewContext();
+        var policy = await new EfTieringService(read, Repos()).PolicyAsync();
+
+        Assert.Equal(3, policy.Placements.Count);
+        var hot = policy.Placements.Single(p => p.StorageClass == "Hot").DesiredTier;
+        var cold = policy.Placements.Single(p => p.StorageClass == "Cold").DesiredTier;
+        Assert.True(hot < cold, "Hot must place on a faster (lower) tier than Cold"); // reflects the real PlacementPolicy
+    }
+
+    [Fact]
+    public async Task Stale_lists_only_superseded_cold_versions()
+    {
+        using var fx = new SqliteTestDatabase();
+        using (var db = fx.NewContext())
+        {
+            // Same family (Acme.Thing): v1 cold + superseded, v2 hot + latest → only v1 is stale.
+            SeedVersioned(db, 1, "Acme.Thing.1", "Acme", "Thing", sort: 1, ContentClass.Cold);
+            SeedVersioned(db, 2, "Acme.Thing.2", "Acme", "Thing", sort: 2, ContentClass.Hot);
+            // Single-version cold package → not stale (no newer version).
+            SeedVersioned(db, 3, "Acme.Solo.1", "Acme", "Solo", sort: 1, ContentClass.Cold);
+            // Superseded but Hot → not stale (only cold superseded versions count).
+            SeedVersioned(db, 4, "Acme.Warm.1", "Acme", "Warm", sort: 1, ContentClass.Hot);
+            SeedVersioned(db, 5, "Acme.Warm.2", "Acme", "Warm", sort: 2, ContentClass.Hot);
+            await db.SaveChangesAsync();
+        }
+
+        using var read = fx.NewContext();
+        var stale = await new EfTieringService(read, Repos()).StaleVersionsAsync();
+
+        Assert.Single(stale);
+        Assert.Equal(1, stale[0].PackageId);
+    }
+
+    private static void SeedVersioned(VarVaultDbContext db, long id, string varName, string creator, string pkg, int sort, ContentClass cls)
+    {
+        db.Packages.Add(new Package
+        {
+            Id = id, VarName = varName, IdentityKey = varName.ToUpperInvariant(), Creator = creator, PackageName = pkg,
+            VersionToken = sort.ToString(), VersionSort = sort, FirstSeenAt = DateTime.UtcNow, LastIndexedAt = DateTime.UtcNow,
+        });
+        db.PackageListItems.Add(new PackageListItem
+        {
+            PackageId = id, VarName = varName, Creator = creator, PackageName = pkg, VersionToken = sort.ToString(),
+            PrimaryType = ContentType.Scene, TotalSize = 100, Class = cls, ActualTierMin = 3,
+            OnlineInstanceCount = 1, IsSingleCopy = true, AddedAt = DateTime.UtcNow,
+        });
+    }
+
     private static void SeedItem(VarVaultDbContext db, long id, string name, ContentClass cls, int actualTier, long size, int online = 1)
     {
         db.Packages.Add(new Package

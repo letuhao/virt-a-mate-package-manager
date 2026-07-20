@@ -20,6 +20,8 @@ public class HealthScreenTests
             Task.FromResult<IReadOnlyList<EncodingGroup>>([new EncodingGroup("GBK", 431), new EncodingGroup("Shift-JIS", 188)]);
         public Task<IReadOnlyList<IntegrityIssue>> IntegrityAsync(CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<IntegrityIssue>>([]);
+        public Task<IReadOnlyList<IntegrityIssue>> MissingMetaAsync(CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<IntegrityIssue>>([]);
         public Task<Result<long>> FixAsync(long id, CancellationToken ct = default) => Task.FromResult(Result.Success(1L));
     }
 

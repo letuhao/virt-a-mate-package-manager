@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using VarVault.Domain.Analyzer;
 using VarVault.Domain.Entities;
+using VarVault.Domain.Identity;
 using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Library;
 using VarVault.Sdk.Repositories;
@@ -84,5 +85,33 @@ public sealed class EfTieringService(VarVaultDbContext db, IRepositoryService re
         return new TierMigrationPlan(
             plan.Proposals.Select(p => new TierMoveProposal(p.VarFileId, p.FromTier, p.ToTier)).ToList(),
             plan.Excluded.Count);
+    }
+
+    public Task<TierPolicy> PolicyAsync(CancellationToken cancellationToken = default) =>
+        // Read-only view of the active placement policy the engine actually uses. (24-checklist A6.)
+        Task.FromResult(new TierPolicy(
+        [
+            new(nameof(ContentClass.Hot), PlacementPolicy.DesiredTier(ContentClass.Hot)),
+            new(nameof(ContentClass.Warm), PlacementPolicy.DesiredTier(ContentClass.Warm)),
+            new(nameof(ContentClass.Cold), PlacementPolicy.DesiredTier(ContentClass.Cold)),
+        ]));
+
+    public async Task<IReadOnlyList<StaleVersion>> StaleVersionsAsync(CancellationToken cancellationToken = default)
+    {
+        // Stale = a newer version of the same identity family (Creator.Package) exists AND this one is Cold. (24-checklist A7.)
+        var items = await db.PackageListItems
+            .Select(x => new { x.PackageId, x.VarName, x.Creator, x.PackageName, x.Class, x.TotalSize, Sort = x.Package!.VersionSort })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var stale = new List<StaleVersion>();
+        foreach (var family in items.GroupBy(i => (IdentityFold.Compute(i.Creator), IdentityFold.Compute(i.PackageName))))
+        {
+            var maxSort = family.Max(i => i.Sort);
+            foreach (var i in family)
+                if (i.Sort < maxSort && i.Class == ContentClass.Cold)
+                    stale.Add(new StaleVersion(i.PackageId, i.VarName, i.Class.ToString(), i.TotalSize));
+        }
+        return stale;
     }
 }

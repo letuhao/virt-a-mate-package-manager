@@ -41,11 +41,10 @@ public sealed class OnboardingServiceFlowTests
         Assert.True(await db.PackageListItems.AnyAsync());       // catalog populated
     }
 
-    [Theory]
-    [InlineData(@"D:\VarVault_test_repo")]
-    public async Task Add_and_index_a_real_repo(string path)
+    [Fact]
+    public async Task Add_and_index_a_real_repo()
     {
-        if (!Directory.Exists(path) || !Directory.EnumerateFiles(path, "*.var", SearchOption.AllDirectories).Any())
+        if (TestCorpus.Primary is not { } path)
             return;
 
         await using var host = TestHost.Create(withPersistence: true);

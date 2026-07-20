@@ -37,12 +37,18 @@ public sealed class StubTiering(
         Task.FromResult(misplaced ?? []);
     public Task<TierMigrationPlan> BuildPlanAsync(CancellationToken ct = default) =>
         Task.FromResult(plan ?? new TierMigrationPlan([], 0));
+    public Task<TierPolicy> PolicyAsync(CancellationToken ct = default) =>
+        Task.FromResult(new TierPolicy([]));
+    public Task<IReadOnlyList<StaleVersion>> StaleVersionsAsync(CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<StaleVersion>>([]);
 }
 
 public sealed class StubReclaim(IReadOnlyList<DuplicateGroup>? groups = null) : IReclaimService
 {
     public Task<IReadOnlyList<DuplicateGroup>> ExactGroupsAsync(CancellationToken ct = default) =>
         Task.FromResult(groups ?? []);
+    public Task<IReadOnlyList<NearDuplicateGroup>> NearDuplicateGroupsAsync(CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<NearDuplicateGroup>>([]);
     public Task<ReclaimResult> TrashRedundantAsync(long keep, IReadOnlyList<long> trash, CancellationToken ct = default) =>
         Task.FromResult(new ReclaimResult(trash.Count, 0));
 }
@@ -52,6 +58,8 @@ public sealed class StubHealth(IReadOnlyList<EncodingGroup>? groups = null) : IH
     public Task<IReadOnlyList<EncodingGroup>> EncodingGroupsAsync(CancellationToken ct = default) =>
         Task.FromResult(groups ?? []);
     public Task<IReadOnlyList<IntegrityIssue>> IntegrityAsync(CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<IntegrityIssue>>([]);
+    public Task<IReadOnlyList<IntegrityIssue>> MissingMetaAsync(CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<IntegrityIssue>>([]);
     public Task<Result<long>> FixAsync(long varFileId, CancellationToken ct = default) =>
         Task.FromResult(Result.Success(varFileId));

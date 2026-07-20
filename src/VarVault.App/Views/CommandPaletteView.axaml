@@ -1,0 +1,35 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             x:Class="VarVault.App.Views.CommandPaletteView"
+             x:DataType="vm:CommandPaletteViewModel">
+  <UserControl.KeyBindings>
+    <KeyBinding Gesture="Escape" Command="{Binding CloseCommand}" />
+  </UserControl.KeyBindings>
+  <!-- Dim backdrop; clicking it closes the palette -->
+  <Border Background="#99000000">
+    <Border Width="560" MaxHeight="440" VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,110,0,0"
+            Background="{DynamicResource Bg1Brush}" BorderBrush="{DynamicResource Bg3Brush}" BorderThickness="1"
+            CornerRadius="8" Padding="12">
+      <DockPanel>
+        <TextBox DockPanel.Dock="Top" Watermark="Type a command…  (Esc to close)" Text="{Binding Query}" Margin="0,0,0,8" />
+        <ScrollViewer MaxHeight="360">
+          <ItemsControl ItemsSource="{Binding Results}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:PaletteCommand">
+                <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Background="Transparent" Padding="8,6"
+                        Command="{Binding ((vm:CommandPaletteViewModel)DataContext).InvokeCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                        CommandParameter="{Binding}">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding Category}" Opacity="0.55" FontSize="11" VerticalAlignment="Center" />
+                  </Grid>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+  </Border>
+</UserControl>

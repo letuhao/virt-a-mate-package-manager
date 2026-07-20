@@ -36,6 +36,16 @@ public sealed class EfHealthService(VarVaultDbContext db, EncodingFixCoordinator
             .ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyList<IntegrityIssue>> MissingMetaAsync(CancellationToken cancellationToken = default)
+    {
+        // Missing-meta is already detected + stored by VarInspector; this just surfaces it. (24-checklist A4.)
+        return await db.VarFiles
+            .Where(v => v.IntegrityStatus == IntegrityStatus.MissingMeta)
+            .Select(v => new IntegrityIssue(v.Id, v.Package != null ? v.Package.VarName : v.RelativePath, v.RelativePath))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<Result<long>> FixAsync(long varFileId, CancellationToken cancellationToken = default)
     {
         var v = await db.VarFiles

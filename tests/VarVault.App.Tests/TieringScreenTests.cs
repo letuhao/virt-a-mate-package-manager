@@ -20,6 +20,8 @@ public class TieringScreenTests
             Task.FromResult<IReadOnlyList<MisplacedItem>>([new MisplacedItem(1, "VeeRifter.CyberRoom.4", "Hot", 3, 1, 880, "hot on slower tier")]);
         public Task<TierMigrationPlan> BuildPlanAsync(CancellationToken ct = default) =>
             Task.FromResult(new TierMigrationPlan([new TierMoveProposal(1, 3, 1)], 0));
+        public Task<TierPolicy> PolicyAsync(CancellationToken ct = default) => Task.FromResult(new TierPolicy([]));
+        public Task<IReadOnlyList<StaleVersion>> StaleVersionsAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<StaleVersion>>([]);
     }
 
     [AvaloniaFact]

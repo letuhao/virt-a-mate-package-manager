@@ -36,11 +36,12 @@ public static class AppHost
                 tags: services.GetService<ITagService>(),
                 thumbnails: services.GetService<Domain.Indexing.IThumbnailStore>()),
             ["analytics"] = new AnalyticsViewModel(services.GetRequiredService<IAnalyticsService>()),
-            ["dashboard"] = new DashboardViewModel(services.GetRequiredService<IDashboardService>(), launcher),
+            ["dashboard"] = new DashboardViewModel(services.GetRequiredService<IDashboardService>(), launcher,
+                services.GetService<IReclaimService>(), services.GetService<IActivityLog>()),
             ["repos"] = new RepositoriesViewModel(services.GetRequiredService<Sdk.Repositories.IRepositoryService>(), launcher),
             ["presets"] = new PresetsViewModel(services.GetRequiredService<Sdk.Presets.IPresetService>(), services.GetService<IProfileService>(), launcher, services.GetService<Sdk.Activation.IActivationService>(), services.GetService<Sdk.Settings.ISettingsService>()),
             ["tiering"] = new TieringViewModel(services.GetRequiredService<ITieringService>(), launcher),
-            ["dupes"] = new DupesViewModel(services.GetRequiredService<IReclaimService>(), launcher),
+            ["dupes"] = new DupesViewModel(services.GetRequiredService<IReclaimService>(), launcher, services.GetService<IIntakeService>()),
             ["history"] = new ActivityViewModel(services.GetRequiredService<IActivityLog>()),
             ["missing"] = new MissingDepsViewModel(services.GetRequiredService<IMissingDepsQuery>(), launcher),
             ["proposals"] = new ProposalsViewModel(services.GetRequiredService<IProposalService>(), launcher),
@@ -90,6 +91,14 @@ public static class AppHost
             };
         }
 
+        // E9 · command palette (Ctrl-K): jump to any screen + a couple of quick actions.
+        var paletteCommands = ShellViewModel.AllScreens
+            .Select(s => new PaletteCommand($"Go to {s.Label}", s.Group, () => shell.Navigate(s.Id)))
+            .ToList();
+        paletteCommands.Add(new PaletteCommand("Add repository…", "Actions", () => launcher.OpenAddRepo()));
+        paletteCommands.Add(new PaletteCommand("Rescue…", "Actions", () => launcher.OpenRescue()));
+        shell.CommandPalette = new CommandPaletteViewModel(paletteCommands);
+
         return shell;
     }
 
@@ -132,35 +141,48 @@ public static class AppHost
     /// <summary>Build the live-feeds source if all its read services are present (null in minimal test hosts).</summary>
     private static Services.IShellLiveFeeds? TryBuildFeeds(IServiceProvider services, Sdk.Threading.IJobQueue? jobQueue)
     {
-        var proposals = services.GetService<IProposalService>();
-        var health = services.GetService<IHealthService>();
-        var missing = services.GetService<IMissingDepsQuery>();
-        var dashboard = services.GetService<IDashboardService>();
-        if (proposals is null || health is null || missing is null || dashboard is null || jobQueue is null)
+        // Presence check keeps minimal test hosts (without these read services) returning null; the feeds resolve
+        // their services per-poll from a fresh scope, so the poll never shares the shell's DbContext. (24-checklist B1.)
+        var scopeFactory = services.GetService<IServiceScopeFactory>();
+        if (services.GetService<IProposalService>() is null || services.GetService<IHealthService>() is null
+            || services.GetService<IMissingDepsQuery>() is null || services.GetService<IDashboardService>() is null
+            || jobQueue is null || scopeFactory is null)
             return null;
-        return new Services.ShellLiveFeeds(proposals, health, missing, dashboard, jobQueue);
+        return new Services.ShellLiveFeeds(scopeFactory, jobQueue);
     }
 
-    /// <summary>Compose the app host under LocalAppData and build the shell; null on composition failure.</summary>
-    public static ShellViewModel? TryCreateShell()
+    private static string DefaultDataDir => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VarVault");
+
+    /// <summary>
+    /// Compose the app host + shell, or return a startup-error view-model on failure — never a null result that
+    /// would render as a blank window bound to nothing. The exception is traced and surfaced (copyable). (24-checklist C1.)
+    /// </summary>
+    public static (ShellViewModel? Shell, StartupErrorViewModel? Error) TryCreateShellOrError() =>
+        TryCreateShellOrError(DefaultDataDir);
+
+    /// <summary>Testable overload: compose under an explicit data directory.</summary>
+    public static (ShellViewModel? Shell, StartupErrorViewModel? Error) TryCreateShellOrError(string dataDir)
     {
         try
         {
-            var dataDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "VarVault");
             Directory.CreateDirectory(dataDir);
             var host = Bootstrap.BuildApp(dataDir);
             var scope = host.Services.CreateScope(); // app-lifetime scope backing the shell's read services
             var shell = CreateShell(scope.ServiceProvider);
             ReconcileProfiles(host.Services); // T3.3: sync Profile rows with on-disk profile dirs (own scope)
             EnqueueIndexAll(scope.ServiceProvider); // GA-5: populate the catalog in the background on launch
-            return shell;
+            return (shell, null);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            return null;
+            System.Diagnostics.Trace.TraceError("VarVault startup failed: " + ex);
+            return (null, new StartupErrorViewModel("VarVault couldn't start.", ex.ToString()));
         }
     }
+
+    /// <summary>Back-compat: the shell only (null on failure). Prefer <see cref="TryCreateShellOrError()"/>.</summary>
+    public static ShellViewModel? TryCreateShell() => TryCreateShellOrError().Shell;
 
     /// <summary>Legacy library-only view-model (kept for the existing MainWindow until screens land).</summary>
     public static MainWindowViewModel? TryCreateMainViewModel()

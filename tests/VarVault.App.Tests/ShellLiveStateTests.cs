@@ -62,13 +62,7 @@ public class ShellLiveStateTests
         var sp = scope.ServiceProvider;
         var feeds = new ShellLiveFeeds(
             Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
-                .GetRequiredService<VarVault.Sdk.Library.IProposalService>(sp),
-            Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
-                .GetRequiredService<VarVault.Sdk.Library.IHealthService>(sp),
-            Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
-                .GetRequiredService<VarVault.Sdk.Library.IMissingDepsQuery>(sp),
-            Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
-                .GetRequiredService<VarVault.Sdk.Library.IDashboardService>(sp),
+                .GetRequiredService<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>(sp),
             Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
                 .GetRequiredService<VarVault.Sdk.Threading.IJobQueue>(sp));
 
@@ -76,6 +70,24 @@ public class ShellLiveStateTests
         // Empty catalog → zero counts, no crash. Proves the wire to real services.
         Assert.True(snap.ProposalCount >= 0);
         Assert.True(snap.MissingCount >= 0);
+    }
+
+    /// <summary>24-checklist B1 · Each poll runs in its own DI scope, so concurrent snapshots never share a
+    /// DbContext (EF is not thread-safe). Before B1 the feeds held services off the shell's app-lifetime scope.</summary>
+    [Trait("Category", TestCategories.Integration)]
+    [Fact]
+    public async Task Concurrent_snapshots_never_share_a_dbcontext()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        var sf = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
+            .GetRequiredService<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>(host.Host.Services);
+        var jq = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
+            .GetRequiredService<VarVault.Sdk.Threading.IJobQueue>(host.Host.Services);
+        var feeds = new ShellLiveFeeds(sf, jq);
+
+        // 30 concurrent polls: with a per-snapshot scope this never throws EF's "second operation on this context".
+        var snaps = await Task.WhenAll(Enumerable.Range(0, 30).Select(_ => feeds.SnapshotAsync()));
+        Assert.All(snaps, s => Assert.True(s.ProposalCount >= 0));
     }
 
     private static int? Badge(ShellViewModel shell, string id) =>

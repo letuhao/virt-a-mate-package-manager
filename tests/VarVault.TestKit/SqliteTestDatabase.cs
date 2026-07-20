@@ -1,4 +1,3 @@
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using VarVault.Infrastructure.Persistence;
 
@@ -17,8 +16,12 @@ public sealed class SqliteTestDatabase : IDisposable
 
     public VarVaultDbContext NewContext()
     {
+        // Pooling=False: each connection fully closes on context dispose, so the temp db file is unlocked
+        // for cleanup without a process-global SqliteConnection.ClearAllPools() — that global call, fired
+        // per-instance while xUnit runs test classes in parallel, disposed native handles other tests were
+        // mid-migration on (intermittent ObjectDisposedException). (24-checklist D3.)
         var options = new DbContextOptionsBuilder<VarVaultDbContext>()
-            .UseSqlite($"Data Source={Path}")
+            .UseSqlite($"Data Source={Path};Pooling=False")
             .Options;
 
         var db = new VarVaultDbContext(options);
@@ -27,9 +30,5 @@ public sealed class SqliteTestDatabase : IDisposable
         return db;
     }
 
-    public void Dispose()
-    {
-        SqliteConnection.ClearAllPools();
-        _dir.Dispose();
-    }
+    public void Dispose() => _dir.Dispose();
 }

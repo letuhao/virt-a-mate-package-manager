@@ -15,7 +15,7 @@ namespace VarVault.Infrastructure.Tests;
 [Trait("Category", TestCategories.Integration)]
 public sealed class RealRepoClassificationTests
 {
-    private const string Repo = @"D:\VarVault_test_repo\Vam_Installer_notSameContentFiles1";
+    private static string Repo => TestCorpus.Primary ?? "";
 
     [Fact]
     public void Classifies_real_vars_into_known_types_with_a_primary()
@@ -23,7 +23,7 @@ public sealed class RealRepoClassificationTests
         if (!Directory.Exists(Repo))
             return;
 
-        var vars = Directory.GetFiles(Repo, "*.var");
+        var vars = Directory.GetFiles(Repo, "*.var", SearchOption.AllDirectories);
         Assert.NotEmpty(vars);
 
         var classifiedCount = 0;
@@ -57,7 +57,7 @@ public sealed class RealRepoClassificationTests
         if (!Directory.Exists(Repo))
             return;
 
-        var vars = Directory.GetFiles(Repo, "*.var");
+        var vars = Directory.GetFiles(Repo, "*.var", SearchOption.AllDirectories);
         Assert.NotEmpty(vars);
 
         foreach (var path in vars)

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using VarVault.Sdk.Library;
 
 namespace VarVault.App.Services;
@@ -24,16 +25,25 @@ public interface IShellLiveFeeds
 /// <summary>
 /// Default live-feeds source: badges from proposals/health/missing services, tier summary from the
 /// dashboard service, index status from the job queue's active indexing job.
+/// <para>
+/// Each poll runs in its own DI scope so its scoped <c>VarVaultDbContext</c> is never shared with a screen's
+/// concurrent read (EF Core <c>DbContext</c> is not thread-safe). The 750 ms shell timer and a user screen-load
+/// can otherwise interleave on one context → intermittent "second operation started on this context". (24-checklist B1.)
+/// </para>
 /// </summary>
 public sealed class ShellLiveFeeds(
-    IProposalService proposals,
-    IHealthService health,
-    IMissingDepsQuery missing,
-    IDashboardService dashboard,
+    IServiceScopeFactory scopeFactory,
     Sdk.Threading.IJobQueue jobQueue) : IShellLiveFeeds
 {
     public async Task<ShellLiveSnapshot> SnapshotAsync(CancellationToken cancellationToken = default)
     {
+        using var scope = scopeFactory.CreateScope();
+        var sp = scope.ServiceProvider;
+        var proposals = sp.GetRequiredService<IProposalService>();
+        var health = sp.GetRequiredService<IHealthService>();
+        var missing = sp.GetRequiredService<IMissingDepsQuery>();
+        var dashboard = sp.GetRequiredService<IDashboardService>();
+
         var pending = await proposals.ListAsync(cancellationToken).ConfigureAwait(false);
         var encoding = await health.EncodingGroupsAsync(cancellationToken).ConfigureAwait(false);
         var miss = await missing.GetMissingAsync(cancellationToken).ConfigureAwait(false);
