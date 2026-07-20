@@ -1,6 +1,6 @@
 # VarVault — a tiered VaM var manager
 
-A desktop application for managing [Virt-a-Mate](https://hub.virtamate.com) `.var` packages at scale — **tiered, multi-drive object storage** with first-class dependency management, duplicate reclaim, a visual gallery, and CJK-encoding auto-fix.
+A desktop application for managing Virt-a-Mate `.var` packages at scale — **tiered, multi-drive object storage** with first-class dependency management, duplicate reclaim, a visual gallery, and CJK-encoding auto-fix.
 
 ## The problem it solves
 
@@ -25,7 +25,6 @@ A full 13-screen desktop app wired to a real catalog engine (SQLite):
 
 - **0 build errors · 563 tests green** (unit + integration + real-repo E2E). The full-app walkthrough registers real repositories, runs real indexing/extraction, browses the populated library, renders real gallery previews, and performs real cross-drive moves — all driving the actual application window.
 - Design docs: **[docs/new-app/](docs/new-app/README.md)** (features, data architecture — adversarially reviewed + perf-proven at 1M packages — UI prototype, and item-level checklists).
-- Legacy feature reference: **[docs/varManager/](docs/varManager/README.md)**.
 
 ## Stack
 
