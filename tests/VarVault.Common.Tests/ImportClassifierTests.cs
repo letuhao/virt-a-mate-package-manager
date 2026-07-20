@@ -16,8 +16,9 @@ public class ImportClassifierTests
 
     private static ImportCandidateFacts Cand(
         IntegrityStatus integrity = IntegrityStatus.Ok, string? sig = "SIG_NEW",
-        string? filenameId = "brand.new.1", bool metaDivergent = false, bool encoding = false) =>
-        new(integrity, sig, filenameId, metaDivergent, encoding);
+        string? filenameId = "brand.new.1", bool metaDivergent = false, bool encoding = false,
+        string? metaId = null) =>
+        new(integrity, sig, filenameId, metaDivergent, encoding, metaId);
 
     [Fact]
     public void Corrupt_zip_is_Corrupt()
@@ -55,6 +56,31 @@ public class ImportClassifierTests
     {
         // filename parses but meta disagrees, and neither content nor filename-identity is in the repo.
         var c = Cand(sig: "SIG_NEW", filenameId: "wrong.name.1", metaDivergent: true);
+        Assert.Equal(LaneKind.Naming, ImportClassifier.Classify(c, Repo));
+    }
+
+    [Fact]
+    public void Misnamed_var_whose_meta_matches_existing_identity_is_Conflict_not_Naming()   // E1 conflict half
+    {
+        // Garbage filename (identity not in repo) but the META identity resolves to an existing var with DIFFERENT
+        // content — a misnamed same-identity conflict, not a plain Naming warning.
+        var c = Cand(sig: "SIG_DIFFERENT", filenameId: "garbage.name.1", metaDivergent: true, metaId: "creator.pack.1");
+        Assert.Equal(LaneKind.Conflict, ImportClassifier.Classify(c, Repo));
+    }
+
+    [Fact]
+    public void Misnamed_var_whose_meta_matches_by_content_is_Exact_not_Conflict()   // E1 exact half (content wins)
+    {
+        // Even though the meta identity matches, a byte-identical copy is Exact (content beats the meta cross-check).
+        var c = Cand(sig: "SIG_PACK1", filenameId: "garbage.name.1", metaDivergent: true, metaId: "creator.pack.1");
+        Assert.Equal(LaneKind.Exact, ImportClassifier.Classify(c, Repo));
+    }
+
+    [Fact]
+    public void Divergent_name_whose_meta_is_unknown_stays_Naming()
+    {
+        // meta identity present but not in the repo, content new → still just a Naming warning.
+        var c = Cand(sig: "SIG_NEW", filenameId: "wrong.name.1", metaDivergent: true, metaId: "nobody.nothing.9");
         Assert.Equal(LaneKind.Naming, ImportClassifier.Classify(c, Repo));
     }
 

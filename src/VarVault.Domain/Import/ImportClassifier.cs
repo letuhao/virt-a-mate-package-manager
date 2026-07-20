@@ -15,7 +15,8 @@ public sealed record ImportCandidateFacts(
     string? ContentSignature,
     string? FilenameIdentityKey,   // fold(Creator.Package.Version) from the FILE NAME; null if unparseable
     bool MetaDivergent,            // meta.json's Creator.Package differs from the filename's
-    bool HasEncodingIssue);        // valid var, but legacy-CJK entry names (needs Unicode fix)
+    bool HasEncodingIssue,         // valid var, but legacy-CJK entry names (needs Unicode fix)
+    string? MetaIdentityKey = null); // fold(MetaCreator.MetaPackage.Version) — for the E1 meta cross-check
 
 /// <summary>
 /// Classifies an incoming var against the <b>whole library</b> (all repos, D1). Pure. Content-first so a byte-identical
@@ -42,6 +43,13 @@ public static class ImportClassifier
         // 3 · same filename identity present but different content → same version, different insides → Conflict.
         if (candidate.FilenameIdentityKey is not null &&
             catalog.Any(v => string.Equals(v.IdentityKey, candidate.FilenameIdentityKey, StringComparison.Ordinal)))
+            return LaneKind.Conflict;
+
+        // 3b · E1 meta cross-check: a garbage/renamed filename whose well-formed META identity resolves to an
+        //      existing var (different content — an exact byte-copy already left at step 2) is really a misnamed
+        //      same-identity Conflict, not a plain Naming warning. Don't blindly import a misnamed duplicate.
+        if (candidate.MetaIdentityKey is not null &&
+            catalog.Any(v => string.Equals(v.IdentityKey, candidate.MetaIdentityKey, StringComparison.Ordinal)))
             return LaneKind.Conflict;
 
         // 4 · filename can't be trusted (diverges from meta, or unparseable) and it isn't a known dup → Naming warning.

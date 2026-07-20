@@ -41,7 +41,7 @@ public sealed class EfImportService(
     /// <summary>One catalogued var reduced to what dedup + the "existing" ref need. Loaded once per scan.</summary>
     private sealed record CatalogFact(
         long VarFileId, string IdentityKey, string? ContentSignature, int Tier, string RepositoryName,
-        string AbsolutePath, bool IsOnline);
+        Guid RepositoryId, string AbsolutePath, bool IsOnline);
 
     public async Task<ImportSession> ScanAsync(ImportSpec spec, IProgressSink? progress = null, CancellationToken cancellationToken = default)
     {
@@ -101,13 +101,14 @@ public sealed class EfImportService(
                 v.ContentSignature,
                 v.Repository!.Tier,
                 RepoName = v.Repository.Name,
+                RepoId = v.Repository.Id,
                 v.Repository.MountPath,
                 v.RelativePath,
                 v.Repository.IsOnline,
             })
             .ToListAsync(cancellationToken).ConfigureAwait(false))
             .Select(v => new CatalogFact(v.Id, v.IdentityKey, v.ContentSignature, v.Tier, v.RepoName,
-                Path.Combine(v.MountPath, v.RelativePath), v.IsOnline))
+                v.RepoId, Path.Combine(v.MountPath, v.RelativePath), v.IsOnline))
             .ToList();
 
         var catalogFacts = catalog
@@ -132,7 +133,49 @@ public sealed class EfImportService(
         Telemetry.ImportScanned.Add(items.Count);
         Telemetry.ImportTempBytes.Record(DirectorySize(workspace.Root));
 
-        return new ImportSession(SessionIdFrom(workspace), workspace.Root, spec.TargetRepositoryId, spec.ActivateAfter, sources, items);
+        var warnings = await BuildDedupTrustWarningsAsync(spec.TargetRepositoryId, catalog, cancellationToken).ConfigureAwait(false);
+
+        return new ImportSession(SessionIdFrom(workspace), workspace.Root, spec.TargetRepositoryId,
+            spec.ActivateAfter, sources, items, warnings);
+    }
+
+    /// <summary>
+    /// D1 dedup-trust warnings (§3/D1): whole-library dedup is only reliable if the catalog is complete. Surface —
+    /// don't silently trust — the two cheap staleness signals: (a) any <b>offline</b> repo (its current on-disk state
+    /// can't be confirmed, so a match there may be missed) and (b) the <b>target</b> repo looking <b>unindexed</b>
+    /// (has <c>.var</c> files on disk but no catalog rows → an existing copy could slip through as New and get
+    /// duplicated). The target check is bounded to one repo for perf (2M-scale); it never enumerates every repo.
+    /// </summary>
+    private async Task<IReadOnlyList<string>> BuildDedupTrustWarningsAsync(
+        Guid targetRepoId, IReadOnlyList<CatalogFact> catalog, CancellationToken ct)
+    {
+        var repos = await db.Repositories
+            .Select(r => new { r.Id, r.Name, r.MountPath, r.IsOnline })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        var warnings = new List<string>();
+        foreach (var r in repos.Where(r => !r.IsOnline))
+            warnings.Add($"Repo '{r.Name}' đang offline — kiểm tra trùng lặp có thể bỏ sót bản đã có ở đó.");
+
+        var target = repos.FirstOrDefault(r => r.Id == targetRepoId);
+        if (target is not null
+            && catalog.All(c => c.RepositoryId != targetRepoId)
+            && TargetHasVarsOnDisk(target.MountPath))
+        {
+            warnings.Add($"Repo đích '{target.Name}' chưa được index — bản đã có trong repo có thể bị coi là 'Mới' và bị copy trùng. Hãy index repo trước khi import.");
+        }
+
+        return warnings;
+    }
+
+    private static bool TargetHasVarsOnDisk(string? mount)
+    {
+        try
+        {
+            return !string.IsNullOrEmpty(mount) && Directory.Exists(mount)
+                && Directory.EnumerateFiles(mount, "*.var", SearchOption.AllDirectories).Any();
+        }
+        catch { return false; }
     }
 
     private static long DirectorySize(string dir)
@@ -192,14 +235,27 @@ public sealed class EfImportService(
             return Item(fileName, sourcePath, label, signals, ImportLane.Exact, ImportDecision.Skip,
                 "Trùng với một file khác trong cùng đợt import — sẽ bỏ qua.", null, []);
 
+        // E1: fold(MetaCreator.MetaPackage.<filenameVersion>) — meta.json has no version, so borrow the filename's.
+        // Only when the filename parses (we need a version to form a full identity key to match the catalog).
+        string? metaIdentityKey = signals.MetaIdentity is { } metaCp && parsed.IsSuccess
+            ? IdentityFold.Compute($"{metaCp}.{parsed.Value.VersionToken}")
+            : null;
+
         var candidate = new ImportCandidateFacts(
             insp.Integrity,
             contentSig,
             filenameIdentityKey,
             signals.MetaDivergent,
-            HasEncodingIssue(insp));
+            HasEncodingIssue(insp),
+            metaIdentityKey);
 
         var lane = Map(ImportClassifier.Classify(candidate, catalogFacts));
+
+        // For a Conflict, resolve against whichever key actually matched the catalog: the filename identity if it
+        // collides, else the E1 meta identity (a misnamed var whose meta resolves to an existing var).
+        var conflictKey = filenameIdentityKey is not null && catalog.Any(c => c.IdentityKey == filenameIdentityKey)
+            ? filenameIdentityKey
+            : metaIdentityKey ?? filenameIdentityKey;
 
         return lane switch
         {
@@ -211,7 +267,7 @@ public sealed class EfImportService(
             ImportLane.Cjk => Item(fileName, sourcePath, label, signals, lane, ImportDecision.ImportAndFix,
                 $"Var hợp lệ, {signals.GbkEntryCount} entry tên mã GBK — sẽ import và tự fix Unicode.", null, [], incomingPath: varPath),
 
-            ImportLane.Conflict => ConflictItem(fileName, sourcePath, label, signals, insp, filenameIdentityKey!, catalog, varPath, ct),
+            ImportLane.Conflict => ConflictItem(fileName, sourcePath, label, signals, insp, conflictKey!, catalog, varPath, ct),
 
             ImportLane.Naming => Item(fileName, sourcePath, label, signals, lane, ImportDecision.RenameToMeta,
                 signals.MetaIdentity is { } m ? $"Tên file không khớp meta.json (meta: {m})." : "Tên file không đọc được.",
@@ -444,22 +500,34 @@ public sealed class EfImportService(
     public async Task<ApplyResult> ApplyAsync(ImportSession session, CancellationToken cancellationToken = default)
     {
         Guard.NotNull(session);
-        var mount = await db.Repositories.Where(r => r.Id == session.TargetRepositoryId)
-            .Select(r => r.MountPath).FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
-        if (string.IsNullOrEmpty(mount) || !Directory.Exists(mount))
-            throw new InvalidOperationException("Target repository not found or offline.");
+
+        // §11 · block Apply with a clear message when the target repo is offline/missing or too full to hold the
+        //       import — never start copying into a repo that can't take it. (reuses the online/capacity signals.)
+        //       Uses None so a pre-cancelled token doesn't abort here — a graceful cancel is handled in the loop (E5).
+        var target = await db.Repositories.Where(r => r.Id == session.TargetRepositoryId)
+            .Select(r => new { r.MountPath, r.IsOnline }).FirstOrDefaultAsync(CancellationToken.None).ConfigureAwait(false);
+        if (target is null || string.IsNullOrEmpty(target.MountPath) || !target.IsOnline || !Directory.Exists(target.MountPath))
+            throw new InvalidOperationException("Repo đích không sẵn sàng (offline hoặc không tìm thấy) — không thể import.");
+        var mount = target.MountPath;
+        var plannedBytes = session.Items.Where(i => IsCopyDecision(i.Decision))
+            .Sum(i => Math.Max(0, i.Signals.SizeBytes));
+        if (!HasFreeSpace(mount, plannedBytes))
+            throw new InvalidOperationException("Repo đích không đủ dung lượng trống cho lần import này — hãy giải phóng bớt hoặc chọn repo khác.");
 
         var sw = Stopwatch.StartNew();
         using var activity = Telemetry.StartActivity("import.apply");
         int copied = 0, fixedCount = 0, renamed = 0, skipped = 0, discarded = 0, failed = 0;
         var didImport = false;
+        var cancelled = false;   // E5: a graceful cancel mid-apply still records a partial run (remainder skipped).
         var importedRefs = new List<string>();   // identities of vars that landed, for activate-after (5.9)
         var outcomes = new List<ImportOutcome>(session.Items.Count);   // per-item results, persisted (§8 · G3)
         try
         {
+          try
+          {
             foreach (var item in session.Items)
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                if (cancellationToken.IsCancellationRequested) { cancelled = true; break; }
                 bool ok = true;
                 string? reason = null;
                 switch (item.Decision)
@@ -499,20 +567,40 @@ public sealed class EfImportService(
                 }
                 outcomes.Add(new ImportOutcome(item.FileName, item.IdentityKey, item.Lane, item.Decision, ok, reason));
             }
+          }
+          catch (OperationCanceledException)
+          {
+              // Cancelled mid-copy (mover/fixer observed the token). Fall through to record the partial run. (E5)
+              cancelled = true;
+          }
 
-            if (didImport)
-                await orchestrator.IndexRepositoryAsync(session.TargetRepositoryId, cancellationToken).ConfigureAwait(false);
+            // E5: on a graceful cancel, the un-processed remainder is recorded as skipped so history reflects reality.
+            if (cancelled)
+                foreach (var item in session.Items.Skip(outcomes.Count))
+                {
+                    skipped++;
+                    outcomes.Add(new ImportOutcome(item.FileName, item.IdentityKey, item.Lane, item.Decision, true, "cancelled"));
+                }
 
-            // Optional activate-after (D2/5.9): link the just-imported vars into VaM via the existing preset flow.
+            // Index + activate + event only on a complete run; a cancelled run leaves its landed vars for the next
+            // index pass (durable copies are already on disk) and doesn't announce a (partial) import.
             var activated = false;
-            if (session.ActivateAfter && importedRefs.Count > 0)
-                activated = await ActivateImportedAsync(importedRefs, cancellationToken).ConfigureAwait(false);
+            if (!cancelled)
+            {
+                if (didImport)
+                    await orchestrator.IndexRepositoryAsync(session.TargetRepositoryId, cancellationToken).ConfigureAwait(false);
+
+                // Optional activate-after (D2/5.9): link the just-imported vars into VaM via the existing preset flow.
+                if (session.ActivateAfter && importedRefs.Count > 0)
+                    activated = await ActivateImportedAsync(importedRefs, cancellationToken).ConfigureAwait(false);
+            }
 
             var failedSources = session.Sources.Where(s => s.Status != ImportSourceStatus.Ok)
                 .Select(s => new ImportFailedSource(s.Path, s.Kind, s.FailReason ?? s.Status.ToString())).ToList();
             var run = new ImportRun(Guid.NewGuid(), DateTime.UtcNow, session.TargetRepositoryId,
                 SummarizeSources(session.Sources), copied, fixedCount, renamed, skipped, discarded, failed, failedSources, outcomes);
-            var runId = await history.RecordAsync(run, cancellationToken).ConfigureAwait(false);
+            // History is written even for a cancelled run (§11) — and always before temp cleanup in `finally`.
+            var runId = await history.RecordAsync(run, CancellationToken.None).ConfigureAwait(false);
 
             // Metrics + event (5.7/§9) — after the run is persisted so subscribers see a consistent state.
             Telemetry.ImportsApplied.Add(1);
@@ -520,9 +608,13 @@ public sealed class EfImportService(
             Telemetry.ImportFixed.Add(fixedCount);
             if (failed > 0) Telemetry.ImportFailed.Add(failed);
             Telemetry.ImportApplyDurationMs.Record(sw.Elapsed.TotalMilliseconds);
-            await events.PublishAsync(
-                new VarsImported(runId, session.TargetRepositoryId, copied, fixedCount, renamed, activated),
-                cancellationToken).ConfigureAwait(false);
+            if (!cancelled)
+                await events.PublishAsync(
+                    new VarsImported(runId, session.TargetRepositoryId, copied, fixedCount, renamed, activated),
+                    cancellationToken).ConfigureAwait(false);
+
+            if (cancelled)
+                throw new OperationCanceledException(cancellationToken);
 
             return new ApplyResult(copied, fixedCount, renamed, skipped, discarded, failed, runId);
         }
@@ -531,6 +623,24 @@ public sealed class EfImportService(
             try { if (Directory.Exists(session.TempRoot)) Directory.Delete(session.TempRoot, recursive: true); }
             catch { /* startup sweep catches leftovers */ }
         }
+    }
+
+    private static bool IsCopyDecision(ImportDecision d) => d is
+        ImportDecision.Import or ImportDecision.KeepIncoming or ImportDecision.ImportAndFix
+        or ImportDecision.RenameToMeta or ImportDecision.KeepBoth;
+
+    /// <summary>Free-space guard for Apply (§11): the target drive must hold the planned copies. Fails open if unknown.</summary>
+    private static bool HasFreeSpace(string mount, long neededBytes)
+    {
+        if (neededBytes <= 0) return true;
+        try
+        {
+            var root = Path.GetPathRoot(Path.GetFullPath(mount));
+            if (string.IsNullOrEmpty(root)) return true;
+            // A little headroom so we never fill the drive to the last byte.
+            return new DriveInfo(root).AvailableFreeSpace >= neededBytes + (64L * 1024 * 1024);
+        }
+        catch { return true; }
     }
 
     /// <summary>Record the on-disk identity of an imported var (its final var-name) for activate-after. (5.9)</summary>

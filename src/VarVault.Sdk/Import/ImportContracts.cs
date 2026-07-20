@@ -69,7 +69,14 @@ public sealed record ImportSpec(IReadOnlyList<string> Paths, Guid TargetReposito
 /// <summary>A scanned, not-yet-applied import session (decisions mutate in place before Apply). (doc 30 §5.)</summary>
 public sealed record ImportSession(
     Guid Id, string TempRoot, Guid TargetRepositoryId, bool ActivateAfter,
-    IReadOnlyList<ImportSource> Sources, IReadOnlyList<ImportItem> Items);
+    IReadOnlyList<ImportSource> Sources, IReadOnlyList<ImportItem> Items,
+    IReadOnlyList<string> Warnings)   // D1 dedup-trust warnings (offline / unindexed target repo). (doc 30 §3/D1.)
+{
+    /// <summary>Back-compat / test convenience: a session with no dedup-trust warnings.</summary>
+    public ImportSession(Guid id, string tempRoot, Guid targetRepositoryId, bool activateAfter,
+        IReadOnlyList<ImportSource> sources, IReadOnlyList<ImportItem> items)
+        : this(id, tempRoot, targetRepositoryId, activateAfter, sources, items, []) { }
+}
 
 /// <summary>Result of applying a session. (doc 30 §5.)</summary>
 public sealed record ApplyResult(int Copied, int Fixed, int Renamed, int Skipped, int Discarded, int Failed, Guid RunId);

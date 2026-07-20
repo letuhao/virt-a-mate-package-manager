@@ -82,9 +82,13 @@ completion **or** cancellation (try/finally), history is written **before** clea
 | **Corrupt** | `IntegrityStatus` ∈ {CorruptZip, MissingMeta, BadName} | discard | **yes** (confirm) |
 | **New** | none of the above (incl. a version you don't have) | import | no (auto) |
 
-Precedence when several could apply: **Corrupt &gt; Name≠meta &gt; Conflict &gt; CJK &gt; Exact &gt; New**.
-Rule-1 note: the old `NearDuplicate`/`EncodingVariant` cross-identity classes stay for the *Duplicates* screen but
-are **not** used to compare versions here. A different-version file is `New`.
+Precedence when several could apply — **content-first** (amended A2, 2026-07-20):
+**Corrupt &gt; Exact &gt; Conflict(filename) &gt; Conflict(meta·E1) &gt; Name≠meta &gt; CJK &gt; New**. This differs from the
+original `Corrupt &gt; Name≠meta &gt; Conflict &gt; CJK &gt; Exact &gt; New` ordering: **Exact beats Name≠meta** so a
+byte-identical but garbage-named copy is skipped, not warned (E1's "don't import a misnamed duplicate"), and the
+filename/meta identity match is surfaced as **Conflict** before falling back to the Name≠meta warning. See
+[§13 A2](#13-decisions-log--sealed). Rule-1 note: the old `NearDuplicate`/`EncodingVariant` cross-identity classes
+stay for the *Duplicates* screen but are **not** used to compare versions here. A different-version file is `New`.
 
 **Dedup scope = the whole library, not just the target repo (D1).** Classification checks the candidate against
 **every** catalogued var across **all** repositories (hot/warm/cold). A var already present in any repo → **Exact dup
@@ -296,6 +300,19 @@ Reviewed &amp; sealed 2026-07-20. **B-items** answered by the user; **A-items** 
 Change any of these only with a new dated entry here + a bump to the affected checklist item.
 
 **Amendments (post-seal):**
+- **A2 · 2026-07-20 — Classification precedence is content-first (audit reconciliation).** The §3 precedence table as
+  originally sealed (`Corrupt > Name≠meta > Conflict > CJK > Exact > New`) conflicts with **E1** (don't import a
+  misnamed duplicate) and the implemented, tested behavior. Decision: the authoritative order is **content-first** —
+  `Corrupt > Exact > Conflict(by filename identity) > Conflict(by meta identity, E1) > Name≠meta > CJK > New`. A
+  byte-identical copy is Exact-skipped regardless of its name; a misnamed var whose **meta identity** resolves to an
+  existing var (different content) is a **Conflict**, not a plain Naming warning. `IntegrityStatus.Corrupt` still wins
+  over everything. Covered by `ImportClassifierTests` (E1 exact/conflict halves) + `ImportGuardrailsE2ETests`. (§3.)
+- **A3 · 2026-07-20 — Discard & rename-collision literals (audit note).** (a) **Discard** performs no file op: the
+  incoming var is never copied, so there is nothing to move to `___VarInvalid___`; the source is left untouched
+  (§11/E6). The §7 "move to quarantine" wording applies only if a copy had already been made — it never has at the
+  discard point. (b) **Rename-to-meta / Keep-both collisions** use a non-colliding `…(n).var` suffix rather than
+  reclassifying to Conflict; this satisfies §11's core intent (**never a silent overwrite**) without a second review
+  round. Both are accepted as-is. (§7/§11.)
 - **A1 · 2026-07-20 — Archive extractor CJK strategy (web-checked).** Concern: managed zip libs mangle legacy-CJK
   entry names. Research confirmed SharpCompress (0.50.x) exposes `ArchiveEncoding.CustomDecoder(byte[],int,int)→string`
   giving the **raw** name bytes, so it *is* solvable pure-managed. Decision: SharpCompress + a CustomDecoder wired to
@@ -307,6 +324,10 @@ Change any of these only with a new dated entry here + a bump to the affected ch
 - **D1 · Dedup scope = whole library.** Check the candidate against every catalogued var across all repos; already-present
   anywhere ⇒ skip (with a promote/move nudge if it's in a colder repo). Requires complete catalog signatures — the scan
   indexes stale/unindexed repos first, or warns which repo is stale, before trusting the dedup result. (§3)
+  · **Implemented (2026-07-20):** the **warn** path — `ScanAsync` surfaces `ImportSession.Warnings` for any **offline**
+  repo and for the **target** repo looking **unindexed** (has `.var` files on disk but no catalog rows). Auto
+  index-first is deferred; the target check is bounded to one repo for 2M-scale perf and never enumerates every repo.
+  Shown as a warning banner on the Import screen.
 - **D2 · Optional activate after import** — a default-off checkbox that, on success, activates the just-imported vars into
   VaM (existing activation flow). Import and activation otherwise stay separate. (§7, `ImportSpec.ActivateAfter`)
 - **D3 · Name≠meta has no auto-default** — the user chooses rename-to-meta vs keep-filename (vs discard) per var; the

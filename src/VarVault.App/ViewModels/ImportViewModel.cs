@@ -97,6 +97,8 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
 
     public ObservableCollection<string> SourcePaths { get; } = [];
     public ObservableCollection<ImportSource> Sources { get; } = [];
+    public ObservableCollection<string> Warnings { get; } = [];   // D1 dedup-trust warnings (offline/unindexed repo).
+    public bool HasWarnings => Warnings.Count > 0;
     public ObservableCollection<ImportItemViewModel> Items { get; } = [];   // the filtered view
     public ObservableCollection<ImportRun> History { get; } = [];
 
@@ -202,9 +204,18 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
             Sources.Clear();
             foreach (var s in _session.Sources)
                 Sources.Add(s);
+            Warnings.Clear();
+            foreach (var w in _session.Warnings)
+                Warnings.Add(w);
             OnPropertyChanged(nameof(SourcesSummary));
+            OnPropertyChanged(nameof(HasWarnings));
             ApplyFilter();
             StatusMessage = $"Đã quét {_all.Count} var · {ReviewRemaining} cần review";
+        }
+        catch (Exception ex)
+        {
+            _session = null;
+            StatusMessage = $"Lỗi khi quét nguồn: {ex.Message}";
         }
         finally
         {
@@ -253,7 +264,19 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
             _all.Clear();
             Items.Clear();
             Sources.Clear();
+            Warnings.Clear();
+            OnPropertyChanged(nameof(HasWarnings));
             await RefreshHistoryAsync().ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "Đã huỷ import — phần đã copy vẫn được giữ, phần còn lại bỏ qua (ghi vào History).";
+            await RefreshHistoryAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            // §11: target offline/full and other apply failures surface as a clear message, not a crash.
+            StatusMessage = $"Không thể import: {ex.Message}";
         }
         finally
         {

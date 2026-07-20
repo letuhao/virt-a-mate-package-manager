@@ -58,6 +58,22 @@
         <TextBlock Text="{Binding StatusMessage}" Opacity="0.6" FontSize="11.5" VerticalAlignment="Center" />
       </StackPanel>
 
+      <!-- D1 dedup-trust warnings (offline / unindexed target repo) -->
+      <Border DockPanel.Dock="Top" IsVisible="{Binding HasWarnings}" Margin="0,0,0,8"
+              Background="{DynamicResource WarnBgBrush}" BorderBrush="{DynamicResource WarnBrush}"
+              BorderThickness="1" CornerRadius="6" Padding="10,7">
+        <ItemsControl ItemsSource="{Binding Warnings}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <StackPanel Orientation="Horizontal" Spacing="7">
+                <TextBlock Text="⚠" Foreground="{DynamicResource WarnBrush}" FontSize="12" VerticalAlignment="Top" />
+                <TextBlock Text="{Binding}" Foreground="{DynamicResource WarnBrush}" FontSize="11.5" TextWrapping="Wrap" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </Border>
+
       <!-- Stepper: Sources → Scan → Review → Apply -->
       <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10" IsVisible="{Binding HasSession}">
         <c:Tag Content="① Nguồn" />
