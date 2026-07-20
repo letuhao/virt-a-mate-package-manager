@@ -37,7 +37,7 @@ public sealed class RepositoryCardViewModel(RepositoryInfo info)
 
 /// <summary>SCR-3 · Repositories: cards per registered repository. (16-checklist SCR-3.)</summary>
 public sealed partial class RepositoriesViewModel(
-    IRepositoryService repositories, Services.IDialogLauncher? launcher = null) : ObservableObject
+    IRepositoryService repositories, Services.IDialogLauncher? launcher = null) : ObservableObject, ILoadableScreen
 {
     public ObservableCollection<RepositoryCardViewModel> Repositories { get; } = [];
 

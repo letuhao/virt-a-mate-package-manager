@@ -41,11 +41,11 @@ public sealed class OnboardingServiceFlowTests
         Assert.True(await db.PackageListItems.AnyAsync());       // catalog populated
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Add_and_index_a_real_repo()
     {
-        if (TestCorpus.Primary is not { } path)
-            return;
+        Skip.If(TestCorpus.Primary is null, "requires VARVAULT_TEST_CORPUS");
+        var path = TestCorpus.Primary!;
 
         await using var host = TestHost.Create(withPersistence: true);
         using var scope = host.Host.Services.CreateScope();

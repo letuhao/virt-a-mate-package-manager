@@ -115,6 +115,21 @@ public sealed class EfLibraryActionService(
         return new BulkActionResult(ok, fail);
     }
 
+    public async Task<bool> SetFavoriteAsync(long packageId, bool isFavorite, CancellationToken cancellationToken = default)
+    {
+        var pkg = await db.Packages.FirstOrDefaultAsync(p => p.Id == packageId, cancellationToken).ConfigureAwait(false);
+        if (pkg is null)
+            return false;
+        pkg.IsFavorite = isFavorite;
+        // Keep the materialized read model in sync so the grid/detail reflect it immediately (no re-index).
+        var item = await db.PackageListItems.FirstOrDefaultAsync(i => i.PackageId == packageId, cancellationToken).ConfigureAwait(false);
+        if (item is not null)
+            item.IsFavorite = isFavorite;
+        // Single-writer discipline (CLAUDE.md): route the catalog write through the write queue.
+        await writeQueue.EnqueueAsync(ct => db.SaveChangesAsync(ct), cancellationToken: cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
     public async Task<TxtResolveResult> ResolveTxtAsync(string txt, CancellationToken cancellationToken = default)
     {
         var wanted = (txt ?? string.Empty)

@@ -148,6 +148,12 @@ public sealed class GapABackendTests
         Assert.Equal(2, row.ContentCounts["Plugin"]);
         Assert.Contains("Sc 3", row.ContentSummary);
         Assert.Contains("Pl 2", row.ContentSummary);
+
+        // doc 26 · G-2.1/G-2.2 — the dedicated per-type props + AddedAt the new table columns bind to.
+        Assert.Equal(3, row.Scenes);
+        Assert.Equal(2, row.Plugins);
+        Assert.Equal(0, row.Looks);
+        Assert.NotNull(row.AddedAt);
     }
 
     private static void WriteVar(string path, string meta, params (string Name, string Content)[] entries)

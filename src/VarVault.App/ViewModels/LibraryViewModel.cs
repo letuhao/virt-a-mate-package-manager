@@ -28,7 +28,9 @@ public sealed partial class LibraryViewModel(
     IPackageDetailQuery? detail = null,
     Sdk.Presets.IPresetService? presets = null,
     ITagService? tags = null,
-    Domain.Indexing.IThumbnailStore? thumbnails = null) : ObservableObject
+    Domain.Indexing.IThumbnailStore? thumbnails = null,
+    Services.IFileReveal? reveal = null,
+    Sdk.Activation.IActivationService? activation = null) : ObservableObject, ILoadableScreen
 {
     // Off-thread, cached loader for the extracted preview thumbnails the indexer stores (gallery). (1.35)
     private readonly Services.ThumbnailLoader<Avalonia.Media.Imaging.Bitmap>? _thumbLoader =
@@ -61,6 +63,56 @@ public sealed partial class LibraryViewModel(
             return;
         var res = await actions.ResolveTxtAsync(txt, cancellationToken).ConfigureAwait(true);
         LastActionMessage = $"Matched {res.MatchedPackageIds.Count}, {res.Unmatched.Count} not owned";
+    }
+
+    // ── Bulk Install / Uninstall via a dedicated "Library installs" preset (doc 26 · G-5) ────────────────
+    // Reuses the proven activation path: Install = add members + build links; Uninstall = remove members + rebuild.
+    private const string LibraryPresetName = "Library installs";
+
+    private async Task<long?> EnsureLibraryPresetAsync(CancellationToken cancellationToken)
+    {
+        if (presets is null)
+            return null;
+        var existing = (await presets.ListAsync(cancellationToken).ConfigureAwait(true)).FirstOrDefault(p => p.Name == LibraryPresetName);
+        if (existing is not null)
+            return existing.Id;
+        var created = await presets.CreateAsync(LibraryPresetName, [], cancellationToken).ConfigureAwait(true);
+        return created.IsSuccess ? created.Value.Id : (long?)null;
+    }
+
+    /// <summary>Ops-bar "Install": activate the selected packages (materialize per-var symlinks). (doc 26 · G-5)</summary>
+    [RelayCommand]
+    public async Task InstallSelectedAsync(CancellationToken cancellationToken = default)
+    {
+        if (activation is null || presets is null || SelectedItems.Count == 0)
+            return;
+        var presetId = await EnsureLibraryPresetAsync(cancellationToken).ConfigureAwait(true);
+        if (presetId is null) { LastActionMessage = "Could not prepare the library preset."; return; }
+        var count = SelectedItems.Count;
+        foreach (var entry in SelectedItems.ToList())
+            await presets.AddMemberAsync(presetId.Value, entry.VarName, cancellationToken).ConfigureAwait(true);
+        var r = await activation.BuildProfileLinksAsync(presetId.Value, cancellationToken).ConfigureAwait(true);
+        LastActionMessage = r.PrivilegeFailures > 0
+            ? "Enable Windows Developer Mode (or run elevated) to create symlinks."
+            : $"Installed {count} selected → {r.LinksCreated} linked, {r.MissingPackages} missing";
+        ShowToast?.Invoke(LastActionMessage, null);
+    }
+
+    /// <summary>Ops-bar "Uninstall": deactivate the selected packages (remove their symlinks). (doc 26 · G-5)</summary>
+    [RelayCommand]
+    public async Task UninstallSelectedAsync(CancellationToken cancellationToken = default)
+    {
+        if (activation is null || presets is null || SelectedItems.Count == 0)
+            return;
+        var presetId = await EnsureLibraryPresetAsync(cancellationToken).ConfigureAwait(true);
+        if (presetId is null)
+            return;
+        var count = SelectedItems.Count;
+        foreach (var entry in SelectedItems.ToList())
+            await presets.RemoveMemberAsync(presetId.Value, entry.VarName, cancellationToken).ConfigureAwait(true);
+        var r = await activation.BuildProfileLinksAsync(presetId.Value, cancellationToken).ConfigureAwait(true);
+        LastActionMessage = $"Uninstalled {count} selected → {r.LinksRemoved} links removed";
+        ShowToast?.Invoke(LastActionMessage, null);
     }
 
     /// <summary>Presets available as add-to-preset targets (drives the ops-bar "Add to preset…" flyout). (AC-2)</summary>
@@ -233,6 +285,11 @@ public sealed partial class LibraryViewModel(
     /// <summary>Full detail (copies + dependency closure) for the selected row, for the detail panel. (AC-13)</summary>
     [ObservableProperty] private PackageDetail? _selectedDetail;
 
+    /// <summary>The selected package's extracted preview image — the detail hero. (doc 26 · G-2.4)</summary>
+    [ObservableProperty] private Avalonia.Media.Imaging.Bitmap? _selectedThumbnail;
+    public bool HasSelectedThumbnail => SelectedThumbnail is not null;
+    partial void OnSelectedThumbnailChanged(Avalonia.Media.Imaging.Bitmap? value) => OnPropertyChanged(nameof(HasSelectedThumbnail));
+
     partial void OnSelectedEntryChanged(PackageListEntry? value) => _ = LoadSelectedDetailAsync(value);
 
     private async Task LoadSelectedDetailAsync(PackageListEntry? entry)
@@ -240,9 +297,12 @@ public sealed partial class LibraryViewModel(
         if (detail is null || entry is null)
         {
             SelectedDetail = null;
+            SelectedThumbnail = null;
             return;
         }
         SelectedDetail = await detail.GetAsync(entry.PackageId).ConfigureAwait(true);
+        // G-2.4 · load the extracted preview for the detail hero (per-package thumbnail store).
+        SelectedThumbnail = _thumbLoader is null ? null : await _thumbLoader.LoadAsync(entry.PackageId).ConfigureAwait(true);
     }
 
     /// <summary>Detail-panel "resolve via alias →": open the alias dialog for the selected package. (AC-13)</summary>
@@ -251,6 +311,34 @@ public sealed partial class LibraryViewModel(
     {
         if (SelectedEntry is not null)
             launcher?.OpenAlias(SelectedEntry.VarName);
+    }
+
+    /// <summary>Detail-panel "★ Favorite": toggle the selected package's favorite flag. (doc 26 · G-1.1)</summary>
+    [RelayCommand]
+    public async Task ToggleFavoriteAsync(CancellationToken cancellationToken = default)
+    {
+        if (actions is null || SelectedEntry is null)
+            return;
+        var target = SelectedEntry;
+        var newValue = !target.IsFavorite;
+        if (!await actions.SetFavoriteAsync(target.PackageId, newValue, cancellationToken).ConfigureAwait(true))
+            return;
+        // Reflect immediately: replace the (immutable) row + re-select so the grid tag and detail update.
+        var updated = target with { IsFavorite = newValue };
+        var index = Items.IndexOf(target);
+        if (index >= 0)
+            Items[index] = updated;
+        SelectedEntry = updated;
+    }
+
+    /// <summary>Detail-panel "◎ Locate": reveal the selected package's file in the OS file browser. (doc 26 · G-1.2)</summary>
+    [RelayCommand]
+    public void Locate()
+    {
+        var path = SelectedDetail?.Copies.FirstOrDefault(c => c.IsOnline)?.Path
+                   ?? SelectedDetail?.Copies.FirstOrDefault()?.Path;
+        if (!string.IsNullOrWhiteSpace(path))
+            reveal?.Reveal(path);
     }
 
     /// <summary>
@@ -287,6 +375,9 @@ public sealed partial class LibraryViewModel(
 
     /// <summary>Whether more rows remain beyond what's loaded (drives incremental scroll load).</summary>
     public bool HasMore => _loaded < TotalCount;
+
+    /// <summary>ILoadableScreen: the shell loads the library by refreshing it. (G-0)</summary>
+    Task ILoadableScreen.LoadAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
 
     [RelayCommand]
     public async Task RefreshAsync(CancellationToken cancellationToken = default)

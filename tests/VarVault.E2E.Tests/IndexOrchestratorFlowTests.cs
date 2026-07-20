@@ -63,12 +63,11 @@ public sealed class IndexOrchestratorFlowTests
     }
 
     // D: exercise the orchestrator against a real repo when present (loop repos).
-    [Theory]
+    [SkippableTheory]
     [MemberData(nameof(TestCorpus.ConfiguredRoots), MemberType = typeof(TestCorpus))]
     public async Task Index_all_on_a_real_repo(string repoPath)
     {
-        if (string.IsNullOrEmpty(repoPath))
-            return; // no VARVAULT_TEST_CORPUS* configured
+        Skip.If(string.IsNullOrEmpty(repoPath), "no VARVAULT_TEST_CORPUS* configured");
 
         await using var host = TestHost.Create(withPersistence: true);
         using (var scope = host.Host.Services.CreateScope())

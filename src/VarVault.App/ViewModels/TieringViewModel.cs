@@ -7,7 +7,7 @@ namespace VarVault.App.ViewModels;
 
 /// <summary>SCR-5 · Tiering &amp; migration: class counts + misplaced proposals. (16-checklist SCR-5.)</summary>
 public sealed partial class TieringViewModel(
-    ITieringService tiering, Services.IDialogLauncher? launcher = null) : ObservableObject
+    ITieringService tiering, Services.IDialogLauncher? launcher = null) : ObservableObject, ILoadableScreen
 {
     /// <summary>Sub-navigation tabs (GC-2); per-tab content lands with the screen items.</summary>
     public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =

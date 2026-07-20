@@ -7,7 +7,7 @@ namespace VarVault.App.ViewModels;
 
 /// <summary>SCR-9 · Health &amp; fix: encoding groups + integrity issues; fix into UTF-8. (16-checklist SCR-9.)</summary>
 public sealed partial class HealthViewModel(
-    IHealthService health, Services.IDialogLauncher? launcher = null) : ObservableObject
+    IHealthService health, Services.IDialogLauncher? launcher = null) : ObservableObject, ILoadableScreen
 {
     /// <summary>Sub-navigation tabs (GC-2).</summary>
     public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =

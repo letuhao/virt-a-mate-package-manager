@@ -5,7 +5,20 @@
              x:DataType="vm:OnboardingViewModel">
   <StackPanel Spacing="12" MinWidth="440">
     <TextBlock Text="Welcome — set up your library" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
-    <TextBlock Text="{Binding Step, StringFormat='Step: {0}'}" Opacity="0.7" />
+    <!-- Visual stepper (doc 26 · F-9) -->
+    <StackPanel Orientation="Horizontal" Spacing="6">
+      <StackPanel.Styles>
+        <Style Selector="Border.step"><Setter Property="CornerRadius" Value="12" /><Setter Property="Padding" Value="10,3" /><Setter Property="Background" Value="#22808080" /></Style>
+        <Style Selector="Border.step.on"><Setter Property="Background" Value="{DynamicResource AccentBrush}" /></Style>
+        <Style Selector="Border.step > TextBlock"><Setter Property="FontSize" Value="11" /><Setter Property="Opacity" Value="0.7" /></Style>
+        <Style Selector="Border.step.on > TextBlock"><Setter Property="Opacity" Value="1" /><Setter Property="Foreground" Value="White" /></Style>
+      </StackPanel.Styles>
+      <Border Classes="step" Classes.on="{Binding IsAtAddDrives}"><TextBlock Text="1 Add drives" /></Border>
+      <Border Classes="step" Classes.on="{Binding IsAtBenchmark}"><TextBlock Text="2 Benchmark" /></Border>
+      <Border Classes="step" Classes.on="{Binding IsAtIndex}"><TextBlock Text="3 Index" /></Border>
+      <Border Classes="step" Classes.on="{Binding IsAtRescue}"><TextBlock Text="4 Rescue" /></Border>
+      <Border Classes="step" Classes.on="{Binding IsAtDone}"><TextBlock Text="5 Done" /></Border>
+    </StackPanel>
     <TextBlock Text="Point VarVault at a folder where your .var files live." Opacity="0.8" TextWrapping="Wrap" />
     <StackPanel Orientation="Horizontal" Spacing="8">
       <TextBox Width="300" Watermark="D:\vars" Text="{Binding FolderPath}" />

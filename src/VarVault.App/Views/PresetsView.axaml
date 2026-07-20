@@ -15,6 +15,21 @@
                 Background="{DynamicResource AccentBrush}" Foreground="White" />
       </StackPanel>
     </Grid>
+    <!-- AddonPackages profile switcher (doc 26 · G-6) -->
+    <c:Card DockPanel.Dock="Top" Margin="0,0,0,12" Header="AddonPackages profile"
+            IsVisible="{Binding VamPathConfigured}">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBlock Text="Active:" Opacity="0.6" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding ActiveProfile, TargetNullValue='(none)'}" FontWeight="SemiBold"
+                   VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}" />
+        <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" MinWidth="160" />
+        <Button Content="Switch" Command="{Binding SwitchProfileCommand}" />
+        <TextBox Width="130" Watermark="new / rename…" Text="{Binding NewProfileName}" VerticalAlignment="Center" />
+        <Button Content="Add" Command="{Binding AddProfileCommand}" />
+        <Button Content="Rename" Command="{Binding RenameProfileCommand}" />
+        <Button Content="Delete" Command="{Binding DeleteProfileCommand}" Foreground="{DynamicResource CritBrush}" />
+      </StackPanel>
+    </c:Card>
     <Grid ColumnDefinitions="260,*">
       <ListBox Grid.Column="0" ItemsSource="{Binding Presets}" SelectedItem="{Binding Selected}">
         <ListBox.ItemTemplate>
@@ -44,7 +59,13 @@
           <TextBlock Text="Members" FontSize="10" Opacity="0.6" Margin="0,6,0,0" />
           <ItemsControl ItemsSource="{Binding Members}" MaxHeight="240">
             <ItemsControl.ItemTemplate>
-              <DataTemplate><TextBlock Text="{Binding}" FontFamily="{DynamicResource MonoFont}" FontSize="12" Margin="0,1" /></DataTemplate>
+              <DataTemplate x:DataType="vm:PresetMemberRow">
+                <Grid ColumnDefinitions="*,Auto" Margin="0,1">
+                  <TextBlock Grid.Column="0" Text="{Binding Ref}" FontFamily="{DynamicResource MonoFont}" FontSize="12" VerticalAlignment="Center" />
+                  <c:StatePill Grid.Column="1" State="Miss" Text="missing" IsVisible="{Binding IsMissing}" />
+                  <c:StatePill Grid.Column="1" State="Ok" Text="ok" IsVisible="{Binding !IsMissing}" />
+                </Grid>
+              </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
           <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">

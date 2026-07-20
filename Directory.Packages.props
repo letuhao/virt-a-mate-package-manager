@@ -1,6 +1,8 @@
 <Project>
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- doc 26 · G-8 — allow pinning CVE-patched versions of transitive dependencies. -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <ItemGroup>
     <!-- Composition / DI / hosting -->
@@ -38,7 +40,16 @@
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <!-- doc 26 · G-9 — runtime-visible skips (Skip.If) for corpus-gated real-data tests, on xUnit v2.
+         (Literal xUnit v3 is coupled to an Avalonia 11.3 upgrade for the 50 AvaloniaFact tests; SkippableFact
+         delivers the actual goal — masked environments show as SKIPPED, not green — without that risk.) -->
+    <PackageVersion Include="Xunit.SkippableFact" Version="1.5.61" />
     <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <!-- doc 26 · G-8 — CVE-patched transitive deps (clears NU1903; pinned via transitive pinning above).
+         lib.e_sqlite3 2.1.12 is a native-SQLite patch compatible with SQLitePCLRaw.core 2.1.x. -->
+    <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.12" />
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.10" />
+    <PackageVersion Include="Tmds.DBus.Protocol" Version="0.94.2" />
   </ItemGroup>
 </Project>

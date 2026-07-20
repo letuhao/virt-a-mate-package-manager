@@ -8,21 +8,24 @@ using VarVault.Sdk.Settings;
 
 namespace VarVault.App.ViewModels;
 
+/// <summary>A preset member ref + whether it currently resolves (for the member-table state pill). (doc 26 · F-9)</summary>
+public sealed record PresetMemberRow(string Ref, bool IsMissing);
+
 /// <summary>SCR-4 · Loading presets: list, activation preview, activate (materialize per-var symlinks), switch. (16-checklist SCR-4; checklist 22 · T6.1.)</summary>
 public sealed partial class PresetsViewModel(
     IPresetService presets,
     IProfileService? profiles = null,
     Services.IDialogLauncher? launcher = null,
     IActivationService? activation = null,
-    ISettingsService? settings = null) : ObservableObject
+    ISettingsService? settings = null) : ObservableObject, ILoadableScreen
 {
     private const string DevModeHint =
         "Enable Windows Developer Mode (Settings → Privacy & security → For developers) or run elevated to create symlinks.";
 
     public ObservableCollection<PresetInfo> Presets { get; } = [];
 
-    /// <summary>Member refs of the selected preset (member table). (GD-8)</summary>
-    public ObservableCollection<string> Members { get; } = [];
+    /// <summary>Members of the selected preset with resolution state (member table). (GD-8 / doc 26 · F-9)</summary>
+    public ObservableCollection<PresetMemberRow> Members { get; } = [];
 
     [ObservableProperty] private PresetInfo? _selected;
     [ObservableProperty] private ActivationPreview? _preview;
@@ -30,6 +33,12 @@ public sealed partial class PresetsViewModel(
 
     /// <summary>True once a VaM install path is configured — gates Activate (per-var links need a target). (T6.3)</summary>
     [ObservableProperty] private bool _vamPathConfigured;
+
+    /// <summary>AddonPackages loading profiles (directories under ___AddonPacksSwitch ___) + the active one. (doc 26 · G-6)</summary>
+    public ObservableCollection<string> Profiles { get; } = [];
+    [ObservableProperty] private string? _activeProfile;
+    [ObservableProperty] private string? _selectedProfile;
+    [ObservableProperty] private string? _newProfileName;
 
     public bool IsEmpty => Presets.Count == 0;
 
@@ -94,7 +103,7 @@ public sealed partial class PresetsViewModel(
     [RelayCommand]
     private void Export()
     {
-        LastExportText = string.Join(System.Environment.NewLine, Members);
+        LastExportText = string.Join(System.Environment.NewLine, Members.Select(m => m.Ref));
         StatusMessage = $"Exported {Members.Count} members";
     }
 
@@ -118,6 +127,73 @@ public sealed partial class PresetsViewModel(
             var vamPath = await settings.GetAsync(SettingKeys.VamPath, cancellationToken).ConfigureAwait(true);
             VamPathConfigured = !string.IsNullOrWhiteSpace(vamPath);
         }
+
+        await ReloadProfilesAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    // ── AddonPackages profile switcher (doc 26 · G-6) ────────────────────────────
+    private async Task ReloadProfilesAsync(CancellationToken cancellationToken = default)
+    {
+        if (profiles is null)
+            return;
+        Profiles.Clear();
+        foreach (var p in await profiles.ListAsync(cancellationToken).ConfigureAwait(true))
+            Profiles.Add(p);
+        ActiveProfile = await profiles.ActiveAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    /// <summary>Switch the active AddonPackages profile to the selected one (repoints one symlink).</summary>
+    [RelayCommand]
+    public async Task SwitchProfileAsync(CancellationToken cancellationToken = default)
+    {
+        if (profiles is null || string.IsNullOrWhiteSpace(SelectedProfile))
+            return;
+        var r = await profiles.SwitchToAsync(SelectedProfile!, cancellationToken).ConfigureAwait(true);
+        StatusMessage = r.IsSuccess ? $"Switched profile → {SelectedProfile}" : r.Error.Message;
+        if (r.IsSuccess)
+            ActiveProfile = SelectedProfile;
+    }
+
+    /// <summary>Add a new empty AddonPackages profile named <see cref="NewProfileName"/>.</summary>
+    [RelayCommand]
+    public async Task AddProfileAsync(CancellationToken cancellationToken = default)
+    {
+        if (profiles is null || string.IsNullOrWhiteSpace(NewProfileName))
+            return;
+        var r = await profiles.CreateAsync(NewProfileName!, cancellationToken).ConfigureAwait(true);
+        StatusMessage = r.IsSuccess ? $"Added profile '{NewProfileName}'" : r.Error.Message;
+        if (r.IsSuccess)
+        {
+            NewProfileName = null;
+            await ReloadProfilesAsync(cancellationToken).ConfigureAwait(true);
+        }
+    }
+
+    /// <summary>Rename the selected profile to <see cref="NewProfileName"/>.</summary>
+    [RelayCommand]
+    public async Task RenameProfileAsync(CancellationToken cancellationToken = default)
+    {
+        if (profiles is null || string.IsNullOrWhiteSpace(SelectedProfile) || string.IsNullOrWhiteSpace(NewProfileName))
+            return;
+        var r = await profiles.RenameAsync(SelectedProfile!, NewProfileName!, cancellationToken).ConfigureAwait(true);
+        StatusMessage = r.IsSuccess ? $"Renamed → {NewProfileName}" : r.Error.Message;
+        if (r.IsSuccess)
+        {
+            NewProfileName = null;
+            await ReloadProfilesAsync(cancellationToken).ConfigureAwait(true);
+        }
+    }
+
+    /// <summary>Delete the selected profile (blocked for the active profile by the service).</summary>
+    [RelayCommand]
+    public async Task DeleteProfileAsync(CancellationToken cancellationToken = default)
+    {
+        if (profiles is null || string.IsNullOrWhiteSpace(SelectedProfile))
+            return;
+        var r = await profiles.DeleteAsync(SelectedProfile!, cancellationToken).ConfigureAwait(true);
+        StatusMessage = r.IsSuccess ? $"Deleted profile '{SelectedProfile}'" : r.Error.Message;
+        if (r.IsSuccess)
+            await ReloadProfilesAsync(cancellationToken).ConfigureAwait(true);
     }
 
     partial void OnSelectedChanged(PresetInfo? value)
@@ -138,8 +214,11 @@ public sealed partial class PresetsViewModel(
         Preview = preset is null ? null : await presets.PreviewActivationAsync(preset.Id).ConfigureAwait(true);
         Members.Clear();
         if (preset is not null)
+        {
+            var missing = new HashSet<string>(Preview?.MissingRefs ?? [], StringComparer.OrdinalIgnoreCase);
             foreach (var m in await presets.MembersAsync(preset.Id).ConfigureAwait(true))
-                Members.Add(m);
+                Members.Add(new PresetMemberRow(m, missing.Contains(m)));
+        }
     }
 
     [RelayCommand]

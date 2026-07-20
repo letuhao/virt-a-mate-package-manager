@@ -47,7 +47,10 @@ public sealed record PackageListEntry(
     bool HasMissingDeps,
     DateTime? LastUsedAt,
     int? Tier = null,
-    IReadOnlyDictionary<string, int>? ContentCounts = null)
+    IReadOnlyDictionary<string, int>? ContentCounts = null,
+    DateTime? AddedAt = null,
+    int DependencyCount = 0,
+    bool IsActive = false)
 {
     /// <summary>Compact per-content-type breakdown for the grid/detail, e.g. "Sc 3  Lk 1  Pl 2". (24-checklist E3/E4)</summary>
     public string ContentSummary => ContentCounts is null || ContentCounts.Count == 0
@@ -56,6 +59,18 @@ public sealed record PackageListEntry(
             .OrderByDescending(kv => kv.Value)
             .Take(5)
             .Select(kv => $"{Abbrev(kv.Key)} {kv.Value}"));
+
+    // Per-content-type counts for the mockup's dedicated grid columns (Sc/Lk/Cl/Hr/Pl/As/Mo/Po/Sk). (doc 26 · G-2.1)
+    public int Scenes => Count("Scene");
+    public int Looks => Count("Look");
+    public int Clothing => Count("Clothing");
+    public int Hair => Count("Hairstyle");
+    public int Plugins => Count("Plugin");
+    public int Assets => Count("Asset");
+    public int Morphs => Count("Morph");
+    public int Poses => Count("Pose");
+    public int Skins => Count("Skin");
+    private int Count(string type) => ContentCounts?.GetValueOrDefault(type) ?? 0;
 
     private static string Abbrev(string type) => type switch
     {

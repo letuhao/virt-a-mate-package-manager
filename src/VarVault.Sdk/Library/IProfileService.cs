@@ -12,4 +12,10 @@ public interface IProfileService
     Task<string?> ActiveAsync(CancellationToken cancellationToken = default);
     Task<Result> CreateAsync(string profileName, CancellationToken cancellationToken = default);
     Task<Result> SwitchToAsync(string profileName, CancellationToken cancellationToken = default);
+
+    /// <summary>Delete a profile (refuses the active one). (doc 26 · G-6)</summary>
+    Task<Result> DeleteAsync(string profileName, CancellationToken cancellationToken = default);
+
+    /// <summary>Rename a profile (repoints the active symlink if needed). (doc 26 · G-6)</summary>
+    Task<Result> RenameAsync(string oldName, string newName, CancellationToken cancellationToken = default);
 }

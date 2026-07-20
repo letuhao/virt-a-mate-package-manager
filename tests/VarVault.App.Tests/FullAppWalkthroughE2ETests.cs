@@ -79,7 +79,9 @@ public class FullAppWalkthroughE2ETests
 
             // Gallery view with real extracted preview thumbnails.
             await lib.ToggleViewModeCommand.ExecuteAsync(null);
-            for (var i = 0; i < 40 && lib.GalleryItems.All(g => !g.HasThumbnail); i++) { UiE2E.Pump(); await Task.Delay(50); }
+            // Bounded wait for at least one off-thread thumbnail to decode — generous so it doesn't flake under
+            // full parallel test load (the decode is I/O + image work; 2s was too tight). (doc-23 F-11 class)
+            for (var i = 0; i < 160 && lib.GalleryItems.All(g => !g.HasThumbnail); i++) { UiE2E.Pump(); await Task.Delay(50); }
             Assert.Contains(lib.GalleryItems, g => g.HasThumbnail);
             UiE2E.Screenshot(window, "walk-03-library-gallery");
             await lib.ToggleViewModeCommand.ExecuteAsync(null); // back to table

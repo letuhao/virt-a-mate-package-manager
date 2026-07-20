@@ -12,8 +12,9 @@ namespace VarVault.TestKit;
 ///   <item><c>VARVAULT_TEST_CORPUS_2</c> — a second repo, ideally on another physical drive (cross-drive / multi-repo).</item>
 ///   <item><c>VARVAULT_TEST_CORPUS_3/4</c> — optional further repos for multi-repo theories.</item>
 /// </list>
-/// (24-checklist D1/D2 — replaces the old hardcoded <c>D:\VarVault_test_repo</c> literals. xUnit v2 has no
-/// <c>Assert.Skip</c>, so real-data tests guard with <c>if (TestCorpus.Primary is not { } root) return;</c>.)
+/// (24-checklist D1/D2 — replaces the old hardcoded <c>D:\VarVault_test_repo</c> literals. doc 26 · G-9 —
+/// real-data tests now use <c>[SkippableFact]</c> + <c>Skip.If(TestCorpus.Primary is null, …)</c> so a missing
+/// corpus reports as <b>SKIPPED</b>, not silently green.)
 /// </summary>
 public static class TestCorpus
 {

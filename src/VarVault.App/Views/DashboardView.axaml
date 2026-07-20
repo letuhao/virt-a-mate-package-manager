@@ -26,7 +26,7 @@
                 <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,3" x:CompileBindings="False">
                   <TextBlock Grid.Column="0" Text="{Binding Tier, StringFormat='T{0}'}" />
                   <c:MeterBar Grid.Column="1" Margin="8,0" VerticalAlignment="Center"
-                              Value="{Binding UsedBytes}" Fill="{DynamicResource AccentBrush}" />
+                              Value="{Binding UsedFraction}" Fill="{DynamicResource AccentBrush}" />
                   <TextBlock Grid.Column="2" Text="{Binding CapacityBytes}" Opacity="0.7" />
                 </Grid>
               </DataTemplate>

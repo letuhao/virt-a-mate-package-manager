@@ -7,7 +7,7 @@ namespace VarVault.App.ViewModels;
 
 /// <summary>Missing-deps screen: unresolved refs with needed-by counts. (Checklist 2.14.)</summary>
 public sealed partial class MissingDepsViewModel(
-    IMissingDepsQuery query, Services.IDialogLauncher? launcher = null) : ObservableObject
+    IMissingDepsQuery query, Services.IDialogLauncher? launcher = null) : ObservableObject, ILoadableScreen
 {
     public ObservableCollection<MissingDependency> Items { get; } = [];
 
@@ -20,6 +20,9 @@ public sealed partial class MissingDepsViewModel(
         if (dep is not null)
             launcher?.OpenAlias(dep.Ref);
     }
+
+    /// <summary>ILoadableScreen: the shell loads this screen by refreshing it. (G-0)</summary>
+    Task ILoadableScreen.LoadAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
 
     [RelayCommand]
     public async Task RefreshAsync(CancellationToken cancellationToken = default)

@@ -33,4 +33,10 @@ public interface IVamProfileService
     /// named profile. The profile directory must exist. This is the flat-cost preset switch. (3.2)
     /// </summary>
     Result SwitchTo(string vamRoot, string profileName);
+
+    /// <summary>Delete a profile directory (and its own links — never their targets). Refuses the active profile. (doc 26 · G-6)</summary>
+    Result DeleteProfile(string vamRoot, string profileName);
+
+    /// <summary>Rename a profile directory; repoints <c>AddonPackages</c> if it was the active profile. (doc 26 · G-6)</summary>
+    Result RenameProfile(string vamRoot, string oldName, string newName);
 }

@@ -132,11 +132,11 @@ public sealed class IndexingFlowTests
     }
 
     // D: 1.31 — full index of the real corpus; reports throughput and flagged files.
-    [Fact]
+    [SkippableFact]
     public async Task Indexes_the_real_repository_corpus()
     {
-        if (TestCorpus.Primary is not { } repo)
-            return;
+        Skip.If(TestCorpus.Primary is null, "requires VARVAULT_TEST_CORPUS");
+        var repo = TestCorpus.Primary!;
 
         await using var host = TestHost.Create(withPersistence: true);
         var repoId = await RegisterRepository(host, repo);

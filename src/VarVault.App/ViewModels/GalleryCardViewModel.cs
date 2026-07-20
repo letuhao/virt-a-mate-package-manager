@@ -19,6 +19,17 @@ public sealed partial class GalleryCardViewModel(PackageListEntry entry, Thumbna
     public string Creator => entry.Creator;
     public string PrimaryType => entry.PrimaryType;
 
+    // Card badges + meta the mockup shows (audit 25 §5.2 "gallery cards are bare"). (doc 26 · G-3)
+    public string StorageClass => entry.StorageClass;
+    public bool IsFavorite => entry.IsFavorite;
+    public bool IsSingleCopy => entry.IsSingleCopy;
+    public bool HasMissingDeps => entry.HasMissingDeps;
+    public bool IsActive => entry.IsActive;
+    public string TierLabel => entry.Tier is { } t ? $"T{t}" : "";
+    public string SizeText => entry.TotalSize >= 1L << 30
+        ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{entry.TotalSize / (double)(1L << 30):F1} GB")
+        : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{entry.TotalSize / (double)(1L << 20):F0} MB");
+
     [ObservableProperty] private Bitmap? _thumbnail;
 
     public bool HasThumbnail => Thumbnail is not null;
