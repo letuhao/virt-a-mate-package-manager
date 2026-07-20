@@ -30,9 +30,7 @@ public sealed class RepositoryCardViewModel(RepositoryInfo info)
         ? $"{Fmt(cap - (Info.FreeBytes ?? 0))} / {Fmt(cap)}"
         : "capacity unknown";
 
-    private static string Fmt(long b) => b >= 1L << 40
-        ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{b / (double)(1L << 40):F2} TB")
-        : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{b / (double)(1L << 30):F1} GB");
+    private static string Fmt(long b) => Common.Formatting.ByteSize.Humanize(b);
 }
 
 /// <summary>SCR-3 · Repositories: cards per registered repository. (16-checklist SCR-3.)</summary>

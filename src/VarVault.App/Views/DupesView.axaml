@@ -9,7 +9,7 @@
     <TextBlock DockPanel.Dock="Top" Text="Duplicates &amp; reclaim" FontSize="21" FontWeight="SemiBold"
                Foreground="{DynamicResource TextHiBrush}" Margin="0,0,0,12" />
     <TextBlock DockPanel.Dock="Top" Foreground="{DynamicResource TextLoBrush}" Margin="0,0,0,12"
-               Text="{Binding ReclaimableBytes, StringFormat='{}{0} bytes reclaimable'}" />
+               Text="{Binding ReclaimableBytes, Converter={StaticResource BytesToSize}, StringFormat='{}{0} reclaimable'}" />
     <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
 
     <!-- One panel per tab; only the active tab renders. (24-checklist A1/A8) -->
@@ -20,7 +20,7 @@
           <c:Card Header="Duplicate copies" Width="200" Margin="0,0,10,0">
             <StackPanel Spacing="2">
               <TextBlock Text="{Binding RedundantCopies}" FontSize="24" Foreground="{DynamicResource AccentBrush}" />
-              <TextBlock Text="{Binding ReclaimableBytes, StringFormat='{}{0} bytes reclaimable'}" Opacity="0.7" FontSize="11" />
+              <TextBlock Text="{Binding ReclaimableBytes, Converter={StaticResource BytesToSize}, StringFormat='{}{0} reclaimable'}" Opacity="0.7" FontSize="11" />
             </StackPanel>
           </c:Card>
           <c:Card Header="Duplicate groups" Width="200">

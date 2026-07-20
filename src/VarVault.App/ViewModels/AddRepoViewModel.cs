@@ -1,3 +1,4 @@
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VarVault.Sdk.Repositories;
@@ -38,7 +39,7 @@ public sealed partial class AddRepoViewModel(IRepositoryService repositories, Ac
     {
         if (string.IsNullOrWhiteSpace(FolderPath))
             return;
-        var r = await repositories.RegisterAsync(new RegisterRepositoryRequest("repository", FolderPath!), cancellationToken).ConfigureAwait(true);
+        var r = await repositories.RegisterAsync(new RegisterRepositoryRequest(DeriveName(FolderPath!), FolderPath!), cancellationToken).ConfigureAwait(true);
         if (r.IsSuccess)
         {
             Registered = r.Value;
@@ -49,5 +50,14 @@ public sealed partial class AddRepoViewModel(IRepositoryService repositories, Ac
         {
             Message = r.Error.Message;
         }
+    }
+
+    /// <summary>Repo display name = the folder's leaf name (e.g. <c>VarVault_test_repo</c>), not a generic literal.
+    /// Falls back to "repository" for a drive root / empty leaf. (28-checklist A3.)</summary>
+    internal static string DeriveName(string folderPath)
+    {
+        var trimmed = folderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var leaf = Path.GetFileName(trimmed);
+        return string.IsNullOrWhiteSpace(leaf) ? "repository" : leaf;
     }
 }

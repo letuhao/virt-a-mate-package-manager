@@ -146,8 +146,9 @@ public class LibraryViewModelStateTests
     [Fact]
     public void Format_size_is_human_readable()
     {
+        // Now delegates to the shared VarVault.Common.Formatting.ByteSize (28-checklist A1.4): TB=2dp, GB=1dp, KB/MB=0dp.
         Assert.Equal("1.0 GB", LibraryViewModel.FormatSize(1L << 30));
-        Assert.Equal("2.0 MB", LibraryViewModel.FormatSize(2L << 20));
+        Assert.Equal("2 MB", LibraryViewModel.FormatSize(2L << 20));
     }
 
     private sealed class StubLibrary(int total) : ILibraryQueryService

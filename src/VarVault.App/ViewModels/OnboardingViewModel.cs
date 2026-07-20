@@ -26,7 +26,7 @@ public sealed partial class OnboardingViewModel(IOnboardingService? onboarding =
     {
         if (onboarding is null || string.IsNullOrWhiteSpace(FolderPath))
             return;
-        var result = await onboarding.AddAndIndexAsync("repository", FolderPath!, cancellationToken: cancellationToken).ConfigureAwait(true);
+        var result = await onboarding.AddAndIndexAsync(AddRepoViewModel.DeriveName(FolderPath!), FolderPath!, cancellationToken: cancellationToken).ConfigureAwait(true);
         if (result.IsSuccess)
         {
             ResultMessage = $"Indexed {result.Value.Index.Indexed} vars";

@@ -42,6 +42,17 @@
         </ListBox.ItemTemplate>
       </ListBox>
 
+      <!-- 28-checklist B2.2 · empty-state so a fresh install shows a CTA, not a blank pane -->
+      <StackPanel Grid.Column="1" Margin="16,0,0,0" IsVisible="{Binding IsEmpty}"
+                  HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+        <TextBlock Text="No loading presets yet" HorizontalAlignment="Center" FontWeight="SemiBold"
+                   Foreground="{DynamicResource TextHiBrush}" />
+        <TextBlock Text="A preset is a named set of packages you activate into VaM together."
+                   HorizontalAlignment="Center" Opacity="0.6" FontSize="12" TextWrapping="Wrap" MaxWidth="320" TextAlignment="Center" />
+        <Button Content="+ New preset" Command="{Binding NewPresetCommand}" HorizontalAlignment="Center"
+                Background="{DynamicResource AccentBrush}" Foreground="White" />
+      </StackPanel>
+
       <c:Card Grid.Column="1" Margin="16,0,0,0" Header="Preset detail"
               IsVisible="{Binding Selected, Converter={x:Static ObjectConverters.IsNotNull}}">
         <StackPanel Spacing="10">

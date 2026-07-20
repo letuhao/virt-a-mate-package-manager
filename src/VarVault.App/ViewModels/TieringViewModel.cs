@@ -7,8 +7,18 @@ namespace VarVault.App.ViewModels;
 
 /// <summary>SCR-5 · Tiering &amp; migration: class counts + misplaced proposals. (16-checklist SCR-5.)</summary>
 public sealed partial class TieringViewModel(
-    ITieringService tiering, Services.IDialogLauncher? launcher = null) : ObservableObject, ILoadableScreen
+    ITieringService tiering, Services.IDialogLauncher? launcher = null,
+    Sdk.Repositories.IRepositoryService? repositories = null) : ObservableObject, ILoadableScreen
 {
+    /// <summary>True unless every registered repository is cold (T3) — i.e. there is at least one T1/T2 fast drive.
+    /// Default true so the HDD-only hint stays hidden until Load proves otherwise. (28-checklist E1.)</summary>
+    [ObservableProperty] private bool _hasFastDrive = true;
+
+    /// <summary>Show the "all storage is cold" hint: repositories exist but none is tiered hot/warm. (E1.)</summary>
+    public bool ShowHddOnlyHint => !HasFastDrive;
+
+    partial void OnHasFastDriveChanged(bool value) => OnPropertyChanged(nameof(ShowHddOnlyHint));
+
     /// <summary>Sub-navigation tabs (GC-2); per-tab content lands with the screen items.</summary>
     public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =
         [new("Overview"), new("Lifecycle rules"), new("Placement policy"), new("Stale / old versions")];
@@ -77,6 +87,13 @@ public sealed partial class TieringViewModel(
         foreach (var s in await tiering.StaleVersionsAsync(cancellationToken).ConfigureAwait(true))
             StaleVersions.Add(s);
         OnPropertyChanged(nameof(StaleIsEmpty));
+
+        // E1 · detect HDD-only setups (no T1/T2 drive) so the screen can explain why nothing is hot/warm.
+        if (repositories is not null)
+        {
+            var repos = await repositories.ListAsync(cancellationToken).ConfigureAwait(true);
+            HasFastDrive = repos.Count == 0 || repos.Any(r => r.Tier <= 2);
+        }
     }
 
     [RelayCommand]

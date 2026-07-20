@@ -708,10 +708,5 @@ public sealed partial class LibraryViewModel(
     }
 
     /// <summary>A tiny helper so the view can format sizes without a converter.</summary>
-    public static string FormatSize(long bytes) => bytes switch
-    {
-        >= 1L << 30 => string.Create(CultureInfo.InvariantCulture, $"{bytes / (double)(1L << 30):F1} GB"),
-        >= 1L << 20 => string.Create(CultureInfo.InvariantCulture, $"{bytes / (double)(1L << 20):F1} MB"),
-        _ => string.Create(CultureInfo.InvariantCulture, $"{bytes / 1024.0:F0} KB"),
-    };
+    public static string FormatSize(long bytes) => Common.Formatting.ByteSize.Humanize(bytes);
 }

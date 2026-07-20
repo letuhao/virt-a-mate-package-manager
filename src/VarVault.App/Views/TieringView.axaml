@@ -15,6 +15,17 @@
     </Grid>
     <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
 
+    <!-- 28-checklist E1 · HDD-only hint: explain why nothing is hot/warm when there is no fast drive -->
+    <Border DockPanel.Dock="Top" IsVisible="{Binding ShowHddOnlyHint}" Margin="0,0,0,12"
+            Background="{DynamicResource WarnBgBrush}" BorderBrush="{DynamicResource WarnBrush}"
+            BorderThickness="1" CornerRadius="{DynamicResource RadiusSm}" Padding="12,8">
+      <StackPanel Spacing="2">
+        <TextBlock Text="All storage is cold (HDD)" FontWeight="SemiBold" Foreground="{DynamicResource WarnBrush}" />
+        <TextBlock Opacity="0.8" FontSize="12" TextWrapping="Wrap"
+                   Text="Every repository is on a slow drive, so tiering keeps everything cold. Add an SSD/NVMe drive — or set a fast repository to T1/T2 in Repositories — to let VarVault place hot packages there." />
+      </StackPanel>
+    </Border>
+
     <!-- One panel per tab; only the active tab renders. (24-checklist A1/A5-A7) -->
     <Grid>
       <!-- Overview (tab 0): class cards + misplaced list -->

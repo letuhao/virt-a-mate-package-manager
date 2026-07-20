@@ -27,7 +27,7 @@
                   <TextBlock Grid.Column="0" Text="{Binding Tier, StringFormat='T{0}'}" />
                   <c:MeterBar Grid.Column="1" Margin="8,0" VerticalAlignment="Center"
                               Value="{Binding UsedFraction}" Fill="{DynamicResource AccentBrush}" />
-                  <TextBlock Grid.Column="2" Text="{Binding CapacityBytes}" Opacity="0.7" />
+                  <TextBlock Grid.Column="2" Text="{Binding CapacityBytes, Converter={StaticResource BytesToSize}}" Opacity="0.7" />
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -58,7 +58,7 @@
         <c:Card Header="Needs your attention" Width="320" Margin="0,0,14,14">
           <StackPanel Spacing="6">
             <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding GoCommand}" CommandParameter="missing"
-                    Content="{Binding Summary.MissingDepsCount, StringFormat='{}{0} missing dependencies →'}" />
+                    Content="{Binding Summary.MissingDepsCount, StringFormat='{}{0} packages need dependencies →'}" />
             <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding GoCommand}" CommandParameter="proposals"
                     Content="Review proposals →" />
             <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding GoCommand}" CommandParameter="repos"
@@ -69,7 +69,7 @@
         <!-- Reclaimable space -->
         <c:Card Header="Reclaimable space" Width="320" Margin="0,0,14,14">
           <StackPanel Spacing="6">
-            <TextBlock Text="{Binding ReclaimableBytes, StringFormat='{}{0} bytes'}" FontSize="24" Foreground="{DynamicResource AccentBrush}" />
+            <TextBlock Text="{Binding ReclaimableBytes, Converter={StaticResource BytesToSize}}" FontSize="24" Foreground="{DynamicResource AccentBrush}" />
             <TextBlock Text="Redundant duplicate copies (exact, hash-verified)" Opacity="0.7" FontSize="12" />
             <Button Content="Open reclaim →" Command="{Binding GoCommand}" CommandParameter="dupes" HorizontalAlignment="Left" />
           </StackPanel>
@@ -99,7 +99,7 @@
             <Button Content="◨ Switch loading preset" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                     Command="{Binding GoCommand}" CommandParameter="presets" />
             <Button Content="+ Add repository" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                    Command="{Binding SetupWizardCommand}" />
+                    Command="{Binding AddRepoCommand}" />
             <Button Content="▦ Browse library" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                     Command="{Binding GoCommand}" CommandParameter="library" />
           </StackPanel>
