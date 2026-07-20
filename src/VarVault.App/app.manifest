@@ -1,6 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
   <assemblyIdentity version="1.0.0.0" name="VarVault.App" />
+  <!--
+    Elevate on launch so the app can create NTFS symlinks (install links + profile switch) without the
+    user first enabling Windows Developer Mode. This matches legacy varManager, which ships the same
+    requireAdministrator manifest. Trade-off: a UAC prompt every launch. Alternatives: "highestAvailable"
+    (elevate only when the user is already an admin) or enable Developer Mode and drop this to "asInvoker".
+  -->
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
+    <security>
+      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
+        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
       <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>

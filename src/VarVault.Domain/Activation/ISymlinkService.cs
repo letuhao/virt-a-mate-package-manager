@@ -22,6 +22,13 @@ public interface ISymlinkService
     /// </summary>
     Result RepointDirectory(string linkPath, string newTargetPath);
 
+    /// <summary>
+    /// Delete a file or directory symlink at <paramref name="linkPath"/>. Removes the link only, never
+    /// the target's contents. A missing path is success (idempotent); a real (non-link) file/directory is
+    /// refused with <c>symlink.notalink</c> so activation never clobbers user data. (3.15)
+    /// </summary>
+    Result DeleteLink(string linkPath);
+
     /// <summary>The target a link points at, or null if the path isn't a link.</summary>
     string? ResolveTarget(string linkPath);
 

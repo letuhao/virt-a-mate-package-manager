@@ -9,13 +9,16 @@
     <c:Tabs ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" />
     <c:Card Header="General" IsVisible="{Binding IsGeneralTab}">
       <Grid ColumnDefinitions="200,*" RowDefinitions="Auto,Auto,Auto,Auto">
-        <TextBlock Grid.Row="0" Grid.Column="0" Text="VaM install path" VerticalAlignment="Center" Opacity="0.8" Margin="0,0,14,10" />
-        <TextBox Grid.Row="0" Grid.Column="1" Name="PART_VamPath" Text="{Binding VamPath}" Margin="0,0,0,10" />
-        <TextBlock Grid.Row="1" Grid.Column="0" Text="Catalog DB location" VerticalAlignment="Center" Opacity="0.8" Margin="0,0,14,10" />
-        <TextBox Grid.Row="1" Grid.Column="1" Name="PART_CatalogDb" Text="{Binding CatalogDbPath}" Margin="0,0,0,10" />
-        <TextBlock Grid.Row="2" Grid.Column="0" Text="Symlink type" VerticalAlignment="Center" Opacity="0.8" Margin="0,0,14,10" />
-        <ComboBox Grid.Row="2" Grid.Column="1" Name="PART_Symlink" HorizontalAlignment="Stretch"
-                  ItemsSource="{Binding SymlinkOptions}" SelectedItem="{Binding SymlinkType}" Margin="0,0,0,10" />
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="VaM install path" VerticalAlignment="Center" Opacity="0.8" Margin="0,0,14,4" />
+        <Grid Grid.Row="0" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+          <TextBox Grid.Column="0" Name="PART_VamPath" Text="{Binding VamPath}" Watermark="Path to your VaM install folder" />
+          <Button Grid.Column="1" Content="Browse…" Margin="6,0,0,0" Command="{Binding BrowseVamPathCommand}" />
+        </Grid>
+        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding VamPathValidationMessage}"
+                   Foreground="{DynamicResource CritBrush}" FontSize="12" Margin="0,0,0,10"
+                   IsVisible="{Binding VamPathValidationMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <TextBlock Grid.Row="2" Grid.Column="0" Text="Catalog DB location" VerticalAlignment="Center" Opacity="0.8" Margin="0,0,14,10" />
+        <TextBox Grid.Row="2" Grid.Column="1" Name="PART_CatalogDb" Text="{Binding CatalogDbPath}" Margin="0,0,0,10" />
         <TextBlock Grid.Row="3" Grid.Column="0" Text="Fix-on-import" VerticalAlignment="Center" Opacity="0.8" Margin="0,0,14,0" />
         <ComboBox Grid.Row="3" Grid.Column="1" Name="PART_FixOnImport" HorizontalAlignment="Stretch"
                   ItemsSource="{Binding FixOnImportOptions}" SelectedItem="{Binding FixOnImport}" />

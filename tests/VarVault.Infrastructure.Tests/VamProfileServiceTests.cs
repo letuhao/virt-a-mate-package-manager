@@ -124,6 +124,7 @@ public sealed class VamProfileServiceTests
 
         public Result CreateDirectory(string linkPath, string targetPath) => Result.Success();
         public Result CreateFile(string linkPath, string targetPath) => Result.Success();
+        public Result DeleteLink(string linkPath) => Result.Success();
         public string? ResolveTarget(string linkPath) => LinkTarget;
         public bool IsLink(string path) => LinkTarget is not null;
     }

@@ -14,6 +14,7 @@ public class RescueDialogTests
         public Task<ActivationBuildResult> BuildProfileLinksAsync(long id, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ActivationBuildResult> DeactivateAsync(long p, long pkg, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<int> CleanTempLinksAsync(long id, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<int> ReconcileProfilesAsync(CancellationToken ct = default) => Task.FromResult(0);
     }
 
     [Fact]

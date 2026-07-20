@@ -81,24 +81,33 @@ public class GdScreenLogicTests
 
     // GD-17
     [Fact]
-    public async Task Settings_dropdowns_and_save_persist_all_fields()
+    public async Task Settings_save_persists_all_fields()
     {
-        var store = new StubSettings();
-        var vm = new SettingsViewModel(store)
+        // A folder that looks like a VaM install so the VaM-path validator passes on save. (T6.3a)
+        var vamDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "vv_gd_" + System.Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(System.IO.Path.Combine(vamDir, "AddonPackages"));
+        try
         {
-            VamPath = "D:\\VaM",
-            CatalogDbPath = "C:\\catalog.db",
-            SymlinkType = "Directory-swap profiles (fast)",
-            FixOnImport = "Auto (high-confidence)",
-        };
-        Assert.Equal(3, vm.FixOnImportOptions.Count);
-        Assert.Equal(2, vm.SymlinkOptions.Count);
-        await vm.SaveCommand.ExecuteAsync(null);
+            var store = new StubSettings();
+            var vm = new SettingsViewModel(store)
+            {
+                VamPath = vamDir,
+                CatalogDbPath = "C:\\catalog.db",
+                FixOnImport = "Auto (high-confidence)",
+            };
+            Assert.Equal(3, vm.FixOnImportOptions.Count);
+            Assert.True(vm.IsVamPathValid);
+            await vm.SaveCommand.ExecuteAsync(null);
 
-        var reloaded = new SettingsViewModel(store);
-        await reloaded.LoadCommand.ExecuteAsync(null);
-        Assert.Equal("D:\\VaM", reloaded.VamPath);
-        Assert.Equal("C:\\catalog.db", reloaded.CatalogDbPath);
-        Assert.Equal("Auto (high-confidence)", reloaded.FixOnImport);
+            var reloaded = new SettingsViewModel(store);
+            await reloaded.LoadCommand.ExecuteAsync(null);
+            Assert.Equal(vamDir, reloaded.VamPath);
+            Assert.Equal("C:\\catalog.db", reloaded.CatalogDbPath);
+            Assert.Equal("Auto (high-confidence)", reloaded.FixOnImport);
+        }
+        finally
+        {
+            System.IO.Directory.Delete(vamDir, recursive: true);
+        }
     }
 }

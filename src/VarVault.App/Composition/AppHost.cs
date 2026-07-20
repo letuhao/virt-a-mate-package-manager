@@ -38,7 +38,7 @@ public static class AppHost
             ["analytics"] = new AnalyticsViewModel(services.GetRequiredService<IAnalyticsService>()),
             ["dashboard"] = new DashboardViewModel(services.GetRequiredService<IDashboardService>(), launcher),
             ["repos"] = new RepositoriesViewModel(services.GetRequiredService<Sdk.Repositories.IRepositoryService>(), launcher),
-            ["presets"] = new PresetsViewModel(services.GetRequiredService<Sdk.Presets.IPresetService>(), services.GetService<IProfileService>(), launcher),
+            ["presets"] = new PresetsViewModel(services.GetRequiredService<Sdk.Presets.IPresetService>(), services.GetService<IProfileService>(), launcher, services.GetService<Sdk.Activation.IActivationService>(), services.GetService<Sdk.Settings.ISettingsService>()),
             ["tiering"] = new TieringViewModel(services.GetRequiredService<ITieringService>(), launcher),
             ["dupes"] = new DupesViewModel(services.GetRequiredService<IReclaimService>(), launcher),
             ["history"] = new ActivityViewModel(services.GetRequiredService<IActivityLog>()),
@@ -112,6 +112,23 @@ public static class AppHost
         });
     }
 
+    /// <summary>Reconcile Profile rows with on-disk profile dirs at launch (derive active, prune vanished). (T3.3)</summary>
+    private static void ReconcileProfiles(IServiceProvider rootServices)
+    {
+        // Fire-and-forget on a dedicated scope so we never share the shell's DbContext across threads.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = rootServices.CreateScope();
+                var activation = scope.ServiceProvider.GetService<Sdk.Activation.IActivationService>();
+                if (activation is not null)
+                    await activation.ReconcileProfilesAsync().ConfigureAwait(false);
+            }
+            catch (Exception) { /* best-effort at startup */ }
+        });
+    }
+
     /// <summary>Build the live-feeds source if all its read services are present (null in minimal test hosts).</summary>
     private static Services.IShellLiveFeeds? TryBuildFeeds(IServiceProvider services, Sdk.Threading.IJobQueue? jobQueue)
     {
@@ -135,6 +152,7 @@ public static class AppHost
             var host = Bootstrap.BuildApp(dataDir);
             var scope = host.Services.CreateScope(); // app-lifetime scope backing the shell's read services
             var shell = CreateShell(scope.ServiceProvider);
+            ReconcileProfiles(host.Services); // T3.3: sync Profile rows with on-disk profile dirs (own scope)
             EnqueueIndexAll(scope.ServiceProvider); // GA-5: populate the catalog in the background on launch
             return shell;
         }

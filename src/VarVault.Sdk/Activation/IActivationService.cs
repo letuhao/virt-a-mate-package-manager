@@ -1,7 +1,18 @@
 namespace VarVault.Sdk.Activation;
 
-/// <summary>Result of building a preset's profile links.</summary>
-public sealed record ActivationBuildResult(int LinksCreated, int MissingPackages);
+/// <summary>
+/// Result of building a preset's profile links.
+/// <paramref name="LinksCreated"/> = links now present on disk for this build (install + alias);
+/// <paramref name="LinksRemoved"/> = orphaned links deleted from disk;
+/// <paramref name="MissingPackages"/> = closure packages with no online copy to link;
+/// <paramref name="PrivilegeFailures"/> = symlink-privilege denials (Developer Mode). When &gt; 0 the build
+/// aborted without partial links — surface the Developer-Mode hint. (Checklist 22 · T4.3/T4.4.)
+/// </summary>
+public sealed record ActivationBuildResult(
+    int LinksCreated,
+    int LinksRemoved,
+    int MissingPackages,
+    int PrivilegeFailures = 0);
 
 /// <summary>
 /// Builds a loading preset's profile link set: resolves members + their forward-dependency closure,
@@ -25,4 +36,11 @@ public interface IActivationService
 
     /// <summary>Clean up temp activation links after use. (3.14)</summary>
     Task<int> CleanTempLinksAsync(long profileId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Reconcile Profile rows with the on-disk <c>___AddonPacksSwitch ___</c> directories: derive
+    /// <c>IsActive</c> from the live AddonPackages symlink and prune Profile rows (and their links) whose
+    /// directory has vanished. Called at startup. Returns the number of pruned profiles. (Checklist 22 · T3.3.)
+    /// </summary>
+    Task<int> ReconcileProfilesAsync(CancellationToken cancellationToken = default);
 }

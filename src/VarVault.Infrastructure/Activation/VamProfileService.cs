@@ -13,7 +13,7 @@ namespace VarVault.Infrastructure.Activation;
 public sealed class VamProfileService(ISymlinkService symlinks) : IVamProfileService
 {
     // Load-bearing directory name (verbatim, incl. the space before the trailing underscores).
-    private const string SwitchDirName = "___AddonPacksSwitch ___";
+    private const string SwitchDirName = ActivationPaths.SwitchDirName;
     private const string AddonPackagesName = "AddonPackages";
 
     public string SwitchRoot(string vamRoot)

@@ -79,6 +79,32 @@ public sealed class SymlinkService : ISymlinkService
         }
     }
 
+    public Result DeleteLink(string linkPath)
+    {
+        Guard.NotNullOrWhiteSpace(linkPath);
+        try
+        {
+            var isDir = Directory.Exists(linkPath);
+            var isFile = File.Exists(linkPath);
+            if (!isDir && !isFile)
+                return Result.Success(); // idempotent: nothing to delete
+
+            if (!IsLink(linkPath))
+                return Result.Failure("symlink.notalink", $"'{linkPath}' exists and is not a symlink; refusing to delete it.");
+
+            // Deleting a symlink removes the link only, never the target's contents.
+            if (isDir)
+                Directory.Delete(linkPath);
+            else
+                File.Delete(linkPath);
+            return Result.Success();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return Classify(ex);
+        }
+    }
+
     public string? ResolveTarget(string linkPath)
     {
         Guard.NotNullOrWhiteSpace(linkPath);
