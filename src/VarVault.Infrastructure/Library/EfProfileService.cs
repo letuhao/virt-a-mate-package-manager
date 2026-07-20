@@ -45,4 +45,16 @@ public sealed class EfProfileService(IVamProfileService profiles, ISettingsServi
         var root = await VamRootAsync(cancellationToken).ConfigureAwait(false);
         return root.IsFailure ? Result.Failure(root.Error.Code, root.Error.Message) : profiles.SwitchTo(root.Value, profileName);
     }
+
+    public async Task<Result> DeleteAsync(string profileName, CancellationToken cancellationToken = default)
+    {
+        var root = await VamRootAsync(cancellationToken).ConfigureAwait(false);
+        return root.IsFailure ? Result.Failure(root.Error.Code, root.Error.Message) : profiles.DeleteProfile(root.Value, profileName);
+    }
+
+    public async Task<Result> RenameAsync(string oldName, string newName, CancellationToken cancellationToken = default)
+    {
+        var root = await VamRootAsync(cancellationToken).ConfigureAwait(false);
+        return root.IsFailure ? Result.Failure(root.Error.Code, root.Error.Message) : profiles.RenameProfile(root.Value, oldName, newName);
+    }
 }

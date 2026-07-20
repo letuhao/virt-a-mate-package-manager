@@ -67,11 +67,11 @@ public sealed class VarInspectorTests
     }
 
     // D: real-corpus probe — inspect real vars, assert healthy ones parse meta + fingerprint.
-    [Fact]
+    [SkippableFact]
     public void Inspects_real_repo_vars()
     {
-        if (TestCorpus.Primary is not { } repo)
-            return;
+        Skip.If(TestCorpus.Primary is null, "requires VARVAULT_TEST_CORPUS");
+        var repo = TestCorpus.Primary!;
         var vars = Directory.GetFiles(repo, "*.var", SearchOption.AllDirectories).Take(20).ToArray();
         Assert.NotEmpty(vars);
 

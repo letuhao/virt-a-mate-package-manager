@@ -25,4 +25,9 @@ public interface ILibraryActionService
 
     /// <summary>Resolve a txt list of package names to owned package ids (install-from-txt intake). (BE-G1)</summary>
     Task<TxtResolveResult> ResolveTxtAsync(string txt, CancellationToken cancellationToken = default);
+
+    /// <summary>Set/clear a package's favorite flag (updates catalog + read model). Default no-op so test
+    /// doubles need not implement it; the real service overrides it. (doc 26 · G-1.1)</summary>
+    Task<bool> SetFavoriteAsync(long packageId, bool isFavorite, CancellationToken cancellationToken = default)
+        => Task.FromResult(false);
 }

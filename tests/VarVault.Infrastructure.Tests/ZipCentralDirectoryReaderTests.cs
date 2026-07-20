@@ -100,11 +100,11 @@ public sealed class ZipCentralDirectoryReaderTests
 
     // D: real-data probe — parses actual vars from the user's corpus and proves signatures are
     // stable across re-reads. Silently no-ops when the corpus isn't present (other machines/CI).
-    [Fact]
+    [SkippableFact]
     public void Real_repo_vars_parse_and_signatures_are_stable()
     {
-        if (TestCorpus.Primary is not { } repo)
-            return;
+        Skip.If(TestCorpus.Primary is null, "requires VARVAULT_TEST_CORPUS");
+        var repo = TestCorpus.Primary!;
         var vars = Directory.GetFiles(repo, "*.var", SearchOption.AllDirectories).Take(15).ToArray();
         Assert.NotEmpty(vars);
 

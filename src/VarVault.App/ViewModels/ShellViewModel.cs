@@ -73,10 +73,20 @@ public sealed partial class ShellViewModel : ObservableObject
     /// Pull all live state (jobs, badges, log-dock) from the injected sources. Called by the shell's poll
     /// timer and after actions. (GA-2/GA-3/GA-4.)
     /// </summary>
+    private bool _indexingWasActive;
+
     public async System.Threading.Tasks.Task RefreshLiveStateAsync(
         System.Threading.CancellationToken cancellationToken = default)
     {
         RefreshJobsFromQueue();
+
+        // G-0.3 · when the background index job finishes, reload the active screen so its data reflects the
+        // freshly-indexed catalog — even the screen shown at startup before indexing completed.
+        var indexingActive = ActiveJobs.Any(j => j.Name.Contains("Index"));
+        if (_indexingWasActive && !indexingActive)
+            await ReloadActiveScreenAsync(cancellationToken).ConfigureAwait(true);
+        _indexingWasActive = indexingActive;
+
         if (_feeds is null)
             return;
         var snap = await _feeds.SnapshotAsync(cancellationToken).ConfigureAwait(true);
@@ -214,7 +224,7 @@ public sealed partial class ShellViewModel : ObservableObject
                 : Avalonia.Styling.ThemeVariant.Dark;
     }
 
-    /// <summary>Navigate to a screen by id; swaps the active screen view-model if one is registered.</summary>
+    /// <summary>Navigate to a screen by id; swaps the active screen view-model and loads its data. (G-0.2)</summary>
     [RelayCommand]
     public void Navigate(string screenId)
     {
@@ -224,5 +234,19 @@ public sealed partial class ShellViewModel : ObservableObject
         ActiveScreen = _screens.TryGetValue(screenId, out var vm) ? vm : null;
         foreach (var item in RailItems)
             item.IsActive = item.Id == screenId;
+        // G-0.2 · load the screen's data on navigation so it is never blank on arrival. Fire-and-forget;
+        // PendingScreenLoad lets tests await the load deterministically.
+        PendingScreenLoad = ActiveScreen is ILoadableScreen loadable ? loadable.LoadAsync() : null;
+    }
+
+    /// <summary>The load kicked off by the last <see cref="Navigate"/> (null if the screen isn't loadable). Test seam. (G-0.2)</summary>
+    public System.Threading.Tasks.Task? PendingScreenLoad { get; private set; }
+
+    /// <summary>Reload the active screen's data — used after a background index completes. (G-0.3)</summary>
+    public async System.Threading.Tasks.Task ReloadActiveScreenAsync(
+        System.Threading.CancellationToken cancellationToken = default)
+    {
+        if (ActiveScreen is ILoadableScreen loadable)
+            await loadable.LoadAsync(cancellationToken).ConfigureAwait(true);
     }
 }

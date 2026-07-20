@@ -34,7 +34,7 @@ public sealed partial class ProposalRowViewModel(Proposal proposal) : Observable
 /// (16-checklist SCR-8.)
 /// </summary>
 public sealed partial class ProposalsViewModel(
-    IProposalService proposals, Services.IDialogLauncher? launcher = null) : ObservableObject
+    IProposalService proposals, Services.IDialogLauncher? launcher = null) : ObservableObject, ILoadableScreen
 {
     /// <summary>Sub-navigation tabs (GC-2).</summary>
     public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =

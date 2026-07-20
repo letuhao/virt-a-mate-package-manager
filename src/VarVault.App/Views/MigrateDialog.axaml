@@ -9,6 +9,27 @@
     <TextBlock Text="Nothing moves until you approve." Opacity="0.8" />
     <TextBlock Text="{Binding Flow}" FontFamily="{DynamicResource MonoFont}" Opacity="0.8" />
     <TextBlock Text="{Binding Moves.Count, StringFormat='{}{0} files to move'}" />
+    <!-- Moves table (doc 26 · F-9): the proposed per-var tier moves. -->
+    <Border BorderBrush="#22808080" BorderThickness="1" CornerRadius="4" MaxHeight="200"
+            IsVisible="{Binding CanApprove}">
+      <ScrollViewer>
+        <ItemsControl ItemsSource="{Binding Moves}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="lib:TierMoveProposal">
+              <Grid ColumnDefinitions="*,70" Margin="8,2">
+                <TextBlock Grid.Column="0" Text="{Binding VarFileId, StringFormat='var #{0}'}"
+                           FontFamily="{DynamicResource MonoFont}" FontSize="12" Opacity="0.85" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="3" HorizontalAlignment="Right">
+                  <TextBlock Text="{Binding FromTier, StringFormat='T{0}'}" FontSize="12" Opacity="0.6" />
+                  <TextBlock Text="→" FontSize="12" Opacity="0.5" />
+                  <TextBlock Text="{Binding ToTier, StringFormat='T{0}'}" FontSize="12" Foreground="{DynamicResource AccentBrush}" />
+                </StackPanel>
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
     <Border Background="{DynamicResource WarnBgBrush}" CornerRadius="4" Padding="8" IsVisible="{Binding HasExclusions}">
       <TextBlock Foreground="{DynamicResource WarnBrush}" TextWrapping="Wrap"
                  Text="{Binding ExcludedCount, StringFormat='⚠ {0} single-copy vars excluded — no backup, not moved automatically.'}" />

@@ -48,7 +48,9 @@
           </StackPanel>
         </c:Card>
 
-        <c:Card Header="Usage over time" Width="320" Margin="0,0,14,14">
+        <c:Card Header="Space profile (by type)" Width="320" Margin="0,0,14,14"
+                ToolTip.Tip="Bars show library size by content type. A loads/day time-series arrives with the VaM-log usage feed (doc 27).">
+
           <StackPanel Spacing="6">
             <TextBlock Text="Space profile across content types." Opacity="0.7" FontSize="12" />
             <Border Height="40" Background="{DynamicResource Bg2Brush}" CornerRadius="4" Padding="4">

@@ -79,11 +79,11 @@ public sealed class RepositoryEnumeratorTests
     }
 
     // D: real-corpus probe — quarantine tagging and live counts on the actual repo.
-    [Fact]
+    [SkippableFact]
     public void Real_repo_tags_quarantine_and_finds_live_vars()
     {
-        if (TestCorpus.Primary is not { } repo)
-            return;
+        Skip.If(TestCorpus.Primary is null, "requires VARVAULT_TEST_CORPUS");
+        var repo = TestCorpus.Primary!;
 
         var all = _sut.Enumerate(repo).ToList();
         Assert.NotEmpty(all);

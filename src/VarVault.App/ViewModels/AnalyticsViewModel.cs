@@ -17,7 +17,7 @@ public sealed class SpaceRowViewModel(string group, long bytes, long max)
 }
 
 /// <summary>Analytics screen: where space goes, by creator/type/tier, with bars. (Checklist 5.16 / GD-14.)</summary>
-public sealed partial class AnalyticsViewModel(IAnalyticsService analytics) : ObservableObject
+public sealed partial class AnalyticsViewModel(IAnalyticsService analytics, ITieringService? tiering = null) : ObservableObject, ILoadableScreen
 {
     public ObservableCollection<SpaceRowViewModel> ByCreator { get; } = [];
     public ObservableCollection<SpaceRowViewModel> ByType { get; } = [];
@@ -32,6 +32,9 @@ public sealed partial class AnalyticsViewModel(IAnalyticsService analytics) : Ob
     /// <summary>Per-bar pixel heights for the "usage over time" sparkline card (space profile). (AC-18)</summary>
     public ObservableCollection<double> SparkBars { get; } = [];
 
+    /// <summary>ILoadableScreen: the shell loads this screen by refreshing it. (G-0)</summary>
+    Task ILoadableScreen.LoadAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
+
     [RelayCommand]
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
@@ -41,6 +44,14 @@ public sealed partial class AnalyticsViewModel(IAnalyticsService analytics) : Ob
         SparkBars.Clear();
         foreach (var r in ByType)
             SparkBars.Add(4 + r.Fraction * 30); // 4..34 px tall
+
+        // G-4.2 · "wasting fast storage" = bytes placed on a faster tier than the class wants (cold-on-SSD, etc.).
+        if (tiering is not null)
+        {
+            var misplaced = await tiering.MisplacedAsync(cancellationToken).ConfigureAwait(true);
+            WastedOnFastBytes = misplaced.Where(m => m.CurrentTier < m.DesiredTier).Sum(m => m.SizeBytes);
+        }
+
         OnPropertyChanged(nameof(IsEmpty));
     }
 

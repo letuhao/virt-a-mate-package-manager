@@ -33,11 +33,11 @@ public class StartupIndexTests
         Assert.Contains("Index", handle!.Name, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Startup_index_over_a_real_repo_populates_the_library()
     {
-        if (TestCorpus.Primary is not { } repoPath)
-            return;
+        Skip.If(TestCorpus.Primary is null, "requires VARVAULT_TEST_CORPUS");
+        var repoPath = TestCorpus.Primary!;
 
         await using var host = TestHost.Create(withPersistence: true);
         var scope = host.Host.Services.CreateScope();

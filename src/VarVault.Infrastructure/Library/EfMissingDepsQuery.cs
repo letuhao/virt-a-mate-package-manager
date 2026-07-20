@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using VarVault.Domain.Identity;
 using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Library;
 
@@ -17,9 +18,21 @@ public sealed class EfMissingDepsQuery(VarVaultDbContext db) : IMissingDepsQuery
             .Join(db.VarFiles, d => d.VarFileId, v => v.Id, (d, v) => new { d.DependsOnRefRaw, v.PackageId })
             .Where(x => x.PackageId != null)
             .GroupBy(x => x.DependsOnRefRaw)
-            .Select(g => new MissingDependency(g.Key, g.Select(x => x.PackageId).Distinct().Count()))
+            .Select(g => new { Ref = g.Key, Count = g.Select(x => x.PackageId).Distinct().Count() })
             .ToListAsync(cancellationToken).ConfigureAwait(false);
 
-        return rows.OrderByDescending(m => m.NeededByCount).ThenBy(m => m.Ref, StringComparer.Ordinal).ToList();
+        // doc 26 · F-9 — resolve each missing ref to the owned var a global alias maps it to (fold-key match).
+        var foldByRef = rows.ToDictionary(r => r.Ref, r => IdentityFold.Compute(r.Ref));
+        var foldKeys = foldByRef.Values.Distinct().ToList();
+        var aliasByFold = (await db.VarAliases.AsNoTracking()
+                .Where(a => foldKeys.Contains(a.MissingRefKey))
+                .Join(db.Packages, a => a.ResolvedPackageId, p => p.Id, (a, p) => new { a.MissingRefKey, p.VarName })
+                .ToListAsync(cancellationToken).ConfigureAwait(false))
+            .GroupBy(x => x.MissingRefKey)
+            .ToDictionary(g => g.Key, g => g.First().VarName);
+
+        return rows
+            .Select(r => new MissingDependency(r.Ref, r.Count, aliasByFold.GetValueOrDefault(foldByRef[r.Ref])))
+            .OrderByDescending(m => m.NeededByCount).ThenBy(m => m.Ref, StringComparer.Ordinal).ToList();
     }
 }

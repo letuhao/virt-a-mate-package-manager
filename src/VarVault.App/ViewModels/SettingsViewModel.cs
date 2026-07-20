@@ -7,7 +7,7 @@ using VarVault.Sdk.Settings;
 namespace VarVault.App.ViewModels;
 
 /// <summary>SCR-13 · Settings: VaM path (browse + validate), fix-on-import policy, etc. (16-checklist SCR-13; checklist 22 · T6.3a/b.)</summary>
-public sealed partial class SettingsViewModel(ISettingsService settings) : ObservableObject
+public sealed partial class SettingsViewModel(ISettingsService settings) : ObservableObject, ILoadableScreen
 {
     /// <summary>Sub-navigation tabs (GC-2).</summary>
     public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =
@@ -101,11 +101,21 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
         HotThresholdDays = await settings.GetAsync(HotDaysKey, cancellationToken).ConfigureAwait(true) ?? "30";
         AutoRebalance = await settings.GetBoolAsync(AutoRebalanceKey, false, cancellationToken).ConfigureAwait(true);
         PresetExtractionDir = await settings.GetAsync(PresetExtractKey, cancellationToken).ConfigureAwait(true);
+        _loaded = true;
     }
+
+    // G-0.4 · guard: Save is a no-op until Load has run, so navigating to an un-loaded Settings screen and
+    // pressing Save can never overwrite the stored VaM path / policy with empty strings.
+    private bool _loaded;
 
     [RelayCommand]
     public async Task SaveAsync(CancellationToken cancellationToken = default)
     {
+        if (!_loaded)
+        {
+            StatusMessage = "Settings not loaded yet — nothing saved.";
+            return;
+        }
         // Persist the path regardless (never lose user input). Invalidity is surfaced by the inline
         // VamPathValidationMessage (red hint); activation is guarded defensively in EfActivationService. (T6.3a)
         await settings.SetAsync(SettingKeys.VamPath, VamPath ?? string.Empty, cancellationToken).ConfigureAwait(true);

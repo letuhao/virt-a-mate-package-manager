@@ -43,6 +43,13 @@ public sealed partial class OnboardingViewModel(IOnboardingService? onboarding =
     public bool CanGoBack => Step > OnboardingStep.AddDrives && Step < OnboardingStep.Done;
     public bool IsComplete => Step == OnboardingStep.Done;
 
+    // Per-step flags for the visual stepper. (doc 26 · F-9)
+    public bool IsAtAddDrives => Step == OnboardingStep.AddDrives;
+    public bool IsAtBenchmark => Step == OnboardingStep.Benchmark;
+    public bool IsAtIndex => Step == OnboardingStep.Index;
+    public bool IsAtRescue => Step == OnboardingStep.Rescue;
+    public bool IsAtDone => Step == OnboardingStep.Done;
+
     [RelayCommand(CanExecute = nameof(CanAdvance))]
     public void Next()
     {
@@ -62,6 +69,11 @@ public sealed partial class OnboardingViewModel(IOnboardingService? onboarding =
         OnPropertyChanged(nameof(CanAdvance));
         OnPropertyChanged(nameof(CanGoBack));
         OnPropertyChanged(nameof(IsComplete));
+        OnPropertyChanged(nameof(IsAtAddDrives));
+        OnPropertyChanged(nameof(IsAtBenchmark));
+        OnPropertyChanged(nameof(IsAtIndex));
+        OnPropertyChanged(nameof(IsAtRescue));
+        OnPropertyChanged(nameof(IsAtDone));
         NextCommand.NotifyCanExecuteChanged();
         BackCommand.NotifyCanExecuteChanged();
     }

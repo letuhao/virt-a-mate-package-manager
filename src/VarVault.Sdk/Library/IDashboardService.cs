@@ -1,7 +1,11 @@
 namespace VarVault.Sdk.Library;
 
 /// <summary>Per-tier storage utilization for the dashboard.</summary>
-public sealed record TierUtilization(int Tier, long UsedBytes, long CapacityBytes, int RepositoryCount);
+public sealed record TierUtilization(int Tier, long UsedBytes, long CapacityBytes, int RepositoryCount)
+{
+    /// <summary>Used/capacity as a 0..1 fraction — what a meter bar binds to (not raw bytes). (doc 26 · G-4.1)</summary>
+    public double UsedFraction => CapacityBytes > 0 ? System.Math.Clamp(UsedBytes / (double)CapacityBytes, 0, 1) : 0;
+}
 
 /// <summary>The dashboard header/summary tiles, composed from catalog + repositories. (16-checklist BE-N1.)</summary>
 public sealed record DashboardSummary(

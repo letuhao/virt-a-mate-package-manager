@@ -28,7 +28,7 @@ public sealed class EfLibraryQueryService(VarVaultDbContext db) : ILibraryQueryS
             {
                 x.PackageId, x.VarName, x.Creator, x.PackageName, x.VersionToken,
                 x.PrimaryType, x.TotalSize, x.OnlineInstanceCount, x.TotalInstanceCount,
-                x.IsSingleCopy, x.IsFavorite, x.Class, x.HasMissingDeps, x.LastUsedAt, x.ActualTierMin,
+                x.IsSingleCopy, x.IsFavorite, x.Class, x.HasMissingDeps, x.LastUsedAt, x.ActualTierMin, x.AddedAt, x.IsActive,
             })
             .ToListAsync(cancellationToken).ConfigureAwait(false);
 
@@ -41,11 +41,26 @@ public sealed class EfLibraryQueryService(VarVaultDbContext db) : ILibraryQueryS
             .GroupBy(c => c.PackageId)
             .ToDictionary(g => g.Key, g => (IReadOnlyDictionary<string, int>)g.ToDictionary(c => c.Type.ToString(), c => c.Count));
 
+        // Forward-dependency count per package (via its canonical var file) — secondary query, no migration. (doc 26 · G-2.3)
+        var canonical = await db.Packages.AsNoTracking()
+            .Where(p => ids.Contains(p.Id) && p.CanonicalVarFileId != null)
+            .Select(p => new { p.Id, VarId = p.CanonicalVarFileId!.Value })
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        var canonicalIds = canonical.Select(c => c.VarId).ToList();
+        var depCountByVar = (await db.Dependencies.AsNoTracking()
+                .Where(d => canonicalIds.Contains(d.VarFileId))
+                .GroupBy(d => d.VarFileId)
+                .Select(g => new { VarFileId = g.Key, Count = g.Count() })
+                .ToListAsync(cancellationToken).ConfigureAwait(false))
+            .ToDictionary(x => x.VarFileId, x => x.Count);
+        var depCountByPkg = canonical.ToDictionary(c => c.Id, c => depCountByVar.GetValueOrDefault(c.VarId));
+
         var rows = page.Select(x => new PackageListEntry(
                 x.PackageId, x.VarName, x.Creator, x.PackageName, x.VersionToken,
                 x.PrimaryType.ToString(), x.TotalSize, x.OnlineInstanceCount, x.TotalInstanceCount,
                 x.IsSingleCopy, x.IsFavorite, x.Class.ToString(), x.HasMissingDeps, x.LastUsedAt, x.ActualTierMin,
-                countsByPkg.GetValueOrDefault(x.PackageId))).ToList();
+                countsByPkg.GetValueOrDefault(x.PackageId),
+                x.AddedAt, depCountByPkg.GetValueOrDefault(x.PackageId), x.IsActive)).ToList();
 
         return new LibraryPage(rows, total);
     }

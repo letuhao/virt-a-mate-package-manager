@@ -7,7 +7,7 @@ namespace VarVault.App.ViewModels;
 
 /// <summary>SCR-6 · Duplicates &amp; reclaim: exact duplicate groups. (16-checklist SCR-6.)</summary>
 public sealed partial class DupesViewModel(
-    IReclaimService reclaim, Services.IDialogLauncher? launcher = null, IIntakeService? intake = null) : ObservableObject
+    IReclaimService reclaim, Services.IDialogLauncher? launcher = null, IIntakeService? intake = null) : ObservableObject, ILoadableScreen
 {
     /// <summary>Sub-navigation tabs (GC-2).</summary>
     public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =

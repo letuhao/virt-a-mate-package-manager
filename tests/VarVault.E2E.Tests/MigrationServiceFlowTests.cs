@@ -60,12 +60,11 @@ public sealed class MigrationServiceFlowTests
 
     // Cross-drive real move over the reserved (empty) move-target repos, if mounted. Non-destructive:
     // it moves a scratch file we create, not the corpus.
-    [Theory]
+    [SkippableTheory]
     [MemberData(nameof(TestCorpus.ConfiguredRootPairs), MemberType = typeof(TestCorpus))]
     public async Task Cross_drive_move_between_reserved_repos(string srcRoot, string dstRoot)
     {
-        if (string.IsNullOrEmpty(srcRoot) || string.IsNullOrEmpty(dstRoot))
-            return; // set VARVAULT_TEST_CORPUS and _2 (different drives) to run this cross-drive test
+        Skip.If(string.IsNullOrEmpty(srcRoot) || string.IsNullOrEmpty(dstRoot), "set VARVAULT_TEST_CORPUS + _2 (different drives) to run this cross-drive test");
 
         var scratchDir = Path.Combine(srcRoot, "__vv_move_test__");
         Directory.CreateDirectory(scratchDir);

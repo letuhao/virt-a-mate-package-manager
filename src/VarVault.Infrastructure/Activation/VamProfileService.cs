@@ -92,6 +92,50 @@ public sealed class VamProfileService(ISymlinkService symlinks) : IVamProfileSer
         return symlinks.RepointDirectory(AddonPackagesLink(vamRoot), profileDir);
     }
 
+    public Result DeleteProfile(string vamRoot, string profileName)
+    {
+        if (!IsValidName(profileName))
+            return Result.Failure("profile.name", "Profile name must not contain path separators.");
+        var dir = ProfileDirectory(vamRoot, profileName);
+        if (!Directory.Exists(dir))
+            return Result.Success(); // idempotent
+        if (string.Equals(ActiveProfile(vamRoot), profileName, StringComparison.OrdinalIgnoreCase))
+            return Result.Failure("profile.active", "Cannot delete the active profile; switch away first.");
+        try
+        {
+            // Recursive delete removes the profile's own symlinks — never their targets (.NET 6+ does not
+            // traverse reparse points on delete). (doc 26 · G-6)
+            Directory.Delete(dir, recursive: true);
+            return Result.Success();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return Result.Failure("profile.delete", ex.Message);
+        }
+    }
+
+    public Result RenameProfile(string vamRoot, string oldName, string newName)
+    {
+        if (!IsValidName(oldName) || !IsValidName(newName))
+            return Result.Failure("profile.name", "Profile name must not contain path separators.");
+        var oldDir = ProfileDirectory(vamRoot, oldName);
+        var newDir = ProfileDirectory(vamRoot, newName);
+        if (!Directory.Exists(oldDir))
+            return Result.Failure("profile.missing", $"Profile '{oldName}' does not exist.");
+        if (Directory.Exists(newDir))
+            return Result.Failure("profile.exists", $"Profile '{newName}' already exists.");
+        var wasActive = string.Equals(ActiveProfile(vamRoot), oldName, StringComparison.OrdinalIgnoreCase);
+        try
+        {
+            Directory.Move(oldDir, newDir);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return Result.Failure("profile.rename", ex.Message);
+        }
+        return wasActive ? symlinks.RepointDirectory(AddonPackagesLink(vamRoot), newDir) : Result.Success();
+    }
+
     private static bool IsValidName(string name) =>
         !string.IsNullOrWhiteSpace(name)
         && name.IndexOfAny([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar]) < 0

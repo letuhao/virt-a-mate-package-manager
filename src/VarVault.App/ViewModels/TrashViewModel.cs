@@ -6,7 +6,7 @@ using VarVault.Sdk.Library;
 namespace VarVault.App.ViewModels;
 
 /// <summary>SCR-11 · Trash &amp; backup: restore/purge trashed items; backups. (16-checklist SCR-11.)</summary>
-public sealed partial class TrashViewModel(ITrashQueryService trash) : ObservableObject
+public sealed partial class TrashViewModel(ITrashQueryService trash) : ObservableObject, ILoadableScreen
 {
     /// <summary>Sub-navigation tabs (GC-2).</summary>
     public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =

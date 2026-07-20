@@ -9,7 +9,7 @@ namespace VarVault.App.ViewModels;
 /// <summary>SCR-1 · Dashboard: summary tiles from <see cref="IDashboardService"/>. (16-checklist SCR-1.)</summary>
 public sealed partial class DashboardViewModel(
     IDashboardService dashboard, Services.IDialogLauncher? launcher = null,
-    IReclaimService? reclaim = null, IActivityLog? activity = null) : ObservableObject
+    IReclaimService? reclaim = null, IActivityLog? activity = null) : ObservableObject, ILoadableScreen
 {
     [ObservableProperty] private DashboardSummary? _summary;
 

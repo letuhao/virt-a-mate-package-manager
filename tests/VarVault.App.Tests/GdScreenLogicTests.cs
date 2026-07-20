@@ -89,12 +89,11 @@ public class GdScreenLogicTests
         try
         {
             var store = new StubSettings();
-            var vm = new SettingsViewModel(store)
-            {
-                VamPath = vamDir,
-                CatalogDbPath = "C:\\catalog.db",
-                FixOnImport = "Auto (high-confidence)",
-            };
+            var vm = new SettingsViewModel(store);
+            await vm.LoadCommand.ExecuteAsync(null); // real flow: navigation loads Settings before the user edits (G-0)
+            vm.VamPath = vamDir;
+            vm.CatalogDbPath = "C:\\catalog.db";
+            vm.FixOnImport = "Auto (high-confidence)";
             Assert.Equal(3, vm.FixOnImportOptions.Count);
             Assert.True(vm.IsVamPathValid);
             await vm.SaveCommand.ExecuteAsync(null);

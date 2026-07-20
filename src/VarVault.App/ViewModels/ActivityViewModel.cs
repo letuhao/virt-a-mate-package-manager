@@ -6,7 +6,7 @@ using VarVault.Sdk.Activation;
 namespace VarVault.App.ViewModels;
 
 /// <summary>Activity history screen: recent audited actions, newest first. (Checklist X.12.)</summary>
-public sealed partial class ActivityViewModel(IActivityLog log) : ObservableObject
+public sealed partial class ActivityViewModel(IActivityLog log) : ObservableObject, ILoadableScreen
 {
     private readonly List<ActivityRecord> _all = [];
 
@@ -17,6 +17,9 @@ public sealed partial class ActivityViewModel(IActivityLog log) : ObservableObje
     [ObservableProperty] private string _selectedFilter = "All actions";
 
     public bool IsEmpty => Items.Count == 0;
+
+    /// <summary>ILoadableScreen: the shell loads this screen by refreshing it. (G-0)</summary>
+    Task ILoadableScreen.LoadAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
 
     [RelayCommand]
     public async Task RefreshAsync(CancellationToken cancellationToken = default)

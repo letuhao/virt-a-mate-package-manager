@@ -35,7 +35,9 @@ Project-root **[CLAUDE.md](../../CLAUDE.md)** is the quick-start for coding sess
 - **[22 · Activation & Symlink-Install Implementation Checklist](./22-Activation-Symlink-Install-Implementation-Checklist.md)** — granular, evidence-gated build tasks (T1.1–T7.5) for spec 21.
 - **[23 · Full-Stack Completeness Audit](./23-Full-Stack-Completeness-Audit.md)** — doc-independent ground-truth audit (BE + GUI + tests vs. mockups); backend real, GUI ≈65–75% parity; findings F-1…F-14 + remediation R-1…R-12.
 - **[24 · Gap Remediation Implementation Checklist](./24-Gap-Remediation-Implementation-Checklist.md)** — granular, evidence-gated build tasks (A1…E12 + Z-1) for audit 23; each task names the exact SDK bind-target or flags ⛔ backend gaps.
-- *25 · Usage Feed & VaM-Log Import (fixes G1)* — planned next.
+- **[25 · Completeness Audit & Real-Run Report](./25-Completeness-Audit-and-Real-Run-Report.md)** — mockups-vs-implementation parity + a **live real-data run** (production `Bootstrap.BuildApp`/`AppHost.CreateShell` over `D:`+`E:` corpora and real `F:\VaM` symlinks). Engine verified real end-to-end; **591/591 tests ×2**; doc-23/24 remediation confirmed landed. **New P1 found: screens don't auto-load on navigation** (structural parity ~80%, effective ~55–60%).
+- **[26 · Real-Run Gap-Fix Implementation Checklist](./26-Realrun-Gap-Fix-Implementation-Checklist.md)** — evidence-gated build tracker for audit 25 (G-0…G-9 + F-9); each task names the exact file:line + proving test. P1 = the auto-load fix.
+- *27 · Usage Feed & VaM-Log Import (fixes G1)* — planned next.
 
 ## Interactive drafts
 - **Full prototype** (all screens, clickable): [`mockups/prototype.html`](./mockups/prototype.html)
