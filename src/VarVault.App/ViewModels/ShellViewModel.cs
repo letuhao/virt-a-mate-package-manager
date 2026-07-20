@@ -150,24 +150,51 @@ public sealed partial class ShellViewModel : ObservableObject
     [ObservableProperty] private bool _toastHasUndo;
     private System.Action? _toastUndo;
 
-    /// <summary>Show a transient toast; the optional undo reverses the just-completed action. (DLG-11)</summary>
+    /// <summary>How long a toast stays before it auto-dismisses.</summary>
+    private static readonly System.TimeSpan ToastAutoDismiss = System.TimeSpan.FromSeconds(5);
+    private Avalonia.Threading.DispatcherTimer? _toastTimer;
+
+    /// <summary>Show a transient toast; the optional undo reverses the just-completed action. Auto-dismisses. (DLG-11)</summary>
     public void ShowToast(string message, System.Action? undo = null)
     {
         ToastMessage = message;
         _toastUndo = undo;
         ToastHasUndo = undo is not null;
         ToastVisible = true;
+        RestartToastTimer();
+    }
+
+    /// <summary>(Re)start the auto-dismiss countdown. Guarded so headless/unit hosts without a UI timer don't throw —
+    /// there the toast simply stays until dismissed, which is what those tests assert.</summary>
+    private void RestartToastTimer()
+    {
+        try
+        {
+            if (_toastTimer is null)
+            {
+                _toastTimer = new Avalonia.Threading.DispatcherTimer { Interval = ToastAutoDismiss };
+                _toastTimer.Tick += (_, _) => { _toastTimer!.Stop(); ToastVisible = false; };
+            }
+            _toastTimer.Stop();
+            _toastTimer.Start();
+        }
+        catch { /* no UI dispatcher (pure unit test) — no auto-dismiss, manual dismiss still works */ }
     }
 
     [RelayCommand]
     private void UndoToast()
     {
+        _toastTimer?.Stop();
         _toastUndo?.Invoke();
         ToastVisible = false;
     }
 
     [RelayCommand]
-    private void DismissToast() => ToastVisible = false;
+    private void DismissToast()
+    {
+        _toastTimer?.Stop();
+        ToastVisible = false;
+    }
 
     /// <summary>Hook the shell can set to run the rescue baseline (wired in AppHost, SH-6).</summary>
     public System.Func<System.Threading.Tasks.Task>? RescueHandler { get; set; }

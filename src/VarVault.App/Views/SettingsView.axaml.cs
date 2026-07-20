@@ -18,10 +18,10 @@ public partial class SettingsView : UserControl
     {
         if (DataContext is SettingsViewModel vm)
         {
-            vm.FolderPicker = () => PickFolderAsync("Select the VaM install folder");
-            vm.DataFolderPicker = () => PickFolderAsync("Select the VarVault data folder");
-            vm.ImportTempFolderPicker = () => PickFolderAsync("Select the archive temp folder");
-            vm.SevenZipFilePicker = PickSevenZipAsync;
+            vm.FolderPicker ??= () => PickFolderAsync("Select the VaM install folder");
+            vm.DataFolderPicker ??= () => PickFolderAsync("Select the VarVault data folder");
+            vm.ImportTempFolderPicker ??= () => PickFolderAsync("Select the archive temp folder");
+            vm.SevenZipFilePicker ??= PickSevenZipAsync;
         }
     }
 

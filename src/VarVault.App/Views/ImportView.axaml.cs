@@ -26,8 +26,8 @@ public partial class ImportView : UserControl
     {
         if (DataContext is not ImportViewModel vm)
             return;
-        vm.FolderPicker = PickFoldersAsync;
-        vm.ArchivePicker = PickArchivesAsync;
+        vm.FolderPicker ??= PickFoldersAsync;
+        vm.ArchivePicker ??= PickArchivesAsync;
     }
 
     private async Task<IReadOnlyList<string>> PickFoldersAsync()

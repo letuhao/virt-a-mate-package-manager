@@ -15,7 +15,7 @@ public partial class OnboardingDialog : UserControl
         AvaloniaXamlLoader.Load(this);
         DataContextChanged += (_, _) =>
         {
-            if (DataContext is OnboardingViewModel vm)
+            if (DataContext is OnboardingViewModel { FolderPicker: null } vm)
                 vm.FolderPicker = PickFolderAsync;
         };
     }
