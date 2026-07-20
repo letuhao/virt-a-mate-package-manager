@@ -23,6 +23,7 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
     // folder picker to relocate. See Composition.AppDataLocation.
     [ObservableProperty] private string _dataDirectory = "";
     [ObservableProperty] private string _catalogDbFile = "";
+    [ObservableProperty] private string _thumbnailsDbFile = "";
     [ObservableProperty] private bool _dataDirEnvOverride;
 
     /// <summary>Folder-picker hook the view sets to the real StorageProvider, for the data folder. </summary>
@@ -81,6 +82,7 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
     {
         DataDirectory = AppDataLocation.Resolve();
         CatalogDbFile = AppDataLocation.CatalogDbPath;
+        ThumbnailsDbFile = AppDataLocation.ThumbnailsDir;
         DataDirEnvOverride = AppDataLocation.IsOverriddenByEnv;
     }
 

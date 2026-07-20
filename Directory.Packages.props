@@ -55,5 +55,8 @@
          VarVault's own CJK detection so legacy-encoded entry names decode correctly; optional 7z-binary fallback via
          the `import.sevenzip_path` setting. (30-spec §6 amendment A1, 2026-07-20.) -->
     <PackageVersion Include="SharpCompress" Version="0.50.0" />
+    <!-- Thumbnail downscaling on extraction (server-side resize/re-encode). Version matches Avalonia's Skia so
+         there's no native/managed mismatch. -->
+    <PackageVersion Include="SkiaSharp" Version="2.88.9" />
   </ItemGroup>
 </Project>

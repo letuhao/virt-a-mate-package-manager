@@ -50,6 +50,9 @@ public static class AppDataLocation
     /// <summary>The resolved catalog DB file path (what the user sees in Settings).</summary>
     public static string CatalogDbPath => Path.Combine(Resolve(), "catalog.db");
 
+    /// <summary>The resolved preview-thumbnail cache directory (sharded thumb_*.db files), beside the catalog DB.</summary>
+    public static string ThumbnailsDir => Path.Combine(Resolve(), "thumbnails");
+
     /// <summary>True when the effective data dir is being overridden by the env var (Settings can't change that).</summary>
     public static bool IsOverriddenByEnv => !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(EnvVar));
 

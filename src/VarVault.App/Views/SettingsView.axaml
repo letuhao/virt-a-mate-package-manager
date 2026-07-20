@@ -29,6 +29,8 @@
           </Grid>
           <TextBlock Text="{Binding CatalogDbFile, StringFormat='Catalog DB: {0}'}" Opacity="0.6" FontSize="11"
                      FontFamily="{DynamicResource MonoFont}" TextTrimming="CharacterEllipsis" />
+          <TextBlock Text="{Binding ThumbnailsDbFile, StringFormat='Preview cache (sharded): {0}'}" Opacity="0.6" FontSize="11"
+                     FontFamily="{DynamicResource MonoFont}" TextTrimming="CharacterEllipsis" />
           <TextBlock Text="Changing the folder takes effect after a restart; your existing catalog isn't moved automatically."
                      Opacity="0.55" FontSize="11" TextWrapping="Wrap" IsVisible="{Binding !DataDirEnvOverride}" />
           <TextBlock Text="Data folder is fixed by the VARVAULT_DATA_DIR environment variable." Foreground="{DynamicResource WarnBrush}"

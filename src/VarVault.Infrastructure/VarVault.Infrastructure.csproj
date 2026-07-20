@@ -16,6 +16,7 @@
     <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
     <PackageReference Include="SharpCompress" />
+    <PackageReference Include="SkiaSharp" />
   </ItemGroup>
 
   <PropertyGroup>
