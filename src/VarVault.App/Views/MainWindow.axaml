@@ -6,6 +6,7 @@
         x:Class="VarVault.App.Views.MainWindow"
         x:DataType="vm:ShellViewModel"
         Width="1280" Height="820" Title="VarVault"
+        Icon="/Assets/app.ico"
         Background="{DynamicResource Bg0Brush}">
 
   <Window.KeyBindings>

@@ -8,7 +8,14 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Windows .exe icon (Explorer / taskbar pin), sourced from the repo-root app.ico. -->
+    <ApplicationIcon>..\..\app.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Same file embedded as an Avalonia asset for the runtime window icon (title bar + live taskbar). -->
+    <AvaloniaResource Include="..\..\app.ico" Link="Assets\app.ico" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\VarVault.Common\VarVault.Common.csproj" />
