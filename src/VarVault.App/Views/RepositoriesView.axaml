@@ -7,11 +7,12 @@
              x:DataType="vm:RepositoriesViewModel">
   <ScrollViewer Padding="18">
     <StackPanel Spacing="12">
-      <Grid ColumnDefinitions="*,Auto,Auto">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto">
         <TextBlock Grid.Column="0" Text="Repositories &amp; tiers" FontSize="21" FontWeight="SemiBold"
                    Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center" />
-        <Button Grid.Column="1" Content="Review rebalance plan" Margin="0,0,8,0" Command="{Binding RebalanceCommand}" />
-        <Button Grid.Column="2" Content="+ Add repository" Command="{Binding AddRepoCommand}"
+        <Button Grid.Column="1" Content="↻ Re-index all" Margin="0,0,8,0" Command="{Binding ReindexAllReposCommand}" />
+        <Button Grid.Column="2" Content="Review rebalance plan" Margin="0,0,8,0" Command="{Binding RebalanceCommand}" />
+        <Button Grid.Column="3" Content="+ Add repository" Command="{Binding AddRepoCommand}"
                 Background="{DynamicResource AccentBrush}" Foreground="White" />
       </Grid>
       <ItemsControl ItemsSource="{Binding Repositories}">
@@ -35,6 +36,9 @@
                 <TextBlock Text="{Binding CapacityLabel}" Opacity="0.6" FontSize="11" FontFamily="{DynamicResource MonoFont}" />
                 <!-- per-card actions -->
                 <WrapPanel Margin="0,6,0,0" IsVisible="{Binding !IsConfirmingRemove}">
+                  <Button Content="↻ Re-index" Margin="0,0,6,6"
+                          Command="{Binding ((vm:RepositoriesViewModel)DataContext).ReindexCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                          CommandParameter="{Binding}" />
                   <Button Content="Re-benchmark" Margin="0,0,6,6"
                           Command="{Binding ((vm:RepositoriesViewModel)DataContext).BenchmarkCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                           CommandParameter="{Binding}" />

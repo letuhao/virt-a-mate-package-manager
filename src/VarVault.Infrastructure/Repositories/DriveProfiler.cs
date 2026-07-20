@@ -134,8 +134,11 @@ internal static partial class Native
         public byte AdditionalParameters;
     }
 
+    // Open with desiredAccess = 0 (metadata/query level). IOCTL_STORAGE_QUERY_PROPERTY works at this level WITHOUT
+    // administrator — opening the volume with GENERIC_READ would require elevation, and (since the app runs asInvoker)
+    // that failure previously made every drive fall back to HDD, mis-detecting SSDs. (bugfix.)
     public static SafeFileHandleNative OpenVolume(string driveLetter) =>
-        CreateFile($@"\\.\{driveLetter}", GenericRead, FileShareReadWrite, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+        CreateFile($@"\\.\{driveLetter}", 0, FileShareReadWrite, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
 
     // StorageDeviceSeekPenaltyProperty = 7. DEVICE_SEEK_PENALTY_DESCRIPTOR: version+size (8 bytes) + bool.
     public static bool? IncursSeekPenalty(SafeFileHandleNative handle)

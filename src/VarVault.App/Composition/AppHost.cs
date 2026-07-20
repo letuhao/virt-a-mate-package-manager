@@ -77,7 +77,11 @@ public static class AppHost
         shell.OnboardingHandler = launcher.OpenOnboarding;
 
         if (screens["repos"] is RepositoriesViewModel reposVm)
+        {
             reposVm.ShowToast = shell.ShowToast;
+            reposVm.ReindexRepo = id => EnqueueIndexRepo(services, id);
+            reposVm.ReindexAll = () => EnqueueIndexAll(services);
+        }
 
         // GD-1/GD-2 · let the dashboard + library navigate the shell.
         if (screens["dashboard"] is DashboardViewModel dash)
@@ -134,6 +138,22 @@ public static class AppHost
             var summary = await orchestrator.IndexAllAsync(ctx.Cancellation).ConfigureAwait(false);
             ctx.Progress.Report(new Common.ProgressReport(summary.Indexed, summary.Indexed,
                 $"Indexed {summary.Indexed} vars across {summary.Repositories} repos"));
+        });
+    }
+
+    /// <summary>Re-index (resume) one repository as a background job — idempotent: adds new vars, prunes gone ones,
+    /// leaves existing rows. Returns null when indexing isn't composed. </summary>
+    public static Sdk.Threading.JobHandle? EnqueueIndexRepo(IServiceProvider services, System.Guid repositoryId)
+    {
+        var queue = services.GetService<Sdk.Threading.IJobQueue>();
+        var orchestrator = services.GetService<Sdk.Indexing.IIndexOrchestrator>();
+        if (queue is null || orchestrator is null)
+            return null;
+        return queue.Enqueue("Re-indexing repository", async ctx =>
+        {
+            var summary = await orchestrator.IndexRepositoryAsync(repositoryId, ctx.Cancellation).ConfigureAwait(false);
+            ctx.Progress.Report(new Common.ProgressReport(summary.Indexed, summary.Indexed,
+                $"Indexed {summary.Indexed} vars ({summary.Skipped} unchanged, {summary.Pruned} pruned)"));
         });
     }
 

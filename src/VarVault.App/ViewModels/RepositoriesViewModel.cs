@@ -47,6 +47,32 @@ public sealed partial class RepositoriesViewModel(
     /// <summary>Screen-head "+ Add repository" → add-repo dialog. (GD-7)</summary>
     [RelayCommand] private void AddRepo() => launcher?.OpenAddRepo();
 
+    /// <summary>Hook set by the shell: enqueue a background re-index of one repo, returns a job handle (or null).</summary>
+    public Func<Guid, object?>? ReindexRepo { get; set; }
+
+    /// <summary>Hook set by the shell: enqueue a background re-index of the whole library.</summary>
+    public Func<object?>? ReindexAll { get; set; }
+
+    /// <summary>Per-card "Re-index" → resume/refresh indexing of this repo as a background job. (GD-7)</summary>
+    [RelayCommand]
+    private void Reindex(RepositoryCardViewModel card)
+    {
+        if (card is null || ReindexRepo is null)
+            return;
+        ReindexRepo(card.Id);
+        ShowToast?.Invoke($"Re-indexing “{card.Name}” — see the activity dock for progress.", null);
+    }
+
+    /// <summary>Screen-head "Re-index all" → background full re-index. (GD-7)</summary>
+    [RelayCommand]
+    private void ReindexAllRepos()
+    {
+        if (ReindexAll is null)
+            return;
+        ReindexAll();
+        ShowToast?.Invoke("Re-indexing the library — see the activity dock for progress.", null);
+    }
+
     /// <summary>Screen-head "Review rebalance plan" / per-card "Rebalance…" → migrate dialog. (GD-7)</summary>
     [RelayCommand] private void Rebalance() => launcher?.OpenMigratePlan();
 

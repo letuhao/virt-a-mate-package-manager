@@ -179,6 +179,10 @@ internal sealed class RepositoryService(
         if (repo is null || !System.IO.Directory.Exists(repo.MountPath))
             return null;
 
+        // Re-detect the media type too, so a stale/mis-detected value (e.g. an SSD earlier read as HDD) is corrected
+        // on Re-benchmark — the tier is only as good as the media type it's derived from.
+        repo.MediaType = driveProfiler.Profile(repo.MountPath).MediaType;
+
         var result = await driveBenchmark.MeasureAsync(repo.MountPath, cancellationToken).ConfigureAwait(false);
         repo.ReadSpeedMBps = result.ReadMBps;
         repo.WriteSpeedMBps = result.WriteMBps;
