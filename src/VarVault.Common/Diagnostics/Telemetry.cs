@@ -24,7 +24,13 @@ public static class Telemetry
     // Indexing (scan → upsert pipeline)
     public static readonly Counter<long> IndexVarsIndexed = Meter.CreateCounter<long>("varvault.index.vars_indexed");
     public static readonly Histogram<double> IndexScanDurationMs = Meter.CreateHistogram<double>("varvault.index.scan.duration", unit: "ms");
+    public static readonly Histogram<double> IndexRefreshDurationMs = Meter.CreateHistogram<double>("varvault.index.refresh.duration", unit: "ms");
     public static readonly Histogram<double> IndexResolveDurationMs = Meter.CreateHistogram<double>("varvault.index.resolve.duration", unit: "ms");
+
+    // Pass-2 preview / gallery extraction
+    public static readonly Counter<long> PreviewsExtracted = Meter.CreateCounter<long>("varvault.preview.extracted");
+    public static readonly Histogram<double> PreviewDurationMs = Meter.CreateHistogram<double>("varvault.preview.duration", unit: "ms");
+    public static readonly Histogram<long> PreviewBytesStored = Meter.CreateHistogram<long>("varvault.preview.bytes", unit: "By");
 
     // Background jobs
     public static readonly Counter<long> JobsStarted = Meter.CreateCounter<long>("varvault.jobs.started");

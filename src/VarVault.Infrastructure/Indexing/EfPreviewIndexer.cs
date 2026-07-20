@@ -1,6 +1,7 @@
 using System.IO;
 using Microsoft.EntityFrameworkCore;
 using VarVault.Common;
+using VarVault.Common.Diagnostics;
 using VarVault.Domain.Content;
 using VarVault.Domain.Indexing;
 using VarVault.Infrastructure.Persistence;
@@ -21,6 +22,8 @@ public sealed class EfPreviewIndexer(
     public async Task<int> BuildPreviewsAsync(IReadOnlyCollection<long> packageIds, CancellationToken cancellationToken = default)
     {
         Guard.NotNull(packageIds);
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        using var activity = Telemetry.StartActivity("index.previews");
         var stored = 0;
         foreach (var packageId in packageIds.Distinct())
         {
@@ -30,6 +33,9 @@ public sealed class EfPreviewIndexer(
 
         if (stored > 0)
             await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        Telemetry.PreviewsExtracted.Add(stored);
+        Telemetry.PreviewDurationMs.Record(sw.Elapsed.TotalMilliseconds);
         return stored;
     }
 
@@ -70,6 +76,7 @@ public sealed class EfPreviewIndexer(
                 continue;
 
             await thumbnails.PutAsync(packageId, bytes, cancellationToken).ConfigureAwait(false);
+            Telemetry.PreviewBytesStored.Record(bytes.Length);
             var item = await db.PackageListItems
                 .FirstOrDefaultAsync(x => x.PackageId == packageId, cancellationToken)
                 .ConfigureAwait(false);

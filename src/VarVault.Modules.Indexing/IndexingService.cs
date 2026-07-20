@@ -111,7 +111,11 @@ internal sealed class IndexingService(
         // Pass-1 complete: refresh the read model so the catalog is browsable (names/meta/deps/counts). (1.23)
         var affected = dirty.Drain();
         if (affected.Count > 0)
+        {
+            var rsw = System.Diagnostics.Stopwatch.StartNew();
             await store.RefreshReadModelAsync(affected, cancellationToken).ConfigureAwait(false);
+            Telemetry.IndexRefreshDurationMs.Record(rsw.Elapsed.TotalMilliseconds);
+        }
 
         // Pass-2: previews/thumbnails fill in afterwards — the gallery already shows type placeholders. (1.23/1.32)
         if (affected.Count > 0)
