@@ -24,6 +24,8 @@ public static class Telemetry
     // Indexing (scan → upsert pipeline)
     public static readonly Counter<long> IndexVarsIndexed = Meter.CreateCounter<long>("varvault.index.vars_indexed");
     public static readonly Histogram<double> IndexScanDurationMs = Meter.CreateHistogram<double>("varvault.index.scan.duration", unit: "ms");
+    public static readonly Histogram<double> IndexInspectDurationMs = Meter.CreateHistogram<double>("varvault.index.inspect.duration", unit: "ms");
+    public static readonly Histogram<double> IndexWriteDurationMs = Meter.CreateHistogram<double>("varvault.index.write.duration", unit: "ms");
     public static readonly Histogram<double> IndexRefreshDurationMs = Meter.CreateHistogram<double>("varvault.index.refresh.duration", unit: "ms");
     public static readonly Histogram<double> IndexResolveDurationMs = Meter.CreateHistogram<double>("varvault.index.resolve.duration", unit: "ms");
 

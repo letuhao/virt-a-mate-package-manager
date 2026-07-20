@@ -85,6 +85,8 @@ public sealed class IndexingBenchmark(ITestOutputHelper log)
         void L(string s) { sb.AppendLine(s); log.WriteLine(s); }
 
         L("================ VarVault indexing benchmark ================");
+        L($"GC mode            : {(System.Runtime.GCSettings.IsServerGC ? "Server" : "Workstation")} (the app ships Server GC; run with DOTNET_gcServer=1 to match)");
+        L($"CPU                 : {Environment.ProcessorCount} logical");
         L($"Repo               : {repoPath}");
         L($"Vars on disk       : {varCount:N0}");
         L($"Total size         : {MB(totalBytes) / 1024:N2} GB   (avg {MB((double)totalBytes / Math.Max(1, varCount)):N1} MB/var)");

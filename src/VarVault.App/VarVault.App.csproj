@@ -8,6 +8,10 @@
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Server GC (per-core heaps, concurrent) — the parallel indexer decompresses JSON on many threads; workstation
+         GC serialized them and cost ~3x on inspection. Server GC unlocks the parallelism. (perf.) -->
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
     <!-- Windows .exe icon (Explorer / taskbar pin), sourced from the repo-root app.ico. -->
     <ApplicationIcon>..\..\app.ico</ApplicationIcon>
   </PropertyGroup>

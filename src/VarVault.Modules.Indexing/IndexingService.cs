@@ -25,6 +25,11 @@ internal sealed class IndexingService(
     private const int BatchSize = 512;
     /// <summary>Emit a throughput log line every this many indexed vars.</summary>
     private const int ProgressEvery = 5_000;
+    /// <summary>Concurrent inspections. Inspection is CPU-bound (decompress), so scale to cores.</summary>
+    private static readonly int Dop = Math.Max(2, Environment.ProcessorCount);
+
+    /// <summary>One inspected var ready to persist, plus its lane flags. (Returned from the parallel inspect stage.)</summary>
+    private readonly record struct InspectResult(VarUpsert Upsert, bool Unrecognized, bool Corrupt);
 
     public async Task<IndexResult> IndexRepositoryAsync(
         Guid repositoryId,
@@ -44,54 +49,68 @@ internal sealed class IndexingService(
         var dirty = new ReadModelDirtySet(); // base-table writes mark packages; drained into one refresh (0.26)
         int indexed = 0, skipped = 0, corrupt = 0, unrecognized = 0;
 
-        // Buffer upserts and flush in batches: one transaction per batch (not per var), so a full index doesn't
-        // pay a commit + a growing change-tracker per var. (perf.)
-        var batch = new List<VarUpsert>(BatchSize);
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-
-        async Task FlushAsync()
-        {
-            if (batch.Count == 0)
-                return;
-            var ids = await store.ApplyBatchAsync(batch, cancellationToken).ConfigureAwait(false);
-            foreach (var id in ids)
-                dirty.MarkPackage(id);
-            indexed += batch.Count;
-            batch.Clear();
-            if (indexed % ProgressEvery == 0)
-                logger.LogInformation("Indexing {Repo}: {Indexed} vars ({Rate:F0}/s)", repositoryId, indexed,
-                    indexed / Math.Max(0.001, sw.Elapsed.TotalSeconds));
-        }
-
+        // Pass-0: enumerate (cheap, metadata only) → the set we've seen (for pruning) + the changed subset that
+        // actually needs a (costly) inspection. Freshness skip avoids opening unchanged files. (IDX-2)
+        var toInspect = new List<ScannedVar>();
         foreach (var scanned in enumerator.Enumerate(repositoryMountPath, includeQuarantined: true, cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
             seen.Add(scanned.RelativePath);
-
             if (existing.TryGetValue(scanned.RelativePath, out var ex) &&
                 RepositoryScanRules.IsFresh(ex.SizeBytes, ex.FileMtimeUtc, scanned.SizeBytes, scanned.FileMtimeUtc))
-            {
                 skipped++;
-                continue; // fresh — no file open (IDX-2)
-            }
-
-            var inspection = inspector.Inspect(scanned.FullPath, cancellationToken);
-            if (inspection.IsFailure)
-            {
-                logger.LogWarning("Skipping unreadable var {Path}: {Error}", scanned.RelativePath, inspection.Error);
-                continue;
-            }
-
-            var upsert = BuildUpsert(repositoryId, scanned, inspection.Value, out var wasUnrecognized, out var wasCorrupt);
-            if (wasUnrecognized) unrecognized++;
-            if (wasCorrupt) corrupt++;
-
-            batch.Add(upsert);
-            if (batch.Count >= BatchSize)
-                await FlushAsync().ConfigureAwait(false);
+            else
+                toInspect.Add(scanned);
         }
-        await FlushAsync().ConfigureAwait(false);
 
+        // Inspection (open zip + decompress scene/preset JSON for refs + classify) is CPU-heavy and stateless per
+        // var, so run a chunk of it across all cores, then write that chunk through the single-writer batch. The
+        // dominant phase parallelizes ~Ncores× while catalog writes stay serialized + transactional. (perf.)
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        double inspectMs = 0, writeMs = 0;   // split so we know I/O-bound inspect vs serial DB write
+        var parallel = new ParallelOptions { MaxDegreeOfParallelism = Dop, CancellationToken = cancellationToken };
+        foreach (var chunk in toInspect.Chunk(BatchSize))
+        {
+            var results = new InspectResult?[chunk.Length];
+            // Synchronous Parallel.For is the right primitive for CPU-bound work (real partitioning + work-stealing
+            // across cores); ForEachAsync with a sync body under-parallelizes. Run it off the async caller's thread.
+            var isw = System.Diagnostics.Stopwatch.StartNew();
+            await Task.Run(() => Parallel.For(0, chunk.Length, parallel, i =>
+            {
+                var scanned = chunk[i];
+                var inspection = inspector.Inspect(scanned.FullPath, parallel.CancellationToken);
+                if (inspection.IsFailure)
+                    logger.LogWarning("Skipping unreadable var {Path}: {Error}", scanned.RelativePath, inspection.Error);
+                else
+                    results[i] = BuildUpsert(repositoryId, scanned, inspection.Value); // distinct index → no race
+            }), cancellationToken).ConfigureAwait(false);
+            inspectMs += isw.Elapsed.TotalMilliseconds;
+
+            var batch = new List<VarUpsert>(chunk.Length);
+            foreach (var r in results)
+            {
+                if (r is not { } res)
+                    continue;
+                batch.Add(res.Upsert);
+                if (res.Unrecognized) unrecognized++;
+                if (res.Corrupt) corrupt++;
+            }
+
+            var wsw = System.Diagnostics.Stopwatch.StartNew();
+            var ids = await store.ApplyBatchAsync(batch, cancellationToken).ConfigureAwait(false);
+            writeMs += wsw.Elapsed.TotalMilliseconds;
+            foreach (var id in ids)
+                dirty.MarkPackage(id);
+            indexed += batch.Count;
+            if (indexed >= ProgressEvery && indexed % ProgressEvery < BatchSize)
+                logger.LogInformation("Indexing {Repo}: {Indexed}/{Total} vars ({Rate:F0}/s, {Dop} threads)",
+                    repositoryId, indexed, toInspect.Count, indexed / Math.Max(0.001, sw.Elapsed.TotalSeconds), Dop);
+        }
+
+        logger.LogInformation("Index split for {Repo}: inspect {Inspect:F0} ms ({InspectPerVar:F1} ms/var, {Dop} threads), write {Write:F0} ms ({WritePerVar:F1} ms/var)",
+            repositoryId, inspectMs, indexed > 0 ? inspectMs / indexed : 0, Dop, writeMs, indexed > 0 ? writeMs / indexed : 0);
+        Telemetry.IndexInspectDurationMs.Record(inspectMs);
+        Telemetry.IndexWriteDurationMs.Record(writeMs);
         Telemetry.IndexVarsIndexed.Add(indexed);
         Telemetry.IndexScanDurationMs.Record(sw.Elapsed.TotalMilliseconds);
 
@@ -128,18 +147,14 @@ internal sealed class IndexingService(
         return new IndexResult(indexed, skipped, pruned, corrupt, unrecognized);
     }
 
-    private static VarUpsert BuildUpsert(
-        Guid repositoryId,
-        ScannedVar scanned,
-        VarInspection inspection,
-        out bool unrecognized,
-        out bool corrupt)
+    /// <summary>Pure — safe to call concurrently from the parallel inspect stage.</summary>
+    private static InspectResult BuildUpsert(Guid repositoryId, ScannedVar scanned, VarInspection inspection)
     {
         var fileName = System.IO.Path.GetFileName(scanned.RelativePath);
         var parse = PackageId.TryParse(fileName);
         var identity = parse.IsSuccess ? parse.Value : null;
-        unrecognized = identity is null;
-        corrupt = inspection.Integrity == IntegrityStatus.CorruptZip;
+        var unrecognized = identity is null;
+        var corrupt = inspection.Integrity == IntegrityStatus.CorruptZip;
 
         // BadName overrides only when the zip itself is otherwise fine.
         var integrity = inspection.Integrity;
@@ -160,7 +175,7 @@ internal sealed class IndexingService(
 
         var counts = inspection.Classification?.Counts ?? new Dictionary<ContentType, int>();
 
-        return new VarUpsert(
+        var upsert = new VarUpsert(
             RepositoryId: repositoryId,
             RelativePath: scanned.RelativePath,
             SizeBytes: scanned.SizeBytes,
@@ -183,5 +198,7 @@ internal sealed class IndexingService(
             ContentCounts: counts,
             DependencyRefsRaw: meta?.DependencyRefs ?? [],
             EmbeddedRefsRaw: inspection.EmbeddedRefs);
+
+        return new InspectResult(upsert, unrecognized, corrupt);
     }
 }
