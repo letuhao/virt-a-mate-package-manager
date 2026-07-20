@@ -52,7 +52,8 @@
                     </Button.Flyout>
                   </Button>
                   <Button Content="Edit" Margin="0,0,6,6"
-                          Command="{Binding ((vm:RepositoriesViewModel)DataContext).EditCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                          Command="{Binding ((vm:RepositoriesViewModel)DataContext).EditCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                          CommandParameter="{Binding}" />
                   <Button Content="Rebalance…" Margin="0,0,6,6"
                           Command="{Binding ((vm:RepositoriesViewModel)DataContext).RebalanceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
                   <Button Content="Remove" Margin="0,0,6,6" Foreground="{DynamicResource CritBrush}"

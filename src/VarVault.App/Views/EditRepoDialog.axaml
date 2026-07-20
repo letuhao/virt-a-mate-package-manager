@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             x:Class="VarVault.App.Views.EditRepoDialog"
+             x:DataType="vm:EditRepoViewModel">
+  <StackPanel Spacing="10" MinWidth="440">
+    <TextBlock Text="Edit repository" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+
+    <StackPanel Spacing="4">
+      <TextBlock Text="Name" Opacity="0.8" FontSize="12" />
+      <TextBox Text="{Binding Name}" Watermark="Repository name" />
+    </StackPanel>
+
+    <StackPanel Spacing="4">
+      <TextBlock Text="Folder" Opacity="0.8" FontSize="12" />
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBox Grid.Column="0" Text="{Binding Path}" Watermark="F:\AddonPackages" />
+        <Button Grid.Column="1" Content="Browse…" Margin="6,0,0,0" Command="{Binding BrowseCommand}" />
+      </Grid>
+      <TextBlock Text="Re-pointing to a different physical drive is refused (volume-serial guard). Your files aren't moved."
+                 Opacity="0.55" FontSize="11" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <TextBlock Text="{Binding Message}" FontSize="12" TextWrapping="Wrap"
+               Foreground="{DynamicResource CritBrush}" IsVisible="{Binding IsError}" />
+    <TextBlock Text="{Binding Message}" FontSize="12" TextWrapping="Wrap"
+               Foreground="{DynamicResource GoodBrush}"
+               IsVisible="{Binding Saved}" />
+
+    <Button Content="Save" Command="{Binding SaveCommand}" Background="{DynamicResource AccentBrush}"
+            Foreground="White" HorizontalAlignment="Left" />
+  </StackPanel>
+</UserControl>

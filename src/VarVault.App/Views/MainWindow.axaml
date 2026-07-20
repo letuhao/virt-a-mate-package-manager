@@ -36,6 +36,7 @@
     <!-- Dialog view-model → view map (GA-1 ModalHost hosting). -->
     <DataTemplate DataType="vm:OnboardingViewModel"><views:OnboardingDialog /></DataTemplate>
     <DataTemplate DataType="vm:AddRepoViewModel"><views:AddRepoDialog /></DataTemplate>
+    <DataTemplate DataType="vm:EditRepoViewModel"><views:EditRepoDialog /></DataTemplate>
     <DataTemplate DataType="vm:MigrateViewModel"><views:MigrateDialog /></DataTemplate>
     <DataTemplate DataType="vm:FixEncodingViewModel"><views:FixDialog /></DataTemplate>
     <DataTemplate DataType="vm:AliasViewModel"><views:AliasDialog /></DataTemplate>

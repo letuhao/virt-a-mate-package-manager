@@ -34,6 +34,9 @@ public interface IRepositoryService
     /// Returns false if the repository id wasn't found.
     /// </summary>
     Task<bool> RemoveAsync(Guid repositoryId, CancellationToken cancellationToken = default);
+
+    /// <summary>Rename a repository (display name only — path/identity unchanged). False if the id wasn't found.</summary>
+    Task<bool> RenameAsync(Guid repositoryId, string newName, CancellationToken cancellationToken = default);
     Task<bool> SetEnabledAsync(Guid repositoryId, bool enabled, CancellationToken cancellationToken = default);
     Task<RepositoryInfo?> RefreshCapacityAsync(Guid repositoryId, CancellationToken cancellationToken = default);
 

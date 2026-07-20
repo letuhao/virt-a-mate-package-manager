@@ -12,6 +12,7 @@ public sealed class FakeDialogLauncher : IDialogLauncher
 {
     public List<string> Opened { get; } = [];
     public void OpenAddRepo() => Opened.Add("add-repo");
+    public void OpenEditRepo(VarVault.Sdk.Repositories.RepositoryInfo repo, System.Action? onSaved = null) => Opened.Add($"edit-repo:{repo.Id}");
     public void OpenRescue() => Opened.Add("rescue");
     public void OpenOnboarding() => Opened.Add("onboarding");
     public void OpenMigratePlan() => Opened.Add("migrate");
@@ -102,6 +103,7 @@ public sealed class StubReposEmpty : VarVault.Sdk.Repositories.IRepositoryServic
     public Task<IReadOnlyList<VarVault.Sdk.Repositories.RepositoryInfo>> ListAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<VarVault.Sdk.Repositories.RepositoryInfo>>([]);
     public Task<bool> SetEnabledAsync(Guid id, bool e, CancellationToken ct = default) => Task.FromResult(true);
     public Task<bool> RemoveAsync(Guid id, CancellationToken ct = default) => Task.FromResult(true);
+    public Task<bool> RenameAsync(Guid id, string name, CancellationToken ct = default) => Task.FromResult(true);
     public Task<VarVault.Sdk.Repositories.RepositoryInfo?> RefreshCapacityAsync(Guid id, CancellationToken ct = default) => Task.FromResult<VarVault.Sdk.Repositories.RepositoryInfo?>(null);
     public Task<Result<VarVault.Sdk.Repositories.RepositoryInfo>> RepointAsync(Guid id, string p, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<VarVault.Sdk.Repositories.RepositoryInfo?> BenchmarkAsync(Guid id, CancellationToken ct = default) => Task.FromResult<VarVault.Sdk.Repositories.RepositoryInfo?>(null);

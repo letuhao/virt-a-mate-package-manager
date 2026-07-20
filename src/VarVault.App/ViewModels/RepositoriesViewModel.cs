@@ -76,8 +76,13 @@ public sealed partial class RepositoriesViewModel(
     /// <summary>Screen-head "Review rebalance plan" / per-card "Rebalance…" → migrate dialog. (GD-7)</summary>
     [RelayCommand] private void Rebalance() => launcher?.OpenMigratePlan();
 
-    /// <summary>Per-card "Edit" → repository settings dialog (reuses add-repo for path/tier edits). (GD-7/AC-19)</summary>
-    [RelayCommand] private void Edit() => launcher?.OpenAddRepo();
+    /// <summary>Per-card "Edit" → rename / re-point the selected repository, then refresh the list. (GD-7/AC-19)</summary>
+    [RelayCommand]
+    private void Edit(RepositoryCardViewModel card)
+    {
+        if (card is not null)
+            launcher?.OpenEditRepo(card.Info, () => _ = LoadAsync());
+    }
 
     /// <summary>Per-card "Remove" → arm the inline confirm (nothing happens yet). </summary>
     [RelayCommand]

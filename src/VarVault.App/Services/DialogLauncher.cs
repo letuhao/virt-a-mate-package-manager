@@ -13,6 +13,7 @@ namespace VarVault.App.Services;
 public interface IDialogLauncher
 {
     void OpenAddRepo();
+    void OpenEditRepo(Sdk.Repositories.RepositoryInfo repo, System.Action? onSaved = null);
     void OpenRescue();
     void OpenOnboarding();
     void OpenMigratePlan();
@@ -32,6 +33,9 @@ public sealed class DialogLauncher(
 {
     public void OpenAddRepo() =>
         dialogs.Show(new AddRepoViewModel(services.GetRequiredService<Sdk.Repositories.IRepositoryService>(), afterRepoAdded));
+
+    public void OpenEditRepo(Sdk.Repositories.RepositoryInfo repo, System.Action? onSaved = null) =>
+        dialogs.Show(new EditRepoViewModel(services.GetRequiredService<Sdk.Repositories.IRepositoryService>(), repo, onSaved));
 
     public void OpenRescue()
     {

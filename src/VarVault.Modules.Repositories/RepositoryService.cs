@@ -72,6 +72,21 @@ internal sealed class RepositoryService(
         return repos.Select(Map).ToList();
     }
 
+    public async Task<bool> RenameAsync(Guid repositoryId, string newName, CancellationToken cancellationToken = default)
+    {
+        Guard.NotNullOrWhiteSpace(newName);
+        using var scope = scopeFactory.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IRepositoryStore>();
+        var repo = await store.FindAsync(repositoryId, cancellationToken).ConfigureAwait(false);
+        if (repo is null)
+            return false;
+        repo.Name = newName.Trim();
+        repo.UpdatedAt = clock.UtcNow.UtcDateTime;
+        await store.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        logger.LogInformation("Renamed repository {Id} to {Name}", repo.Id, repo.Name);
+        return true;
+    }
+
     public async Task<bool> RemoveAsync(Guid repositoryId, CancellationToken cancellationToken = default)
     {
         using var scope = scopeFactory.CreateScope();
