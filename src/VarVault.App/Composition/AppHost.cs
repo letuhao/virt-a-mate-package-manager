@@ -76,6 +76,9 @@ public static class AppHost
         // C1.2 · first-run onboarding opens through the same launcher (the window triggers it on load).
         shell.OnboardingHandler = launcher.OpenOnboarding;
 
+        if (screens["repos"] is RepositoriesViewModel reposVm)
+            reposVm.ShowToast = shell.ShowToast;
+
         // GD-1/GD-2 · let the dashboard + library navigate the shell.
         if (screens["dashboard"] is DashboardViewModel dash)
             dash.NavigateTo = shell.Navigate;

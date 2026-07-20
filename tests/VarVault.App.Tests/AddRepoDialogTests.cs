@@ -15,6 +15,7 @@ public class AddRepoDialogTests
             Task.FromResult(Result.Success(new RepositoryInfo(Guid.NewGuid(), r.Name, r.Path, "Hdd", 3, true, true, 8000, 5000, null)));
         public Task<IReadOnlyList<RepositoryInfo>> ListAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<RepositoryInfo>>([]);
         public Task<bool> SetEnabledAsync(Guid id, bool e, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<bool> RemoveAsync(Guid id, CancellationToken ct = default) => Task.FromResult(true);
         public Task<RepositoryInfo?> RefreshCapacityAsync(Guid id, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<Result<RepositoryInfo>> RepointAsync(Guid id, string p, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<RepositoryInfo?> BenchmarkAsync(Guid id, CancellationToken ct = default) => throw new NotSupportedException();

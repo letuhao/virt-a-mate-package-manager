@@ -34,11 +34,11 @@
                 <c:MeterBar Height="5" Margin="0,4,0,0" Value="{Binding UsedFraction}" Fill="{DynamicResource AccentBrush}" />
                 <TextBlock Text="{Binding CapacityLabel}" Opacity="0.6" FontSize="11" FontFamily="{DynamicResource MonoFont}" />
                 <!-- per-card actions -->
-                <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,6,0,0">
-                  <Button Content="Re-benchmark"
+                <WrapPanel Margin="0,6,0,0" IsVisible="{Binding !IsConfirmingRemove}">
+                  <Button Content="Re-benchmark" Margin="0,0,6,6"
                           Command="{Binding ((vm:RepositoriesViewModel)DataContext).BenchmarkCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                           CommandParameter="{Binding}" />
-                  <Button Content="Tier ▾">
+                  <Button Content="Tier ▾" Margin="0,0,6,6">
                     <Button.Flyout>
                       <MenuFlyout>
                         <MenuItem Header="T1 (hot)" Command="{Binding ((vm:RepositoriesViewModel)DataContext).SetTierCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" CommandParameter="{Binding TierArg1}" />
@@ -47,11 +47,34 @@
                       </MenuFlyout>
                     </Button.Flyout>
                   </Button>
-                  <Button Content="Edit"
+                  <Button Content="Edit" Margin="0,0,6,6"
                           Command="{Binding ((vm:RepositoriesViewModel)DataContext).EditCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
-                  <Button Content="Rebalance…"
+                  <Button Content="Rebalance…" Margin="0,0,6,6"
                           Command="{Binding ((vm:RepositoriesViewModel)DataContext).RebalanceCommand, RelativeSource={RelativeSource AncestorType=UserControl}}" />
-                </StackPanel>
+                  <Button Content="Remove" Margin="0,0,6,6" Foreground="{DynamicResource CritBrush}"
+                          Command="{Binding ((vm:RepositoriesViewModel)DataContext).AskRemoveCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                          CommandParameter="{Binding}" />
+                </WrapPanel>
+
+                <!-- inline remove confirm: DB-only, never deletes files -->
+                <Border IsVisible="{Binding IsConfirmingRemove}" Margin="0,6,0,0"
+                        Background="{DynamicResource CritBgBrush}" BorderBrush="{DynamicResource CritBrush}"
+                        BorderThickness="1" CornerRadius="6" Padding="10,8">
+                  <StackPanel Spacing="7">
+                    <TextBlock Text="Remove this repository from VarVault's catalog?" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextHiBrush}" TextWrapping="Wrap" />
+                    <TextBlock Text="This only de-registers it — your folder and every .var file stay exactly where they are on disk. You can add it again later."
+                               Opacity="0.75" FontSize="11.5" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <Button Content="Remove from catalog" Background="{DynamicResource CritBrush}" Foreground="White"
+                              Command="{Binding ((vm:RepositoriesViewModel)DataContext).RemoveCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                              CommandParameter="{Binding}" />
+                      <Button Content="Cancel"
+                              Command="{Binding ((vm:RepositoriesViewModel)DataContext).CancelRemoveCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                              CommandParameter="{Binding}" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
               </StackPanel>
             </c:Card>
           </DataTemplate>

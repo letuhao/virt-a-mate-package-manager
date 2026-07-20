@@ -22,6 +22,28 @@ public sealed class EfRepositoryStore(VarVaultDbContext db) : IRepositoryStore
         await db.Repositories.AddAsync(repository, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<bool> RemoveAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var repo = await db.Repositories.FirstOrDefaultAsync(r => r.Id == id, cancellationToken).ConfigureAwait(false);
+        if (repo is null)
+            return false;
+
+        // DB-only: deleting the row cascades (FK ON DELETE CASCADE, foreign_keys=ON) to this repo's VarFiles and
+        // their dependents (dependencies, content items, activation links). The .var files on disk are untouched.
+        db.Repositories.Remove(repo);
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        // Packages left with no var files anywhere are now orphans — prune them (cascades their aggregate rows).
+        var orphans = await db.Packages.Where(p => !p.VarFiles.Any())
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        if (orphans.Count > 0)
+        {
+            db.Packages.RemoveRange(orphans);
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        return true;
+    }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
         db.SaveChangesAsync(cancellationToken);
 }

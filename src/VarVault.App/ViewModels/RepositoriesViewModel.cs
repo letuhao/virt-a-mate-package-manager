@@ -6,8 +6,11 @@ using VarVault.Sdk.Repositories;
 namespace VarVault.App.ViewModels;
 
 /// <summary>A repository card: the SDK info plus view-computed usage fraction + capacity label. (GD-7)</summary>
-public sealed class RepositoryCardViewModel(RepositoryInfo info)
+public sealed partial class RepositoryCardViewModel(RepositoryInfo info) : ObservableObject
 {
+    /// <summary>Inline "really remove?" confirm state (DB-only removal never deletes files). </summary>
+    [ObservableProperty] private bool _isConfirmingRemove;
+
     public RepositoryInfo Info { get; } = info;
     public Guid Id => Info.Id;
     public string Name => Info.Name;
@@ -49,6 +52,39 @@ public sealed partial class RepositoriesViewModel(
 
     /// <summary>Per-card "Edit" → repository settings dialog (reuses add-repo for path/tier edits). (GD-7/AC-19)</summary>
     [RelayCommand] private void Edit() => launcher?.OpenAddRepo();
+
+    /// <summary>Per-card "Remove" → arm the inline confirm (nothing happens yet). </summary>
+    [RelayCommand]
+    private void AskRemove(RepositoryCardViewModel card)
+    {
+        foreach (var c in Repositories)
+            c.IsConfirmingRemove = ReferenceEquals(c, card); // only one card armed at a time
+    }
+
+    /// <summary>Cancel the inline remove confirm.</summary>
+    [RelayCommand]
+    private void CancelRemove(RepositoryCardViewModel card)
+    {
+        if (card is not null)
+            card.IsConfirmingRemove = false;
+    }
+
+    /// <summary>Confirmed removal: de-register from the catalog only. The folder + .var files stay on disk. </summary>
+    [RelayCommand]
+    public async Task RemoveAsync(RepositoryCardViewModel card, CancellationToken cancellationToken = default)
+    {
+        if (card is null)
+            return;
+        var ok = await repositories.RemoveAsync(card.Id, cancellationToken).ConfigureAwait(true);
+        if (ok)
+        {
+            ShowToast?.Invoke($"Removed “{card.Name}” from the catalog (files kept on disk).", null);
+            await LoadAsync(cancellationToken).ConfigureAwait(true);
+        }
+    }
+
+    /// <summary>Toast hook set by the shell (optional). </summary>
+    public Action<string, Action?>? ShowToast { get; set; }
 
     /// <summary>Per-card manual tier override (BE-G2). (GD-7)</summary>
     [RelayCommand]

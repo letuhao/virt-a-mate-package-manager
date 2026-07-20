@@ -27,6 +27,13 @@ public interface IRepositoryService
 {
     Task<Result<RepositoryInfo>> RegisterAsync(RegisterRepositoryRequest request, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<RepositoryInfo>> ListAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// De-register a repository: remove it and its catalogued vars from the DB only. <b>Never touches the folder or
+    /// its files on disk</b> — the .var files stay exactly where they are; VarVault just stops tracking them.
+    /// Returns false if the repository id wasn't found.
+    /// </summary>
+    Task<bool> RemoveAsync(Guid repositoryId, CancellationToken cancellationToken = default);
     Task<bool> SetEnabledAsync(Guid repositoryId, bool enabled, CancellationToken cancellationToken = default);
     Task<RepositoryInfo?> RefreshCapacityAsync(Guid repositoryId, CancellationToken cancellationToken = default);
 

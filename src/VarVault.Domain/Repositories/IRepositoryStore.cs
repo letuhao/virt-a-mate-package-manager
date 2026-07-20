@@ -11,5 +11,9 @@ public interface IRepositoryStore
     Task<IReadOnlyList<Repository>> ListAsync(CancellationToken cancellationToken = default);
     Task<Repository?> FindAsync(Guid id, CancellationToken cancellationToken = default);
     Task AddAsync(Repository repository, CancellationToken cancellationToken = default);
+
+    /// <summary>Delete the repository row (DB cascade removes its catalogued vars) + prune orphaned packages. No disk I/O.</summary>
+    Task<bool> RemoveAsync(Guid id, CancellationToken cancellationToken = default);
+
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

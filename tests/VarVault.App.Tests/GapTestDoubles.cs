@@ -101,6 +101,7 @@ public sealed class StubReposEmpty : VarVault.Sdk.Repositories.IRepositoryServic
     public Task<Result<VarVault.Sdk.Repositories.RepositoryInfo>> RegisterAsync(VarVault.Sdk.Repositories.RegisterRepositoryRequest r, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<IReadOnlyList<VarVault.Sdk.Repositories.RepositoryInfo>> ListAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<VarVault.Sdk.Repositories.RepositoryInfo>>([]);
     public Task<bool> SetEnabledAsync(Guid id, bool e, CancellationToken ct = default) => Task.FromResult(true);
+    public Task<bool> RemoveAsync(Guid id, CancellationToken ct = default) => Task.FromResult(true);
     public Task<VarVault.Sdk.Repositories.RepositoryInfo?> RefreshCapacityAsync(Guid id, CancellationToken ct = default) => Task.FromResult<VarVault.Sdk.Repositories.RepositoryInfo?>(null);
     public Task<Result<VarVault.Sdk.Repositories.RepositoryInfo>> RepointAsync(Guid id, string p, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<VarVault.Sdk.Repositories.RepositoryInfo?> BenchmarkAsync(Guid id, CancellationToken ct = default) => Task.FromResult<VarVault.Sdk.Repositories.RepositoryInfo?>(null);

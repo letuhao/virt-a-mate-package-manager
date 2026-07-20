@@ -72,6 +72,22 @@ internal sealed class RepositoryService(
         return repos.Select(Map).ToList();
     }
 
+    public async Task<bool> RemoveAsync(Guid repositoryId, CancellationToken cancellationToken = default)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IRepositoryStore>();
+        var repo = await store.FindAsync(repositoryId, cancellationToken).ConfigureAwait(false);
+        if (repo is null)
+            return false;
+
+        // DB-only de-registration — the folder + its .var files are deliberately left on disk.
+        var removed = await store.RemoveAsync(repositoryId, cancellationToken).ConfigureAwait(false);
+        if (removed)
+            logger.LogInformation("Removed repository {Name} ({Id}) from the catalog — files left on disk at {Path}",
+                repo.Name, repo.Id, repo.MountPath);
+        return removed;
+    }
+
     public async Task<bool> SetEnabledAsync(Guid repositoryId, bool enabled, CancellationToken cancellationToken = default)
     {
         using var scope = scopeFactory.CreateScope();
