@@ -18,6 +18,20 @@ public sealed partial class OnboardingViewModel(IOnboardingService? onboarding =
     [ObservableProperty] private string? _folderPath;
     [ObservableProperty] private string? _resultMessage;
 
+    /// <summary>Folder-picker hook the view sets to the real StorageProvider.</summary>
+    public Func<Task<string?>>? FolderPicker { get; set; }
+
+    /// <summary>"Browse…" → pick the .var folder via the native OS dialog.</summary>
+    [RelayCommand]
+    public async Task BrowseAsync()
+    {
+        if (FolderPicker is null)
+            return;
+        var picked = await FolderPicker().ConfigureAwait(true);
+        if (!string.IsNullOrWhiteSpace(picked))
+            FolderPath = picked;
+    }
+
     /// <summary>Folders that have been added + benchmarked/indexed (the benchmarked-folder table). (AC-29)</summary>
     public System.Collections.ObjectModel.ObservableCollection<string> BenchmarkedFolders { get; } = [];
 

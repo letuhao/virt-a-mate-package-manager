@@ -52,12 +52,22 @@
     <c:Card Header="Import" IsVisible="{Binding IsImportTab}">
       <StackPanel Spacing="10">
         <Grid ColumnDefinitions="200,*">
-          <TextBlock Grid.Column="0" Text="Preset extraction folder" VerticalAlignment="Center" Opacity="0.8" />
-          <TextBox Grid.Column="1" Text="{Binding PresetExtractionDir}" Watermark="default subfolder…" />
+          <TextBlock Grid.Column="0" Text="Archive temp folder" VerticalAlignment="Center" Opacity="0.8" />
+          <Grid Grid.Column="1" ColumnDefinitions="*,Auto">
+            <TextBox Grid.Column="0" Text="{Binding ImportTempDir}" Watermark="default: target repo's drive…" />
+            <Button Grid.Column="1" Content="Browse…" Margin="6,0,0,0" Command="{Binding BrowseImportTempCommand}" />
+          </Grid>
         </Grid>
         <Grid ColumnDefinitions="200,*">
-          <TextBlock Grid.Column="0" Text="Archive temp folder" VerticalAlignment="Center" Opacity="0.8" />
-          <TextBox Grid.Column="1" Text="{Binding ImportTempDir}" Watermark="default: target repo's drive…" />
+          <TextBlock Grid.Column="0" Text="7-Zip path (optional)" VerticalAlignment="Top" Opacity="0.8" Margin="0,6,0,0" />
+          <StackPanel Grid.Column="1" Spacing="3">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBox Grid.Column="0" Text="{Binding SevenZipPath}" Watermark="auto-detect system 7-Zip (7z.exe)…" />
+              <Button Grid.Column="1" Content="Browse…" Margin="6,0,0,0" Command="{Binding BrowseSevenZipCommand}" />
+            </Grid>
+            <TextBlock Text="Fallback for archives the built-in extractor can't read (e.g. AES-encrypted 7z). Left blank, VarVault auto-detects an installed 7-Zip."
+                       Opacity="0.55" FontSize="11" TextWrapping="Wrap" />
+          </StackPanel>
         </Grid>
         <Grid ColumnDefinitions="200,*">
           <TextBlock Grid.Column="0" Text="Import history to keep" VerticalAlignment="Center" Opacity="0.8" />

@@ -54,6 +54,28 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
         OnPropertyChanged(nameof(IsVamPathValid));
     }
 
+    /// <summary>"Browse…" for the archive temp folder (import scratch space).</summary>
+    [RelayCommand]
+    public async Task BrowseImportTempAsync()
+    {
+        if (ImportTempFolderPicker is null)
+            return;
+        var picked = await ImportTempFolderPicker().ConfigureAwait(true);
+        if (!string.IsNullOrWhiteSpace(picked))
+            ImportTempDir = picked;
+    }
+
+    /// <summary>"Browse…" for the optional external 7-Zip executable.</summary>
+    [RelayCommand]
+    public async Task BrowseSevenZipAsync()
+    {
+        if (SevenZipFilePicker is null)
+            return;
+        var picked = await SevenZipFilePicker().ConfigureAwait(true);
+        if (!string.IsNullOrWhiteSpace(picked))
+            SevenZipPath = picked;
+    }
+
     /// <summary>Show the effective data folder + catalog DB path (resolved before the DB opens).</summary>
     private void RefreshDataLocation()
     {
@@ -115,9 +137,15 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
     // Additional per-tab settings (AC-21).
     [ObservableProperty] private string? _hotThresholdDays;       // Tiers & policy
     [ObservableProperty] private bool _autoRebalance;            // Automation
-    [ObservableProperty] private string? _presetExtractionDir;    // Import
     [ObservableProperty] private string? _importTempDir;          // Import — archive extraction scratch (5.11)
     [ObservableProperty] private string? _importHistoryKeep;      // Import — how many runs History keeps (5.11)
+    [ObservableProperty] private string? _sevenZipPath;           // Import — optional external 7-Zip for hard archives
+
+    /// <summary>Folder-picker hook for the archive temp folder (set by the view).</summary>
+    public Func<Task<string?>>? ImportTempFolderPicker { get; set; }
+
+    /// <summary>File-picker hook for the 7-Zip executable (set by the view).</summary>
+    public Func<Task<string?>>? SevenZipFilePicker { get; set; }
 
     // Per-tab visibility so each tab shows its own content (AC-21).
     public bool IsGeneralTab => SelectedTabIndex == 0;
@@ -143,9 +171,9 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
 
     private const string HotDaysKey = "tiers.hot_threshold_days";
     private const string AutoRebalanceKey = "automation.auto_rebalance";
-    private const string PresetExtractKey = "import.preset_extraction_dir";
     private const string ImportTempDirKey = "import.temp_dir";
     private const string ImportHistoryKeepKey = "import.history_keep";
+    private const string SevenZipKey = "import.sevenzip_path";
 
     [RelayCommand]
     public async Task LoadAsync(CancellationToken cancellationToken = default)
@@ -155,9 +183,9 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
         RefreshDataLocation();
         HotThresholdDays = await settings.GetAsync(HotDaysKey, cancellationToken).ConfigureAwait(true) ?? "30";
         AutoRebalance = await settings.GetBoolAsync(AutoRebalanceKey, false, cancellationToken).ConfigureAwait(true);
-        PresetExtractionDir = await settings.GetAsync(PresetExtractKey, cancellationToken).ConfigureAwait(true);
         ImportTempDir = await settings.GetAsync(ImportTempDirKey, cancellationToken).ConfigureAwait(true);
         ImportHistoryKeep = await settings.GetAsync(ImportHistoryKeepKey, cancellationToken).ConfigureAwait(true) ?? "200";
+        SevenZipPath = await settings.GetAsync(SevenZipKey, cancellationToken).ConfigureAwait(true);
         _loaded = true;
     }
 
@@ -179,8 +207,8 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
         await settings.SetAsync(SettingKeys.FixOnImport, FixOnImport ?? "Flag only", cancellationToken).ConfigureAwait(true);
         await settings.SetAsync(HotDaysKey, HotThresholdDays ?? "30", cancellationToken).ConfigureAwait(true);
         await settings.SetBoolAsync(AutoRebalanceKey, AutoRebalance, cancellationToken).ConfigureAwait(true);
-        await settings.SetAsync(PresetExtractKey, PresetExtractionDir ?? string.Empty, cancellationToken).ConfigureAwait(true);
         await settings.SetAsync(ImportTempDirKey, ImportTempDir ?? string.Empty, cancellationToken).ConfigureAwait(true);
+        await settings.SetAsync(SevenZipKey, SevenZipPath ?? string.Empty, cancellationToken).ConfigureAwait(true);
         // Keep only a positive integer; blank/invalid falls back to the engine default (200).
         await settings.SetAsync(ImportHistoryKeepKey,
             int.TryParse(ImportHistoryKeep, out var k) && k > 0 ? k.ToString() : string.Empty,

@@ -21,7 +21,8 @@
     </StackPanel>
     <TextBlock Text="Point VarVault at a folder where your .var files live." Opacity="0.8" TextWrapping="Wrap" />
     <StackPanel Orientation="Horizontal" Spacing="8">
-      <TextBox Width="300" Watermark="D:\vars" Text="{Binding FolderPath}" />
+      <TextBox Width="240" Watermark="D:\vars" Text="{Binding FolderPath}" />
+      <Button Content="Browse…" Command="{Binding BrowseCommand}" />
       <Button Content="Add &amp; index" Command="{Binding AddAndIndexCommand}"
               Background="{DynamicResource AccentBrush}" Foreground="White" />
     </StackPanel>
