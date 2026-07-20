@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VarVault.Infrastructure.Persistence;
 
@@ -10,9 +11,11 @@ using VarVault.Infrastructure.Persistence;
 namespace VarVault.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(VarVaultDbContext))]
-    partial class VarVaultDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260720112100_AddImportHistory")]
+    partial class AddImportHistory
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.0");
@@ -252,45 +255,6 @@ namespace VarVault.Infrastructure.Persistence.Migrations
                     b.HasIndex("RunId");
 
                     b.ToTable("ImportFailedSources");
-                });
-
-            modelBuilder.Entity("VarVault.Domain.Entities.ImportOutcomeEntity", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Decision")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("IdentityKey")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Lane")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Reason")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Result")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("RunId")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RunId");
-
-                    b.ToTable("ImportOutcomes");
                 });
 
             modelBuilder.Entity("VarVault.Domain.Entities.ImportRunEntity", b =>
@@ -1176,17 +1140,6 @@ namespace VarVault.Infrastructure.Persistence.Migrations
                     b.Navigation("Run");
                 });
 
-            modelBuilder.Entity("VarVault.Domain.Entities.ImportOutcomeEntity", b =>
-                {
-                    b.HasOne("VarVault.Domain.Entities.ImportRunEntity", "Run")
-                        .WithMany("Outcomes")
-                        .HasForeignKey("RunId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Run");
-                });
-
             modelBuilder.Entity("VarVault.Domain.Entities.LoadingPreset", b =>
                 {
                     b.HasOne("VarVault.Domain.Entities.Profile", "Profile")
@@ -1384,8 +1337,6 @@ namespace VarVault.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("VarVault.Domain.Entities.ImportRunEntity", b =>
                 {
                     b.Navigation("FailedSources");
-
-                    b.Navigation("Outcomes");
                 });
 
             modelBuilder.Entity("VarVault.Domain.Entities.LoadingPreset", b =>

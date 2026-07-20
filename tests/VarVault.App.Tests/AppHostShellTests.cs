@@ -18,7 +18,7 @@ public class AppHostShellTests
         var shell = AppHost.CreateShell(scope.ServiceProvider);
 
         Assert.NotNull(shell);
-        Assert.Equal(13, shell.Screens.Count);
+        Assert.Equal(14, shell.Screens.Count);
 
         // Every screen id resolves to a non-null view-model (real VM or placeholder).
         foreach (var screen in ShellViewModel.AllScreens)

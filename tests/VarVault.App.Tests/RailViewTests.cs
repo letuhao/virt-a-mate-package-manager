@@ -32,7 +32,7 @@ public class RailViewTests
     {
         var (_, _, rail) = Show();
         var items = rail.GetVisualDescendants().OfType<RailNavItem>().ToList();
-        Assert.Equal(13, items.Count);
+        Assert.Equal(14, items.Count);
 
         var headers = rail.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
         foreach (var g in new[] { "Browse", "Optimize", "Problems", "System" })

@@ -35,37 +35,49 @@ public sealed class ShellLiveFeeds(
     IServiceScopeFactory scopeFactory,
     Sdk.Threading.IJobQueue jobQueue) : IShellLiveFeeds
 {
+    private static readonly ShellLiveSnapshot Empty = new(0, 0, 0, null, null);
+
     public async Task<ShellLiveSnapshot> SnapshotAsync(CancellationToken cancellationToken = default)
     {
-        using var scope = scopeFactory.CreateScope();
-        var sp = scope.ServiceProvider;
-        var proposals = sp.GetRequiredService<IProposalService>();
-        var health = sp.GetRequiredService<IHealthService>();
-        var missing = sp.GetRequiredService<IMissingDepsQuery>();
-        var dashboard = sp.GetRequiredService<IDashboardService>();
+        // The poll timer can fire while the host is being torn down (app close, or a test disposing its scope);
+        // resolving/querying from a disposed provider then throws. A dead provider means "no live state" — return
+        // an empty snapshot rather than letting the throw bubble into the timer handler. (shutdown-race guard.)
+        try
+        {
+            using var scope = scopeFactory.CreateScope();
+            var sp = scope.ServiceProvider;
+            var proposals = sp.GetRequiredService<IProposalService>();
+            var health = sp.GetRequiredService<IHealthService>();
+            var missing = sp.GetRequiredService<IMissingDepsQuery>();
+            var dashboard = sp.GetRequiredService<IDashboardService>();
 
-        var pending = await proposals.ListAsync(cancellationToken).ConfigureAwait(false);
-        var encoding = await health.EncodingGroupsAsync(cancellationToken).ConfigureAwait(false);
-        var miss = await missing.GetMissingAsync(cancellationToken).ConfigureAwait(false);
-        var summary = await dashboard.GetSummaryAsync(cancellationToken).ConfigureAwait(false);
+            var pending = await proposals.ListAsync(cancellationToken).ConfigureAwait(false);
+            var encoding = await health.EncodingGroupsAsync(cancellationToken).ConfigureAwait(false);
+            var miss = await missing.GetMissingAsync(cancellationToken).ConfigureAwait(false);
+            var summary = await dashboard.GetSummaryAsync(cancellationToken).ConfigureAwait(false);
 
-        var tiers = summary.Tiers;
-        var tierSummary = tiers.Count == 0
-            ? null
-            : "Storage " + string.Join(" · ", tiers.Select(t =>
-                $"T{t.Tier} {(t.CapacityBytes == 0 ? 0 : t.UsedBytes * 100 / t.CapacityBytes)}%"));
+            var tiers = summary.Tiers;
+            var tierSummary = tiers.Count == 0
+                ? null
+                : "Storage " + string.Join(" · ", tiers.Select(t =>
+                    $"T{t.Tier} {(t.CapacityBytes == 0 ? 0 : t.UsedBytes * 100 / t.CapacityBytes)}%"));
 
-        var indexJob = jobQueue.Active.FirstOrDefault(j => j.Name.Contains("Index", StringComparison.OrdinalIgnoreCase));
-        var indexStatus = indexJob is null
-            ? null
-            : $"{indexJob.Name} · {indexJob.Progress.Done}/{indexJob.Progress.Total}";
+            var indexJob = jobQueue.Active.FirstOrDefault(j => j.Name.Contains("Index", StringComparison.OrdinalIgnoreCase));
+            var indexStatus = indexJob is null
+                ? null
+                : $"{indexJob.Name} · {indexJob.Progress.Done}/{indexJob.Progress.Total}";
 
-        return new ShellLiveSnapshot(
-            ProposalCount: pending.Count,
-            HealthCount: encoding.Sum(g => g.Count),
-            MissingCount: miss.Count,
-            TierSummary: tierSummary,
-            IndexStatus: indexStatus,
-            TotalPackages: summary.TotalPackages);
+            return new ShellLiveSnapshot(
+                ProposalCount: pending.Count,
+                HealthCount: encoding.Sum(g => g.Count),
+                MissingCount: miss.Count,
+                TierSummary: tierSummary,
+                IndexStatus: indexStatus,
+                TotalPackages: summary.TotalPackages);
+        }
+        catch (ObjectDisposedException)
+        {
+            return Empty; // host torn down mid-poll — no live state to report
+        }
     }
 }

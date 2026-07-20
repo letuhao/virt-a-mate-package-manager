@@ -19,6 +19,7 @@
     <DataTemplate DataType="vm:PresetsViewModel"><views:PresetsView /></DataTemplate>
     <DataTemplate DataType="vm:TieringViewModel"><views:TieringView /></DataTemplate>
     <DataTemplate DataType="vm:DupesViewModel"><views:DupesView /></DataTemplate>
+    <DataTemplate DataType="vm:ImportViewModel"><views:ImportView /></DataTemplate>
     <DataTemplate DataType="vm:AnalyticsViewModel"><views:AnalyticsView /></DataTemplate>
     <DataTemplate DataType="vm:ProposalsViewModel"><views:ProposalsView /></DataTemplate>
     <DataTemplate DataType="vm:HealthViewModel"><views:HealthView /></DataTemplate>

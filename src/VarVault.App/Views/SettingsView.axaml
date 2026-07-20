@@ -35,10 +35,20 @@
       <CheckBox Content="Auto-rebalance tiers on idle" IsChecked="{Binding AutoRebalance}" />
     </c:Card>
     <c:Card Header="Import" IsVisible="{Binding IsImportTab}">
-      <Grid ColumnDefinitions="200,*">
-        <TextBlock Grid.Column="0" Text="Preset extraction folder" VerticalAlignment="Center" Opacity="0.8" />
-        <TextBox Grid.Column="1" Text="{Binding PresetExtractionDir}" Watermark="default subfolder…" />
-      </Grid>
+      <StackPanel Spacing="10">
+        <Grid ColumnDefinitions="200,*">
+          <TextBlock Grid.Column="0" Text="Preset extraction folder" VerticalAlignment="Center" Opacity="0.8" />
+          <TextBox Grid.Column="1" Text="{Binding PresetExtractionDir}" Watermark="default subfolder…" />
+        </Grid>
+        <Grid ColumnDefinitions="200,*">
+          <TextBlock Grid.Column="0" Text="Archive temp folder" VerticalAlignment="Center" Opacity="0.8" />
+          <TextBox Grid.Column="1" Text="{Binding ImportTempDir}" Watermark="default: target repo's drive…" />
+        </Grid>
+        <Grid ColumnDefinitions="200,*">
+          <TextBlock Grid.Column="0" Text="Import history to keep" VerticalAlignment="Center" Opacity="0.8" />
+          <TextBox Grid.Column="1" Text="{Binding ImportHistoryKeep}" Watermark="200" />
+        </Grid>
+      </StackPanel>
     </c:Card>
     <c:Card Header="Advanced" IsVisible="{Binding IsAdvancedTab}">
       <TextBlock Text="Catalog is WAL-journaled and auto-backed-up. Rebuild the index from the library rail."

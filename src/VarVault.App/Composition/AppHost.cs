@@ -43,7 +43,8 @@ public static class AppHost
             ["repos"] = new RepositoriesViewModel(services.GetRequiredService<Sdk.Repositories.IRepositoryService>(), launcher),
             ["presets"] = new PresetsViewModel(services.GetRequiredService<Sdk.Presets.IPresetService>(), services.GetService<IProfileService>(), launcher, services.GetService<Sdk.Activation.IActivationService>(), services.GetService<Sdk.Settings.ISettingsService>()),
             ["tiering"] = new TieringViewModel(services.GetRequiredService<ITieringService>(), launcher, services.GetService<Sdk.Repositories.IRepositoryService>()),
-            ["dupes"] = new DupesViewModel(services.GetRequiredService<IReclaimService>(), launcher, services.GetService<IIntakeService>()),
+            ["dupes"] = new DupesViewModel(services.GetRequiredService<IReclaimService>(), launcher),
+            ["import"] = new ImportViewModel(services.GetRequiredService<Sdk.Import.IImportService>(), services.GetRequiredService<Sdk.Repositories.IRepositoryService>()),
             ["history"] = new ActivityViewModel(services.GetRequiredService<IActivityLog>()),
             ["missing"] = new MissingDepsViewModel(services.GetRequiredService<IMissingDepsQuery>(), launcher),
             ["proposals"] = new ProposalsViewModel(services.GetRequiredService<IProposalService>(), launcher),
@@ -60,6 +61,14 @@ public static class AppHost
         var feeds = TryBuildFeeds(services, jobQueue);
         var shell = new ShellViewModel(screens, initial: "dashboard", dialogs: dialogs, jobQueue: jobQueue, feeds: feeds);
         shellRef = shell; // wires the launcher toast callback above
+
+        // Import rail badge = the live review-lane count of the Import screen's current session (spec §10).
+        if (screens["import"] is ImportViewModel importVm)
+            importVm.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(ImportViewModel.ReviewRemaining))
+                    shell.SetBadge("import", importVm.ReviewRemaining == 0 ? null : importVm.ReviewRemaining);
+            };
 
         // GA-6 · top-bar handlers → open the matching dialog through the launcher.
         shell.AddRepoHandler = launcher.OpenAddRepo;
@@ -158,6 +167,22 @@ public static class AppHost
         }
     }
 
+    /// <summary>Sweep import temp-workspace dirs orphaned by a crash, at launch (own scope, best-effort). (§6/E5)</summary>
+    private static void SweepImportTemp(IServiceProvider rootServices)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var scope = rootServices.CreateScope();
+                var import = scope.ServiceProvider.GetService<Sdk.Import.IImportService>();
+                if (import is not null)
+                    await import.SweepTempWorkspacesAsync().ConfigureAwait(false);
+            }
+            catch (Exception) { /* best-effort at startup */ }
+        });
+    }
+
     /// <summary>Reconcile Profile rows with on-disk profile dirs at launch (derive active, prune vanished). (T3.3)</summary>
     private static void ReconcileProfiles(IServiceProvider rootServices)
     {
@@ -210,6 +235,7 @@ public static class AppHost
             // C1.1 · a zero-repository install (that hasn't dismissed the wizard) opens onboarding on load.
             shell.ShowOnboardingOnLoad = NeedsOnboardingAsync(host.Services).GetAwaiter().GetResult();
             ReconcileProfiles(host.Services); // T3.3: sync Profile rows with on-disk profile dirs (own scope)
+            SweepImportTemp(host.Services);   // §6/E5: remove import temp dirs orphaned by a crash (own scope)
             EnqueueIndexAll(scope.ServiceProvider); // GA-5: populate the catalog in the background on launch
             return (shell, null);
         }

@@ -31,7 +31,7 @@ public class MainWindowUiTests
         Dispatcher.UIThread.RunJobs();
 
         // Rail present with all 13 items.
-        Assert.Equal(13, window.GetVisualDescendants().OfType<RailNavItem>().Count());
+        Assert.Equal(14, window.GetVisualDescendants().OfType<RailNavItem>().Count());
 
         // Visit every screen — the content host swaps to a non-null view each time.
         foreach (var screen in ShellViewModel.AllScreens)
