@@ -32,4 +32,35 @@ public class SettingsScreenTests
         Assert.Equal(@"E:\VaM", await settings.GetAsync(SettingKeys.VamPath));
         Assert.Equal("Saved", vm.StatusMessage);
     }
+
+    [Fact]
+    public async Task Import_temp_dir_and_history_keep_round_trip()
+    {
+        var settings = new FakeSettings();
+        await settings.SetAsync("import.temp_dir", @"E:\scratch\import");
+        await settings.SetAsync("import.history_keep", "50");
+
+        var vm = new SettingsViewModel(settings);
+        await vm.LoadCommand.ExecuteAsync(null);
+        Assert.Equal(@"E:\scratch\import", vm.ImportTempDir);
+        Assert.Equal("50", vm.ImportHistoryKeep);
+
+        vm.ImportTempDir = @"F:\tmp";
+        vm.ImportHistoryKeep = "25";
+        await vm.SaveCommand.ExecuteAsync(null);
+        Assert.Equal(@"F:\tmp", await settings.GetAsync("import.temp_dir"));
+        Assert.Equal("25", await settings.GetAsync("import.history_keep"));
+
+        // A blank/invalid keep count clears the key so the engine default (200) applies.
+        vm.ImportHistoryKeep = "not-a-number";
+        await vm.SaveCommand.ExecuteAsync(null);
+        Assert.Equal(string.Empty, await settings.GetAsync("import.history_keep"));
+    }
+
+    [Fact]
+    public void Import_tab_is_selectable()
+    {
+        var vm = new SettingsViewModel(new FakeSettings()) { SelectedTabIndex = 3 };
+        Assert.True(vm.IsImportTab);
+    }
 }

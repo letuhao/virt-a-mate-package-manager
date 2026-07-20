@@ -1,0 +1,328 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:c="clr-namespace:VarVault.App.Controls"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             xmlns:imp="clr-namespace:VarVault.Sdk.Import;assembly=VarVault.Sdk"
+             xmlns:repo="clr-namespace:VarVault.Sdk.Repositories;assembly=VarVault.Sdk"
+             x:Class="VarVault.App.Views.ImportView"
+             x:DataType="vm:ImportViewModel">
+  <Panel>
+    <DockPanel Margin="18">
+      <!-- Head + target + actions -->
+      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto,Auto,Auto" Margin="0,0,0,10">
+        <TextBlock Grid.Column="0" Text="Import &amp; review" FontSize="21" FontWeight="SemiBold"
+                   Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center" />
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,8,0">
+          <TextBlock Text="Import vào" Opacity="0.6" VerticalAlignment="Center" FontSize="12" />
+          <ComboBox ItemsSource="{Binding Repositories}" SelectedItem="{Binding TargetRepo}" MinWidth="180">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="repo:RepositoryInfo">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                  <c:Tag Content="{Binding Tier, StringFormat='T{0}'}" VerticalAlignment="Center" />
+                </StackPanel>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </StackPanel>
+        <Button Grid.Column="2" Content="+ Nguồn…" Command="{Binding AddSourceCommand}" Margin="0,0,6,0" />
+        <Button Grid.Column="3" Content="🕘 History" Command="{Binding OpenHistoryCommand}" Margin="0,0,6,0" />
+        <Button Grid.Column="4" Content="Quét" Command="{Binding ScanCommand}"
+                Background="{DynamicResource AccentBrush}" Foreground="White" />
+      </Grid>
+
+      <!-- Sources strip + summary -->
+      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+        <ItemsControl ItemsSource="{Binding Sources}">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="imp:ImportSource">
+              <Border Background="{DynamicResource Bg1Brush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                      CornerRadius="14" Padding="10,4" Margin="0,0,8,4">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="{Binding Kind}" FontSize="11" Opacity="0.7" VerticalAlignment="Center" />
+                  <TextBlock Text="{Binding Path}" FontSize="11" Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center"
+                             TextTrimming="CharacterEllipsis" MaxWidth="200" />
+                  <c:Tag Content="{Binding VarCount, StringFormat='{}{0} var'}" IsVisible="{Binding VarCount}" />
+                  <c:Tag Content="{Binding FailReason}" Kind="Crit"
+                         IsVisible="{Binding FailReason, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12" Margin="0,0,0,8">
+        <TextBlock Text="{Binding SourcesSummary}" Opacity="0.6" FontSize="11.5" VerticalAlignment="Center"
+                   IsVisible="{Binding HasSession}" />
+        <TextBlock Text="{Binding StatusMessage}" Opacity="0.6" FontSize="11.5" VerticalAlignment="Center" />
+      </StackPanel>
+
+      <!-- Stepper: Sources → Scan → Review → Apply -->
+      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10" IsVisible="{Binding HasSession}">
+        <c:Tag Content="① Nguồn" />
+        <TextBlock Text="›" Opacity="0.4" VerticalAlignment="Center" />
+        <c:Tag Content="② Quét &amp; giải nén" />
+        <TextBlock Text="›" Opacity="0.4" VerticalAlignment="Center" />
+        <c:Tag Content="③ Review" Kind="Warn" />
+        <TextBlock Text="›" Opacity="0.4" VerticalAlignment="Center" />
+        <c:Tag Content="④ Apply → repo" />
+      </StackPanel>
+
+      <!-- Triage chips + worknote -->
+      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10" IsVisible="{Binding HasSession}">
+        <WrapPanel Grid.Column="0">
+          <Button Command="{Binding FilterCommand}" CommandParameter="all" Margin="0,0,8,0"><TextBlock Text="{Binding TotalScanned, StringFormat='Tất cả {0}'}" /></Button>
+          <Button Command="{Binding FilterCommand}" CommandParameter="New" Margin="0,0,8,0"><TextBlock Text="{Binding NewCount, StringFormat='Mới {0}'}" Foreground="{DynamicResource GoodBrush}" /></Button>
+          <Button Command="{Binding FilterCommand}" CommandParameter="Cjk" Margin="0,0,8,0"><TextBlock Text="{Binding CjkCount, StringFormat='CJK {0}'}" Foreground="{DynamicResource ColdBrush}" /></Button>
+          <Button Command="{Binding FilterCommand}" CommandParameter="Exact" Margin="0,0,8,0"><TextBlock Text="{Binding ExactCount, StringFormat='Trùng {0}'}" Opacity="0.7" /></Button>
+          <Button Command="{Binding FilterCommand}" CommandParameter="Naming" Margin="0,0,8,0"><TextBlock Text="{Binding NamingCount, StringFormat='Tên≠meta {0}'}" Foreground="{DynamicResource WarnBrush}" /></Button>
+          <Button Command="{Binding FilterCommand}" CommandParameter="Conflict" Margin="0,0,8,0"><TextBlock Text="{Binding ConflictCount, StringFormat='Xung đột {0}'}" Foreground="{DynamicResource WarnBrush}" /></Button>
+          <Button Command="{Binding FilterCommand}" CommandParameter="Corrupt" Margin="0,0,8,0"><TextBlock Text="{Binding CorruptCount, StringFormat='Hỏng {0}'}" Foreground="{DynamicResource CritBrush}" /></Button>
+        </WrapPanel>
+        <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="12" Opacity="0.7" TextAlignment="Right"
+                   Text="{Binding ReviewRemaining, StringFormat='Chỉ {0} mục cần bạn quyết'}" />
+      </Grid>
+
+      <!-- Action bar (bottom) -->
+      <Border DockPanel.Dock="Bottom" Background="{DynamicResource Bg1Brush}" BorderBrush="{DynamicResource BorderBrush}"
+              BorderThickness="0,1,0,0" Padding="0,10,0,0" Margin="0,10,0,0">
+        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,12,0">
+            <TextBlock VerticalAlignment="Center" Opacity="0.7" FontSize="12"
+                       Text="{Binding ReviewResolved, StringFormat='{}{0} /'}" />
+            <TextBlock VerticalAlignment="Center" Opacity="0.7" FontSize="12"
+                       Text="{Binding ReviewTotal, StringFormat='{}{0} đã review'}" />
+            <ProgressBar Minimum="0" Maximum="1" Value="{Binding ReviewProgress}" Width="120" Height="6"
+                         VerticalAlignment="Center" />
+          </StackPanel>
+          <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="12" Opacity="0.75"
+                     Text="{Binding ApplyPlanSummary}" />
+          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" Margin="0,0,12,0">
+            <Button Content="✨ Chấp nhận mọi gợi ý" Command="{Binding AcceptAllCommand}" />
+            <CheckBox Content="Activate vào VaM sau import" IsChecked="{Binding ActivateAfter}" VerticalAlignment="Center" />
+          </StackPanel>
+          <Button Grid.Column="4" Content="Apply →" Command="{Binding ApplyCommand}"
+                  Background="{DynamicResource AccentBrush}" Foreground="White" FontWeight="SemiBold" />
+        </Grid>
+      </Border>
+
+      <!-- Work area: list | resolver -->
+      <Grid ColumnDefinitions="*,1.1*">
+        <DockPanel Grid.Column="0">
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,6">
+            <TextBox Grid.Column="0" Text="{Binding SearchText}" Watermark="Lọc theo tên / creator…"
+                     FontSize="12" Margin="0,0,8,0" />
+            <TextBlock Grid.Column="1" Text="{Binding Items.Count, StringFormat='{}{0} mục'}" Opacity="0.6" FontSize="12"
+                       VerticalAlignment="Center" Margin="0,0,8,0" />
+            <Button Grid.Column="2" Content="▤ / ▦" Command="{Binding ToggleViewCommand}" />
+          </Grid>
+          <!-- Table -->
+          <ListBox IsVisible="{Binding !GalleryView}" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}"
+                   Background="Transparent">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:ImportItemViewModel">
+                <Grid ColumnDefinitions="4,*,Auto" Height="34">
+                  <Border Grid.Column="0" Width="3" CornerRadius="2" VerticalAlignment="Stretch" Margin="0,4"
+                          Background="{Binding Lane, Converter={StaticResource LaneToBrush}}" />
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0">
+                    <TextBlock Text="{Binding FileName}" FontFamily="{DynamicResource MonoFont}" FontSize="12"
+                               Foreground="{DynamicResource TextHiBrush}" TextTrimming="CharacterEllipsis" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <TextBlock Text="{Binding Creator}" FontSize="11" Opacity="0.6" TextTrimming="CharacterEllipsis" MaxWidth="120" />
+                      <TextBlock Text="{Binding SizeLabel}" FontSize="11" Opacity="0.6" />
+                      <TextBlock Text="{Binding GbkCount, StringFormat='{}{0} GBK'}" FontSize="10" Foreground="{DynamicResource ColdBrush}" IsVisible="{Binding IsCjk}" />
+                    </StackPanel>
+                  </StackPanel>
+                  <Border Grid.Column="2" VerticalAlignment="Center" CornerRadius="10" Padding="8,2"
+                          Background="{DynamicResource Bg3Brush}">
+                    <TextBlock Text="{Binding ListPillText}" FontSize="10.5"
+                               Foreground="{Binding Lane, Converter={StaticResource LaneToBrush}}" />
+                  </Border>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <!-- Gallery -->
+          <ListBox IsVisible="{Binding GalleryView}" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}"
+                   Background="Transparent">
+            <ListBox.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:ImportItemViewModel">
+                <Border Width="150" Margin="6" Background="{DynamicResource Bg1Brush}"
+                        BorderBrush="{Binding Lane, Converter={StaticResource LaneToBrush}}"
+                        BorderThickness="0,3,0,0" CornerRadius="8">
+                  <StackPanel>
+                    <Panel Height="90">
+                      <Border Background="{DynamicResource Bg3Brush}" />
+                      <Image Source="{Binding PreviewPath, Converter={StaticResource PathToBitmap}}"
+                             Stretch="UniformToFill" IsVisible="{Binding HasPreview}"
+                             HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+                      <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="6" CornerRadius="9" Padding="7,1"
+                              Background="{DynamicResource Bg0Brush}">
+                        <TextBlock Text="{Binding ListPillText}" FontSize="10"
+                                   Foreground="{Binding Lane, Converter={StaticResource LaneToBrush}}" />
+                      </Border>
+                    </Panel>
+                    <StackPanel Margin="8,6">
+                      <TextBlock Text="{Binding FileName}" FontFamily="{DynamicResource MonoFont}" FontSize="11"
+                                 TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextHiBrush}" />
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="{Binding Creator}" FontSize="10" Opacity="0.6" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1" Text="{Binding SizeLabel}" FontSize="10" Opacity="0.6" />
+                      </Grid>
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+
+        <!-- Resolver -->
+        <c:Card Grid.Column="1" Margin="14,0,0,0" Header="Chi tiết"
+                IsVisible="{Binding Selected, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <ScrollViewer>
+            <StackPanel Spacing="10" DataContext="{Binding Selected}" x:DataType="vm:ImportItemViewModel">
+              <TextBlock Text="{Binding FileName}" FontFamily="{DynamicResource MonoFont}" FontSize="14"
+                         Foreground="{DynamicResource TextHiBrush}" TextWrapping="Wrap" />
+              <Border CornerRadius="6" ClipToBounds="True" MaxHeight="180" HorizontalAlignment="Left"
+                      IsVisible="{Binding HasPreview}">
+                <Image Source="{Binding PreviewPath, Converter={StaticResource PathToBitmap}}" Stretch="Uniform" />
+              </Border>
+              <Border Background="{DynamicResource Bg2Brush}" CornerRadius="6" Padding="10">
+                <TextBlock Text="{Binding Reason}" FontSize="12" TextWrapping="Wrap" />
+              </Border>
+
+              <!-- Naming lane: filename identity vs meta.json identity (G2 · D3) -->
+              <Grid ColumnDefinitions="120,*,*" RowDefinitions="Auto,Auto" IsVisible="{Binding IsNaming}">
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Theo tên file" Foreground="{DynamicResource WarnBrush}" FontWeight="SemiBold" FontSize="12" />
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="Theo meta.json" Foreground="{DynamicResource ColdBrush}" FontWeight="SemiBold" FontSize="12" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Định danh" Opacity="0.6" FontSize="12" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding FilenameIdentity}" FontFamily="{DynamicResource MonoFont}" FontSize="11.5" TextWrapping="Wrap" />
+                <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding MetaIdentityLabel}" FontFamily="{DynamicResource MonoFont}" FontSize="11.5" FontWeight="SemiBold" TextWrapping="Wrap" />
+              </Grid>
+
+              <!-- Conflict side-by-side signal grid -->
+              <Grid ColumnDefinitions="120,*,*" IsVisible="{Binding HasExisting}"
+                    RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Bản mới" Foreground="{DynamicResource GoodBrush}" FontWeight="SemiBold" FontSize="12" />
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="Trong repo" Foreground="{DynamicResource ColdBrush}" FontWeight="SemiBold" FontSize="12" />
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="Zip hợp lệ" Opacity="0.6" FontSize="12" />
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding IntegrityStatus}" FontSize="12" />
+                <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Existing.Signals.IntegrityStatus}" FontSize="12" />
+                <TextBlock Grid.Row="2" Grid.Column="0" Text="Dung lượng" Opacity="0.6" FontSize="12" />
+                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SizeLabel}" FontSize="12" />
+                <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding Existing.Signals.SizeBytes, Converter={StaticResource BytesToSize}}" FontSize="12" />
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="Số entry" Opacity="0.6" FontSize="12" />
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding EntryCount}" FontSize="12" />
+                <TextBlock Grid.Row="3" Grid.Column="2" Text="{Binding Existing.Signals.EntryCount}" FontSize="12" />
+                <TextBlock Grid.Row="4" Grid.Column="0" Text="Repo" Opacity="0.6" FontSize="12" />
+                <TextBlock Grid.Row="4" Grid.Column="2" Text="{Binding Existing.RepositoryName}" FontSize="12" />
+              </Grid>
+
+              <!-- Per-entry diff (+/−/~) -->
+              <ItemsControl ItemsSource="{Binding Diff}" MaxHeight="150">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="imp:EntryDelta">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Text="{Binding Kind}" FontFamily="{DynamicResource MonoFont}" FontSize="11" FontWeight="Bold" Width="12" />
+                      <TextBlock Text="{Binding Path}" FontFamily="{DynamicResource MonoFont}" FontSize="11" Opacity="0.8" TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <TextBlock Text="Quyết định:" Opacity="0.6" FontSize="12" Margin="0,4,0,0" />
+
+              <!-- New / Exact: import vs skip -->
+              <WrapPanel IsVisible="{Binding IsNew}">
+                <Button Content="✅ Import" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
+                <Button Content="⤫ Bỏ qua" Command="{Binding ChooseCommand}" CommandParameter="Skip" Margin="0,0,6,6" />
+              </WrapPanel>
+              <WrapPanel IsVisible="{Binding IsExact}">
+                <Button Content="⤫ Bỏ qua (đã có)" Command="{Binding ChooseCommand}" CommandParameter="Skip" Margin="0,0,6,6" />
+                <Button Content="✅ Import bản sao" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
+              </WrapPanel>
+              <!-- CJK: import+fix vs skip -->
+              <WrapPanel IsVisible="{Binding IsCjk}">
+                <Button Content="🈶 Import + fix Unicode" Command="{Binding ChooseCommand}" CommandParameter="ImportAndFix" Margin="0,0,6,6" />
+                <Button Content="✅ Import (không fix)" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
+                <Button Content="⤫ Bỏ qua" Command="{Binding ChooseCommand}" CommandParameter="Skip" Margin="0,0,6,6" />
+              </WrapPanel>
+              <!-- Naming: rename to meta / keep filename / discard -->
+              <WrapPanel IsVisible="{Binding IsNaming}">
+                <Button Content="🏷 Đổi tên theo meta" Command="{Binding ChooseCommand}" CommandParameter="RenameToMeta" Margin="0,0,6,6" />
+                <Button Content="✅ Giữ tên file" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
+                <Button Content="🗑 Loại" Command="{Binding ChooseCommand}" CommandParameter="Discard" Margin="0,0,6,6" />
+              </WrapPanel>
+              <!-- Conflict: keep new / keep old / both / discard -->
+              <WrapPanel IsVisible="{Binding IsConflict}">
+                <Button Content="✅ Giữ mới" Command="{Binding ChooseCommand}" CommandParameter="KeepIncoming" Margin="0,0,6,6" />
+                <Button Content="↩︎ Giữ cũ" Command="{Binding ChooseCommand}" CommandParameter="KeepExisting" Margin="0,0,6,6" />
+                <Button Content="🔀 Cả hai" Command="{Binding ChooseCommand}" CommandParameter="KeepBoth" Margin="0,0,6,6" />
+                <Button Content="🗑 Loại" Command="{Binding ChooseCommand}" CommandParameter="Discard" Margin="0,0,6,6" />
+              </WrapPanel>
+              <!-- Corrupt: discard / import anyway -->
+              <WrapPanel IsVisible="{Binding IsCorrupt}">
+                <Button Content="🗑 Loại (khuyến nghị)" Command="{Binding ChooseCommand}" CommandParameter="Discard" Margin="0,0,6,6" />
+                <Button Content="⚠ Vẫn import" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
+              </WrapPanel>
+
+              <TextBlock Text="{Binding DecisionLabel, StringFormat='Đã chọn: {0}'}" Foreground="{DynamicResource GoodBrush}"
+                         FontSize="12" IsVisible="{Binding IsResolved}" />
+              <TextBlock Text="J/K chuyển · ] chọn 1 · [ chọn 2 · \ cả hai · Del loại" Opacity="0.5" FontSize="11"
+                         IsVisible="{Binding NeedsReview}" Margin="0,4,0,0" />
+            </StackPanel>
+          </ScrollViewer>
+        </c:Card>
+      </Grid>
+    </DockPanel>
+
+    <!-- History overlay -->
+    <Border IsVisible="{Binding HistoryOpen}" Background="#88000000">
+      <Border Background="{DynamicResource Bg1Brush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+              CornerRadius="12" Width="640" MaxHeight="520" VerticalAlignment="Center" HorizontalAlignment="Center">
+        <DockPanel Margin="18">
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+            <TextBlock Grid.Column="0" Text="🕘 Import history" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+            <Button Grid.Column="1" Content="✕" Command="{Binding CloseHistoryCommand}" />
+          </Grid>
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding History}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="imp:ImportRun">
+                  <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,8">
+                    <StackPanel>
+                      <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock Text="{Binding StartedUtc}" FontFamily="{DynamicResource MonoFont}" FontSize="12" Foreground="{DynamicResource TextHiBrush}" />
+                        <TextBlock Text="{Binding SourceSummary}" FontSize="12" Opacity="0.6" />
+                        <TextBlock Text="{Binding Copied, StringFormat='✓ {0}'}" FontSize="12" Foreground="{DynamicResource GoodBrush}" />
+                        <TextBlock Text="{Binding Skipped, StringFormat='↷ {0}'}" FontSize="12" Opacity="0.6" />
+                        <TextBlock Text="{Binding Failed, StringFormat='✗ {0}'}" FontSize="12" Foreground="{DynamicResource CritBrush}" />
+                      </StackPanel>
+                      <ItemsControl ItemsSource="{Binding FailedSources}" Margin="0,4,0,0">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="imp:ImportFailedSource">
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                              <TextBlock Grid.Column="0" FontSize="11" Foreground="{DynamicResource CritBrush}" VerticalAlignment="Center">
+                                <Run Text="🔒" /><Run Text="{Binding Path}" /><Run Text=" — " /><Run Text="{Binding Reason}" />
+                              </TextBlock>
+                              <Button Grid.Column="1" Content="Thử lại…" FontSize="11" Padding="8,2"
+                                      Command="{Binding $parent[UserControl].((vm:ImportViewModel)DataContext).RetryFailedSourceCommand}"
+                                      CommandParameter="{Binding Path}" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+    </Border>
+  </Panel>
+</UserControl>

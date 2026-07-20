@@ -141,6 +141,10 @@
 
       <!-- Converters (28-checklist A1.2): raw bytes → humanized "GB/TB" size string -->
       <conv:BytesToSizeConverter x:Key="BytesToSize" />
+      <!-- Import gallery/resolver preview (doc 31 · 6.3): image-file path → decoded Bitmap -->
+      <conv:PathToBitmapConverter x:Key="PathToBitmap" />
+      <!-- Import lane colour-coding (draft §10): ImportLane → lane accent brush -->
+      <conv:ImportLaneToBrushConverter x:Key="LaneToBrush" />
     </ResourceDictionary>
   </Application.Resources>
 

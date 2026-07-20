@@ -26,6 +26,15 @@ public static class Telemetry
     public static readonly Counter<long> JobsCompleted = Meter.CreateCounter<long>("varvault.jobs.completed");
     public static readonly Counter<long> JobsFailed = Meter.CreateCounter<long>("varvault.jobs.failed");
 
+    // Import (scan/apply pipeline) — doc 30 §9
+    public static readonly Counter<long> ImportsApplied = Meter.CreateCounter<long>("varvault.imports.applied");
+    public static readonly Counter<long> ImportScanned = Meter.CreateCounter<long>("varvault.imports.scanned");
+    public static readonly Counter<long> ImportVarsCopied = Meter.CreateCounter<long>("varvault.imports.copied");
+    public static readonly Counter<long> ImportFixed = Meter.CreateCounter<long>("varvault.imports.fixed");
+    public static readonly Counter<long> ImportFailed = Meter.CreateCounter<long>("varvault.imports.failed");
+    public static readonly Histogram<double> ImportApplyDurationMs = Meter.CreateHistogram<double>("varvault.imports.apply.duration", unit: "ms");
+    public static readonly Histogram<long> ImportTempBytes = Meter.CreateHistogram<long>("varvault.imports.temp.bytes", unit: "By");
+
     /// <summary>Start a traced activity for an operation (no-op if nobody is listening).</summary>
     public static Activity? StartActivity(string name) => ActivitySource.StartActivity(name);
 }

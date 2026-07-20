@@ -21,10 +21,11 @@ public class TabAdoptionTests
     }
 
     [Fact]
-    public void Dupes_has_its_four_tabs()
+    public void Dupes_has_its_three_tabs()
     {
+        // "Download intake" was retired — the Import screen replaces it (doc 30 §10).
         var vm = new DupesViewModel(new StubReclaim());
-        Assert.Equal(new[] { "Reclaim space", "Exact duplicates", "Near-duplicates", "Download intake" },
+        Assert.Equal(new[] { "Reclaim space", "Exact duplicates", "Near-duplicates" },
             vm.Tabs.Select(t => t.Label));
     }
 

@@ -51,5 +51,9 @@
     <PackageVersion Include="SQLitePCLRaw.lib.e_sqlite3" Version="2.1.12" />
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.10" />
     <PackageVersion Include="Tmds.DBus.Protocol" Version="0.94.2" />
+    <!-- doc 31 · Import archive extraction. SharpCompress (pure-managed, zip/7z/rar/tar) with a CustomDecoder wired to
+         VarVault's own CJK detection so legacy-encoded entry names decode correctly; optional 7z-binary fallback via
+         the `import.sevenzip_path` setting. (30-spec §6 amendment A1, 2026-07-20.) -->
+    <PackageVersion Include="SharpCompress" Version="0.50.0" />
   </ItemGroup>
 </Project>

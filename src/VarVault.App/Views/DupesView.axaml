@@ -76,31 +76,6 @@
         </c:Card>
       </DockPanel>
 
-      <!-- Download intake (tab 3): classify a folder against the catalog (24-checklist A10) -->
-      <DockPanel IsVisible="{Binding IsIntakeTab}">
-        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
-          <TextBox Grid.Column="0" Watermark="Folder of incoming .var files…" Text="{Binding IntakeFolder}" Margin="0,0,8,0" />
-          <Button Grid.Column="1" Content="Classify" Command="{Binding ClassifyIntakeCommand}"
-                  Background="{DynamicResource AccentBrush}" Foreground="White" />
-        </Grid>
-        <TextBlock DockPanel.Dock="Bottom" Opacity="0.6" IsVisible="{Binding IntakeIsEmpty}" Margin="0,8,0,0"
-                   Text="Enter a download folder and Classify to sort each var vs. the catalog (exact-dup / same-name / near-dup / new)." />
-        <c:Card Header="Intake classification">
-          <ScrollViewer>
-            <ItemsControl ItemsSource="{Binding IntakeItems}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="lib:IntakeItem">
-                  <Grid ColumnDefinitions="*,180,160" Height="24">
-                    <TextBlock Grid.Column="0" Text="{Binding FileName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Grid.Column="1" Text="{Binding Classification}" VerticalAlignment="Center" Opacity="0.85" />
-                    <TextBlock Grid.Column="2" Text="{Binding SuggestedAction}" VerticalAlignment="Center" Opacity="0.6" FontSize="11" />
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </ScrollViewer>
-        </c:Card>
-      </DockPanel>
     </Grid>
   </DockPanel>
 </UserControl>

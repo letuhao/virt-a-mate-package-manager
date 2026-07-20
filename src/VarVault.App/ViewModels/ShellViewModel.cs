@@ -35,6 +35,7 @@ public sealed partial class ShellViewModel : ObservableObject
         new("presets", "Loading presets", "Browse", "M12,3 L21,8 L12,13 L3,8 Z M3,13 L12,18 L21,13"),
         new("tiering", "Tiering & migration", "Optimize", "M3,5 L21,5 M6,12 L18,12 M9,19 L15,19"),
         new("dupes", "Duplicates & reclaim", "Optimize", "M8,8 L20,8 L20,20 L8,20 Z M4,16 L4,6 L6,4 L16,4"),
+        new("import", "Import & review", "Optimize", "M12,3 L12,15 M8,11 L12,15 L16,11 M4,17 L4,20 L20,20 L20,17"),
         new("analytics", "Analytics", "Optimize", "M4,4 L4,20 L20,20 M7,17 L7,12 M12,17 L12,8 M17,17 L17,14"),
         new("proposals", "Proposals", "Problems", "M3,4 L21,4 L21,20 L3,20 Z M8,12 L11,15 L16,9"),
         new("health", "Health & fix", "Problems", "M12,3 L20,6 L20,12 C20,17 16.5,20 12,21 C7.5,20 4,17 4,12 L4,6 Z"),

@@ -26,7 +26,7 @@ public class ShellViewModelTests
     public void Rail_lists_all_13_screens_in_four_groups()
     {
         var shell = new ShellViewModel(new Dictionary<string, object>());
-        Assert.Equal(13, shell.Screens.Count);
+        Assert.Equal(14, shell.Screens.Count);
         Assert.Equal(["Browse", "Optimize", "Problems", "System"], shell.Screens.Select(s => s.Group).Distinct());
     }
 

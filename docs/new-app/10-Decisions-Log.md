@@ -62,6 +62,12 @@ Every open question across the design, resolved. **Sealed** = the decision the b
 | B2 | Slice order: 1 Repos+Indexing+Library → 2 Dependency engine → 3 Activation+Presets → 4 Dedup+Encoding-fix → 5 Analyzer+Migration |
 | B3 | Completeness gate = the item-level [09-Implementation-Checklist](./09-Implementation-Checklist.md); `[x]` only with concrete evidence |
 
+## Feature specs (sealed separately)
+
+| # | Decision |
+|---|----------|
+| F1 | **Import &amp; Dedup-Review** feature sealed 2026-07-20 in [30-Import-And-Dedup-Review-Spec §13](./30-Import-And-Dedup-Review-Spec.md#13-decisions-log--sealed) (checklist [31](./31-Import-Implementation-Checklist.md)): whole-library dedup, optional post-import activate, per-var name≠meta choice, configurable temp dir, encoding-fix as copy modifier, durable copy + import history. Replaces the read-only "Download intake" tab. |
+
 ---
 
 *No open questions remain. Any future change to a sealed decision is logged here as a dated amendment.*

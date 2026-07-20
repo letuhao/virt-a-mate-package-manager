@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VarVault — Import &amp; Review (UX draft)</title>
+<style>
+  :root{
+    --bg0:#0d0f13; --bg1:#15181f; --bg2:#1c2029; --bg3:#232833; --hover:#262c38;
+    --border:#2b313d; --border-hi:#3a414f;
+    --text-hi:#e7ebf2; --text:#aab3c2; --text-lo:#6b7484;
+    --accent:#7c86f0; --accent-hi:#9aa2f6; --accent-bg:#1c2140;
+    --good:#3ddc97; --good-bg:#12291f; --warn:#f4b740; --warn-bg:#2a2413; --crit:#fb6f84; --crit-bg:#2b1620;
+    --cold:#6aa2c8; --cold-bg:#122230; --susp:#c98bdb; --susp-bg:#2a1a33;
+    --radius:8px; --radius-sm:6px;
+    --mono:'Cascadia Code','Consolas',ui-monospace,monospace;
+    --ui:'Inter','Segoe UI',system-ui,-apple-system,sans-serif; color-scheme:dark;
+  }
+  :root[data-theme="light"]{
+    --bg0:#eef0f4; --bg1:#f7f8fb; --bg2:#ffffff; --bg3:#f0f2f6; --hover:#eaecf2;
+    --border:#dde1e9; --border-hi:#c7ccd8; --text-hi:#161a22; --text:#4a5265; --text-lo:#8a93a4;
+    --accent:#5a63d8; --accent-hi:#464fc4; --accent-bg:#e9eafb;
+    --good:#0f9d63; --good-bg:#e4f5ec; --warn:#b9791a; --warn-bg:#f8efdc; --crit:#d63d55; --crit-bg:#fbe6ea;
+    --cold:#4d7ea6; --cold-bg:#e5eef5; --susp:#9b59b6; --susp-bg:#f2e7f7; color-scheme:light;
+  }
+  @media (prefers-color-scheme: light){ :root:not([data-theme="dark"]){
+    --bg0:#eef0f4; --bg1:#f7f8fb; --bg2:#ffffff; --bg3:#f0f2f6; --hover:#eaecf2;
+    --border:#dde1e9; --border-hi:#c7ccd8; --text-hi:#161a22; --text:#4a5265; --text-lo:#8a93a4;
+    --accent:#5a63d8; --accent-hi:#464fc4; --accent-bg:#e9eafb;
+    --good:#0f9d63; --good-bg:#e4f5ec; --warn:#b9791a; --warn-bg:#f8efdc; --crit:#d63d55; --crit-bg:#fbe6ea;
+    --cold:#4d7ea6; --cold-bg:#e5eef5; --susp:#9b59b6; --susp-bg:#f2e7f7; color-scheme:light; } }
+
+  *{box-sizing:border-box;} html,body{margin:0;height:100%;}
+  body{font-family:var(--ui);background:var(--bg0);color:var(--text);font-size:13px;line-height:1.45;-webkit-font-smoothing:antialiased;}
+  .app{display:grid;grid-template-columns:210px 1fr;height:100vh;overflow:hidden;}
+  .rail{background:var(--bg1);border-right:1px solid var(--border);padding:14px 10px;overflow-y:auto;}
+  .brand{display:flex;align-items:center;gap:9px;padding:2px 6px 14px;}
+  .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent-hi));display:grid;place-items:center;color:#fff;font-weight:700;}
+  .brand small{display:block;color:var(--text-lo);font-size:11px;}
+  .rail-group{color:var(--text-lo);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin:12px 8px 4px;}
+  .nav{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:var(--radius-sm);color:var(--text);cursor:pointer;}
+  .nav:hover{background:var(--hover);} .nav.active{background:var(--accent-bg);color:var(--text-hi);font-weight:600;}
+  .nav .ic{width:16px;height:16px;opacity:.85;} .nav .badge{margin-left:auto;background:var(--accent);color:#fff;border-radius:9px;font-size:10px;padding:1px 6px;font-weight:600;}
+
+  .main{display:flex;flex-direction:column;min-width:0;overflow:hidden;position:relative;}
+  .topbar{display:flex;align-items:center;gap:10px;padding:11px 18px;border-bottom:1px solid var(--border);background:var(--bg1);flex-wrap:wrap;}
+  .topbar h1{font-size:16px;margin:0;color:var(--text-hi);font-weight:600;}
+  .topbar .spacer{flex:1;}
+  .selbox{display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border-hi);border-radius:var(--radius);padding:6px 11px;font-size:12.5px;color:var(--text-hi);cursor:pointer;}
+  .selbox .k{color:var(--text-lo);font-size:11px;} .selbox .tier{font-size:10px;background:var(--accent);color:#fff;border-radius:8px;padding:1px 7px;}
+  .selbox .cx{color:var(--text-lo);}
+  .btn{border:1px solid var(--border-hi);background:var(--bg2);color:var(--text-hi);border-radius:var(--radius-sm);padding:7px 12px;font-size:12.5px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;}
+  .btn:hover{background:var(--hover);} .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600;} .btn.primary:hover{background:var(--accent-hi);}
+  .btn.ghost{background:transparent;} .btn:disabled{opacity:.45;cursor:not-allowed;}
+  .icon-btn{width:34px;height:34px;display:grid;place-items:center;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg2);cursor:pointer;color:var(--text);}
+  .icon-btn:hover{background:var(--hover);}
+
+  /* Sources strip */
+  .sources{display:flex;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;background:var(--bg0);}
+  .srcpill{display:flex;align-items:center;gap:7px;background:var(--bg1);border:1px solid var(--border);border-radius:20px;padding:5px 11px;font-size:12px;color:var(--text);}
+  .srcpill .i{font-size:13px;} .srcpill b{color:var(--text-hi);font-weight:600;} .srcpill .cnt{color:var(--text-lo);}
+  .srcpill.locked{border-color:var(--warn);color:var(--warn);cursor:pointer;} .srcpill.locked b{color:var(--warn);}
+  .srcadd{border:1px dashed var(--border-hi);background:transparent;border-radius:20px;padding:5px 12px;font-size:12px;color:var(--text-lo);cursor:pointer;}
+  .srcadd:hover{color:var(--text-hi);border-color:var(--accent);}
+  .sources .sum{margin-left:auto;color:var(--text-lo);font-size:11.5px;}
+
+  .stepper{display:flex;align-items:center;gap:6px;padding:12px 18px 0;color:var(--text-lo);font-size:12px;flex-wrap:wrap;}
+  .step{display:flex;align-items:center;gap:7px;padding:5px 10px;border-radius:20px;}
+  .step .n{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;background:var(--bg3);color:var(--text-lo);}
+  .step.done{color:var(--good);} .step.done .n{background:var(--good);color:#04150d;}
+  .step.active{color:var(--text-hi);background:var(--accent-bg);} .step.active .n{background:var(--accent);color:#fff;}
+  .step-sep{width:16px;height:1px;background:var(--border);}
+
+  .triage{display:flex;gap:9px;padding:14px 18px;flex-wrap:wrap;align-items:stretch;}
+  .chip{background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;min-width:100px;cursor:pointer;display:flex;flex-direction:column;gap:2px;transition:border-color .12s;}
+  .chip:hover{border-color:var(--border-hi);} .chip.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset;}
+  .chip .num{font-size:21px;font-weight:700;color:var(--text-hi);font-variant-numeric:tabular-nums;line-height:1;}
+  .chip .lbl{font-size:11px;color:var(--text-lo);display:flex;align-items:center;gap:6px;}
+  .chip .dot{width:8px;height:8px;border-radius:2px;}
+  .chip.attention{border-color:var(--warn);} .chip.attention .num{color:var(--warn);}
+  .lane-new .dot{background:var(--good);} .lane-encoding .dot{background:var(--cold);} .lane-exact .dot{background:var(--text-lo);}
+  .lane-conflict .dot{background:var(--warn);} .lane-naming .dot{background:var(--susp);} .lane-corrupt .dot{background:var(--crit);}
+  .triage .grow{flex:1;} .worknote{align-self:center;color:var(--text-lo);font-size:12px;max-width:200px;} .worknote b{color:var(--warn);}
+
+  .work{display:grid;grid-template-columns:minmax(380px,1.1fr) minmax(430px,1.15fr);flex:1;min-height:0;border-top:1px solid var(--border);}
+  .list-pane{border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;background:var(--bg0);}
+  .list-head{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text-lo);}
+  .list-head input[type=search]{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 9px;color:var(--text-hi);font-family:inherit;font-size:12px;}
+  .vtoggle{display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;}
+  .vtoggle button{border:none;background:var(--bg2);color:var(--text-lo);padding:6px 9px;cursor:pointer;font-size:13px;}
+  .vtoggle button.on{background:var(--accent);color:#fff;}
+
+  .rows{overflow-y:auto;min-height:0;flex:1;}
+  .row{display:grid;grid-template-columns:16px 1fr auto;gap:10px;align-items:center;padding:9px 14px 9px 10px;border-bottom:1px solid var(--border);cursor:pointer;border-left:3px solid transparent;}
+  .row:hover{background:var(--bg1);} .row.sel{background:var(--accent-bg);}
+  .row.lane-new{border-left-color:var(--good);} .row.lane-encoding{border-left-color:var(--cold);} .row.lane-exact{border-left-color:var(--border-hi);}
+  .row.lane-conflict{border-left-color:var(--warn);} .row.lane-naming{border-left-color:var(--susp);} .row.lane-corrupt{border-left-color:var(--crit);}
+  .row .chkbox{width:15px;height:15px;border:1.5px solid var(--border-hi);border-radius:4px;display:grid;place-items:center;font-size:11px;}
+  .row.on .chkbox{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .row .name{font-family:var(--mono);font-size:12px;color:var(--text-hi);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .row .sub{font-size:11px;color:var(--text-lo);margin-top:1px;display:flex;gap:8px;}
+
+  /* Gallery */
+  .gallery{overflow-y:auto;min-height:0;flex:1;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;padding:12px;}
+  .gcard{background:var(--bg1);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;cursor:pointer;border-top:3px solid var(--border);}
+  .gcard:hover{border-color:var(--border-hi);} .gcard.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}
+  .gcard.lane-new{border-top-color:var(--good);} .gcard.lane-encoding{border-top-color:var(--cold);} .gcard.lane-exact{border-top-color:var(--text-lo);}
+  .gcard.lane-conflict{border-top-color:var(--warn);} .gcard.lane-naming{border-top-color:var(--susp);} .gcard.lane-corrupt{border-top-color:var(--crit);}
+  .gthumb{height:104px;position:relative;display:grid;place-items:center;color:#fff;font-size:26px;}
+  .gthumb .glane{position:absolute;top:6px;left:6px;} .gthumb .gchk{position:absolute;top:6px;right:6px;width:18px;height:18px;border-radius:5px;background:rgba(0,0,0,.4);border:1.5px solid #fff;display:grid;place-items:center;color:#fff;font-size:11px;}
+  .gcard.on .gchk{background:var(--accent);border-color:var(--accent);}
+  .gmeta{padding:8px 9px;} .gmeta .gn{font-family:var(--mono);font-size:11px;color:var(--text-hi);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .gmeta .gs{font-size:10.5px;color:var(--text-lo);margin-top:2px;display:flex;justify-content:space-between;}
+
+  .pill{font-size:10.5px;padding:2px 8px;border-radius:11px;font-weight:600;white-space:nowrap;border:1px solid transparent;}
+  .pill.new{background:var(--good-bg);color:var(--good);} .pill.encoding{background:var(--cold-bg);color:var(--cold);} .pill.exact{background:var(--bg3);color:var(--text-lo);}
+  .pill.conflict{background:var(--warn-bg);color:var(--warn);} .pill.naming{background:var(--susp-bg);color:var(--susp);} .pill.corrupt{background:var(--crit-bg);color:var(--crit);}
+  .pill.decided{background:transparent;border-color:var(--good);color:var(--good);} .pill.pending{background:transparent;border:1px dashed var(--warn);color:var(--warn);}
+  .tagcjk{font-size:9.5px;padding:1px 6px;border-radius:9px;background:var(--cold-bg);color:var(--cold);font-weight:600;}
+
+  .detail{overflow-y:auto;min-height:0;padding:16px 18px 90px;background:var(--bg0);}
+  .empty{color:var(--text-lo);text-align:center;padding:50px 20px;line-height:1.7;}
+  .d-head h2{font-family:var(--mono);font-size:15px;color:var(--text-hi);margin:0 0 3px;word-break:break-all;} .d-head .idk{color:var(--text-lo);font-size:12px;}
+  .rec{display:flex;gap:10px;align-items:flex-start;border-radius:var(--radius);padding:11px 13px;margin:14px 0;border:1px solid;}
+  .rec.keepIncoming{background:var(--good-bg);border-color:var(--good);} .rec.keepExisting{background:var(--cold-bg);border-color:var(--cold);}
+  .rec.both{background:var(--accent-bg);border-color:var(--accent);} .rec.naming{background:var(--susp-bg);border-color:var(--susp);}
+  .rec .ricon{font-size:16px;} .rec .rt{font-weight:600;color:var(--text-hi);margin-bottom:2px;} .rec .rr{font-size:12px;color:var(--text);}
+  .cmp{display:grid;grid-template-columns:150px 1fr 1fr;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px;}
+  .cmp>div{padding:8px 11px;border-bottom:1px solid var(--border);font-size:12px;}
+  .cmp .ch{background:var(--bg1);font-weight:600;color:var(--text-hi);} .cmp .ch.incoming{color:var(--good);} .cmp .ch.existing{color:var(--cold);}
+  .cmp .rk{background:var(--bg1);color:var(--text-lo);font-size:11.5px;} .cmp .v{font-variant-numeric:tabular-nums;color:var(--text);} .cmp .v.win{color:var(--text-hi);font-weight:600;}
+  .cmp>div:nth-last-child(-n+3){border-bottom:none;} .cmp .thumb{width:100%;height:60px;border-radius:6px;border:1px solid var(--border);} .cmp .thumb.none{display:grid;place-items:center;color:var(--text-lo);font-size:11px;background:var(--bg3);}
+  .diff{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:8px;} .diff-h{background:var(--bg1);padding:8px 11px;font-size:12px;color:var(--text-lo);display:flex;gap:14px;flex-wrap:wrap;} .diff-h b{color:var(--text-hi);}
+  .diff-body{max-height:150px;overflow-y:auto;font-family:var(--mono);font-size:11.5px;} .diff-line{padding:3px 11px;display:flex;gap:8px;border-top:1px solid var(--border);} .diff-line .mk{width:14px;font-weight:700;}
+  .diff-line.add{background:var(--good-bg);} .diff-line.add .mk{color:var(--good);} .diff-line.del{background:var(--crit-bg);} .diff-line.del .mk{color:var(--crit);} .diff-line.chg{background:var(--warn-bg);} .diff-line.chg .mk{color:var(--warn);}
+  .diff-line .p{color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .simple{border:1px solid var(--border);border-radius:var(--radius);padding:6px 14px;margin:14px 0;background:var(--bg1);}
+  .simple .row2{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12.5px;} .simple .row2:last-child{border-bottom:none;} .simple .row2 .k{color:var(--text-lo);} .simple .row2 .v{color:var(--text-hi);font-family:var(--mono);}
+  .note{font-size:12px;color:var(--text-lo);background:var(--bg1);border-left:3px solid var(--cold);border-radius:0 6px 6px 0;padding:9px 12px;margin:12px 0;}
+  .fixrow{display:flex;align-items:center;gap:9px;background:var(--cold-bg);border:1px solid var(--cold);border-radius:var(--radius);padding:10px 12px;margin:12px 0;font-size:12.5px;color:var(--text-hi);}
+  .fixrow .sw{margin-left:auto;width:38px;height:21px;border-radius:12px;background:var(--cold);position:relative;cursor:pointer;} .fixrow .sw::after{content:'';position:absolute;top:2px;right:2px;width:17px;height:17px;border-radius:50%;background:#fff;transition:.15s;} .fixrow .sw.off{background:var(--bg3);} .fixrow .sw.off::after{right:19px;}
+  .decide{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:6px;} .decide.db2{grid-template-columns:1fr 1fr;}
+  .db{border:1px solid var(--border-hi);background:var(--bg2);border-radius:var(--radius);padding:11px;cursor:pointer;text-align:left;color:var(--text-hi);} .db:hover{background:var(--hover);border-color:var(--accent);} .db.on{border-color:var(--accent);background:var(--accent-bg);box-shadow:0 0 0 1px var(--accent) inset;}
+  .db .t{font-weight:600;display:flex;align-items:center;gap:6px;} .db .h{font-size:11px;color:var(--text-lo);margin-top:3px;} .db kbd{font-family:var(--mono);font-size:10px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:0 4px;color:var(--text-lo);margin-left:auto;}
+  .discard{margin-top:9px;} .kbdhint{font-size:11px;color:var(--text-lo);margin-top:14px;display:flex;gap:14px;flex-wrap:wrap;} .kbdhint kbd{font-family:var(--mono);background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;}
+
+  .actionbar{position:absolute;left:0;right:0;bottom:0;background:var(--bg1);border-top:1px solid var(--border);padding:11px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+  .progress{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-lo);} .bar{width:150px;height:7px;border-radius:6px;background:var(--bg3);overflow:hidden;} .bar span{display:block;height:100%;background:var(--good);width:0;transition:width .25s;}
+  .actionbar .spacer{flex:1;} .apply-note{font-size:12px;color:var(--text-lo);text-align:right;} .apply-note b{color:var(--text-hi);}
+
+  /* History overlay */
+  .overlay{position:absolute;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-start;justify-content:center;padding:40px 20px;z-index:20;}
+  .overlay.show{display:flex;} .hist{background:var(--bg1);border:1px solid var(--border);border-radius:12px;width:min(720px,100%);max-height:82vh;overflow:hidden;display:flex;flex-direction:column;}
+  .hist-h{display:flex;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);} .hist-h h3{margin:0;color:var(--text-hi);font-size:15px;} .hist-h .x{margin-left:auto;cursor:pointer;color:var(--text-lo);font-size:18px;}
+  .hist-body{overflow-y:auto;padding:6px 0;}
+  .run{padding:12px 18px;border-bottom:1px solid var(--border);} .run .rt{display:flex;align-items:center;gap:12px;} .run .rdate{font-family:var(--mono);font-size:12px;color:var(--text-hi);} .run .rsrc{color:var(--text-lo);font-size:12px;}
+  .run .rstat{margin-left:auto;display:flex;gap:12px;font-size:12px;} .rstat .ok{color:var(--good);} .rstat .sk{color:var(--text-lo);} .rstat .fa{color:var(--crit);}
+  .fails{margin-top:9px;display:flex;flex-direction:column;gap:5px;} .fitem{display:flex;align-items:center;gap:9px;background:var(--crit-bg);border:1px solid var(--crit);border-radius:var(--radius-sm);padding:7px 10px;font-size:12px;}
+  .fitem .fn{font-family:var(--mono);color:var(--text-hi);} .fitem .fr{color:var(--crit);margin-left:auto;} .fitem .fb{border:1px solid var(--border-hi);background:var(--bg2);color:var(--text-hi);border-radius:5px;padding:3px 9px;font-size:11px;cursor:pointer;}
+
+  @media (max-width:1180px){ .app{grid-template-columns:64px 1fr;} .brand small,.rail-group,.nav span{display:none;} .nav{justify-content:center;} .work{grid-template-columns:1fr;} .list-pane{border-right:none;border-bottom:1px solid var(--border);max-height:40vh;} }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="brand"><div class="logo">V</div><div><b style="color:var(--text-hi)">VarVault</b><small>3,204 pkgs</small></div></div>
+    <div class="rail-group">Browse</div>
+    <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="5"/><rect x="13" y="11" width="8" height="10"/><rect x="3" y="13" width="8" height="8"/></svg><span>Dashboard</span></div>
+    <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18"/><path d="M3 9h18M9 21V9"/></svg><span>Library</span></div>
+    <div class="rail-group">Optimize</div>
+    <div class="nav active"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg><span>Import &amp; review</span><span class="badge" id="railBadge">24</span></div>
+    <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="8" y="8" width="12" height="12"/><path d="M4 16V6l2-2h10"/></svg><span>Duplicates</span></div>
+    <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v18M5 8l7-5 7 5M5 8v8l7 5 7-5V8"/></svg><span>Health &amp; fix</span></div>
+    <div class="rail-group">System</div>
+    <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="12" cy="5" rx="8" ry="2.4"/><path d="M4 5v14c0 1.3 3.6 2.4 8 2.4s8-1.1 8-2.4V5"/></svg><span>Repositories</span></div>
+    <div class="nav"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4 4l2 2M18 18l2 2"/></svg><span>Settings</span></div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <h1>Import &amp; review</h1>
+      <div class="selbox"><span class="k">Import vào</span> <b>🗄 D:\VarVault</b> <span class="tier">T1 hot</span> <span class="cx">▾</span></div>
+      <div class="spacer"></div>
+      <button class="btn ghost" id="histBtn">🕘 History</button>
+      <button class="icon-btn" id="themeBtn" title="Toggle theme">◑</button>
+      <button class="btn">Re-scan</button>
+    </div>
+
+    <!-- Multi-source + archive strip -->
+    <div class="sources">
+      <div class="srcpill"><span class="i">📁</span><b>VaM_incoming</b><span class="cnt">84 var</span></div>
+      <div class="srcpill"><span class="i">📁</span><b>Mega\MMD</b><span class="cnt">26 var</span></div>
+      <div class="srcpill"><span class="i">🗜</span><b>pack_2024.7z</b><span class="cnt">giải nén · 18 var</span></div>
+      <div class="srcpill"><span class="i">🗜</span><b>looks.zip</b><span class="cnt">giải nén · 14 var</span></div>
+      <div class="srcpill locked" id="lockedPill"><span class="i">🔒</span><b>premium_set.rar</b><span class="cnt">có mật khẩu — bỏ qua</span></div>
+      <button class="srcadd">+ Thêm folder / archive…</button>
+      <div class="sum">4 nguồn · 12 archive giải nén · <span style="color:var(--warn)">🔒 2 có mật khẩu</span> (ghi vào History)</div>
+    </div>
+
+    <div class="stepper">
+      <div class="step done"><span class="n">✓</span> Chọn nguồn</div><div class="step-sep"></div>
+      <div class="step done"><span class="n">✓</span> Quét &amp; giải nén</div><div class="step-sep"></div>
+      <div class="step active"><span class="n">3</span> Review</div><div class="step-sep"></div>
+      <div class="step"><span class="n">4</span> Apply → D:\VarVault</div>
+    </div>
+
+    <div class="triage" id="triage">
+      <div class="chip sel" data-lane="all"><span class="num">142</span><span class="lbl">Đã quét</span></div>
+      <div class="chip lane-new" data-lane="new"><span class="num">82</span><span class="lbl"><span class="dot"></span>Mới → import</span></div>
+      <div class="chip lane-encoding" data-lane="encoding"><span class="num">12</span><span class="lbl"><span class="dot"></span>CJK → fix + import</span></div>
+      <div class="chip lane-exact" data-lane="exact"><span class="num">24</span><span class="lbl"><span class="dot"></span>Trùng → bỏ qua</span></div>
+      <div class="chip lane-naming attention" data-lane="naming"><span class="num">8</span><span class="lbl"><span class="dot"></span>Tên ≠ meta → review</span></div>
+      <div class="chip lane-conflict attention" data-lane="conflict"><span class="num">10</span><span class="lbl"><span class="dot"></span>Xung đột → review</span></div>
+      <div class="chip lane-corrupt attention" data-lane="corrupt"><span class="num">6</span><span class="lbl"><span class="dot"></span>Hỏng → review</span></div>
+      <div class="grow"></div>
+      <div class="worknote">Chỉ <b><span id="workCount">24</span> mục</b> cần bạn quyết. CJK tự fix, còn lại tự phân loại.</div>
+    </div>
+
+    <div class="work">
+      <div class="list-pane">
+        <div class="list-head">
+          <input type="search" id="search" placeholder="Lọc theo tên / creator…" />
+          <span id="listCount"></span>
+          <div class="vtoggle"><button id="vTable" class="on" title="Bảng">▤</button><button id="vGallery" title="Gallery">▦</button></div>
+        </div>
+        <div class="rows" id="rows"></div>
+        <div class="gallery" id="gallery" style="display:none"></div>
+      </div>
+      <div class="detail" id="detail"></div>
+    </div>
+
+    <div class="actionbar">
+      <div class="progress"><span id="progText">0 / 24 đã review</span><div class="bar"><span id="progBar"></span></div></div>
+      <button class="btn" id="acceptAll">✨ Chấp nhận mọi gợi ý (24)</button>
+      <div class="spacer"></div>
+      <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text);cursor:pointer"><input type="checkbox" id="actAfter"/> Activate vào VaM sau import</label>
+      <div class="apply-note" id="applyNote"></div>
+      <button class="btn primary" id="applyBtn" disabled>Apply →</button>
+    </div>
+
+    <!-- History overlay -->
+    <div class="overlay" id="overlay">
+      <div class="hist">
+        <div class="hist-h"><h3>🕘 Import history</h3><span class="x" id="histClose">✕</span></div>
+        <div class="hist-body" id="histBody"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ITEMS = [
+  { id:1, name:'MacGruber.PostMagic.4', creator:'MacGruber', lane:'conflict', tint:'#7c5cff',
+    inc:{valid:true, mb:41.8, entries:137, date:'2024-11-12', preview:true, meta:'ok'},
+    ex :{valid:false,mb:8.2, entries:41, date:'2023-06-01', preview:false, meta:'ok', status:'CorruptZip'},
+    rec:'keepIncoming', reason:'Cùng version .4 nhưng bản trong repo là zip hỏng — 12 entry lỗi CRC. Bản mới đủ 137 entry.',
+    diff:[['add','Custom/Scripts/PostMagic/PostMagic.cslist'],['add','Custom/Assets/postmagic.assetbundle'],['chg','meta.json'],['del','(41 entry cũ bị cắt cụt)']] },
+  { id:2, name:'Fallen.Masako.7', creator:'Fallen', lane:'conflict', tint:'#e08a5a',
+    inc:{valid:true, mb:212.4, entries:512, date:'2024-10-30', preview:true, meta:'ok'},
+    ex :{valid:true, mb:209.9, entries:508, date:'2024-03-14', preview:true, meta:'ok'},
+    rec:'keepIncoming', reason:'Cùng version .7, khác 4 entry, bản mới nhiều hơn + mới hơn. Nếu là 2 biến thể thật thì “Giữ cả hai”.',
+    diff:[['chg','Textures/face_D.png'],['chg','Textures/torso_D.png'],['add','Morphs/masako_v7b.vmi'],['add','Morphs/masako_v7b.vmb']] },
+  { id:3, name:'1234.newpack.1', creator:'(tên file)', lane:'naming', tint:'#b06fd0',
+    inc:{valid:true, mb:33.9, entries:74, date:'2024-11-09', preview:true, meta:'divergent'}, metaName:'AcidBubbles.Timeline.312',
+    rec:'rename', reason:'Tên file “1234.newpack.1” không liên quan meta.json (khai AcidBubbles.Timeline.312). Nghi đổi tên lộn — nên đổi tên theo meta, nếu không dependency không tìm ra.', diff:[] },
+  { id:4, name:'download (3)', creator:'(tên file)', lane:'naming', tint:'#9b6fd0',
+    inc:{valid:true, mb:12.1, entries:38, date:'2024-11-08', preview:false, meta:'divergent'}, metaName:'kemenate.Morphs.48',
+    rec:'rename', reason:'Tên file “download (3).var” không đúng định dạng. meta.json khai kemenate.Morphs.48 — đổi tên theo meta.', diff:[] },
+  { id:5, name:'caelryn.Dae_free.2', creator:'caelryn', lane:'corrupt', tint:'#d05a6a',
+    inc:{valid:false, mb:3.1, entries:0, date:'2024-11-11', preview:false, meta:'missing', status:'CorruptZip'}, ex:null,
+    rec:'discard', reason:'Zip hỏng — không mở được (central directory lỗi). Nên loại.', diff:[] },
+  { id:6, name:'Dnaddr.Kim_v1_5.1', creator:'Dnaddr', lane:'corrupt', tint:'#d0685a',
+    inc:{valid:false, mb:0.4, entries:1, date:'2024-11-11', preview:false, meta:'missing', status:'MissingMeta'}, ex:null,
+    rec:'discard', reason:'Thiếu meta.json — không phải .var hợp lệ. Nên loại.', diff:[] },
+  { id:7, name:'AnythingFashion.Qipao_Red.1', creator:'AnythingFashion', lane:'encoding', tint:'#c0405a', inc:{valid:true, mb:28.4, entries:63, date:'2024-11-10', gbk:9}, rec:'importFix' },
+  { id:8, name:'BaGe.VAM_BaGe_Shoe41.2', creator:'BaGe', lane:'encoding', tint:'#5a80c0', inc:{valid:true, mb:10.2, entries:44, date:'2024-11-10', gbk:3}, rec:'importFix' },
+  { id:9, name:'Eros.airline_stewardess.2', creator:'Eros', lane:'encoding', tint:'#5aa0b0', inc:{valid:true, mb:47.0, entries:110, date:'2024-11-09', gbk:15}, rec:'importFix' },
+  { id:10, name:'Archer.jingjue2333.1', creator:'Archer', lane:'new', tint:'#6a7fd0', inc:{valid:true, mb:44.7, entries:96, date:'2024-11-10'}, rec:'import' },
+  { id:11, name:'Damarmau.Muscle_normals.3', creator:'Damarmau', lane:'new', tint:'#7a9a6a', altver:'bạn đang có .1 và .2 — .3 vẫn giữ riêng', inc:{valid:true, mb:14.2, entries:22, date:'2024-11-05'}, rec:'import' },
+  { id:12, name:'BooMoon.Piercings.2', creator:'BooMoon', lane:'new', tint:'#c09a5a', inc:{valid:true, mb:6.1, entries:31, date:'2024-11-10'}, rec:'import' },
+  { id:13, name:'FO.FO25.1', creator:'FO', lane:'new', tint:'#8a6ac0', inc:{valid:true, mb:120.3, entries:240, date:'2024-11-08'}, rec:'import' },
+  { id:14, name:'Archer.NianHui2511JinMeiTin.1', creator:'Archer', lane:'exact', tint:'#5b636e', inc:{valid:true, mb:51.2, entries:118, date:'2024-11-10'}, rec:'skip' },
+  { id:15, name:'FO.FO23.1', creator:'FO', lane:'exact', tint:'#5b636e', inc:{valid:true, mb:98.0, entries:210, date:'2024-11-08'}, rec:'skip' },
+];
+const HISTORY = [
+  { date:'2024-11-12 15:40', src:'VaM_incoming + 2 archive → D:\\VarVault', ok:96, sk:31, fa:2,
+    fails:[{n:'premium_set.rar', r:'🔒 Có mật khẩu — giải nén tay'},{n:'broken_pack.7z', r:'💥 Archive lỗi CRC'}] },
+  { date:'2024-11-05 09:12', src:'J:\\Mega\\Downloads → E:\\VarVault_cold', ok:212, sk:44, fa:0, fails:[] },
+  { date:'2024-10-28 22:03', src:'Hub batch 3 → D:\\VarVault', ok:58, sk:12, fa:1, fails:[{n:'set_04.zip', r:'🔒 Có mật khẩu'}] },
+];
+const LANE_META = { new:{pill:'new',label:'Mới',ic:'🆕'}, encoding:{pill:'encoding',label:'CJK',ic:'🈶'}, exact:{pill:'exact',label:'Trùng',ic:'♻️'}, conflict:{pill:'conflict',label:'Xung đột',ic:'⚠️'}, naming:{pill:'naming',label:'Tên≠meta',ic:'🏷️'}, corrupt:{pill:'corrupt',label:'Hỏng',ic:'💥'} };
+const NEEDS_REVIEW = new Set(['conflict','naming','corrupt']);
+const REC_LABEL = { keepIncoming:'Giữ bản mới', keepExisting:'Giữ bản repo', both:'Giữ cả hai', import:'Import', importFix:'Import + fix Unicode', skip:'Bỏ qua', discard:'Loại bỏ', rename:'Đổi tên theo meta' };
+
+let filter='all', selectedId=null, viewMode='table';
+const $=s=>document.querySelector(s), rowsEl=$('#rows'), galleryEl=$('#gallery'), detailEl=$('#detail');
+ITEMS.forEach(it=>{ it.decision = NEEDS_REVIEW.has(it.lane) ? null : it.rec; });
+const fmtMB=x=>x>=1024?(x/1024).toFixed(2)+' GB':x.toFixed(1)+' MB';
+const reviewItems=()=>ITEMS.filter(i=>NEEDS_REVIEW.has(i.lane));
+const resolvedCount=()=>reviewItems().filter(i=>i.decision).length;
+const isOn=it=>!NEEDS_REVIEW.has(it.lane)?['import','importFix'].includes(it.decision):['keepIncoming','both','rename','importFix'].includes(it.decision);
+const filtered=()=>{ const q=($('#search').value||'').toLowerCase(); return ITEMS.filter(i=>(filter==='all'||i.lane===filter)&&(i.name.toLowerCase().includes(q)||i.creator.toLowerCase().includes(q))); };
+
+function renderList(){
+  const list=filtered(); $('#listCount').textContent=list.length+' mục';
+  if(viewMode==='table'){
+    rowsEl.style.display=''; galleryEl.style.display='none';
+    rowsEl.innerHTML=list.map(it=>{ const lm=LANE_META[it.lane]; const on=isOn(it);
+      const sp = NEEDS_REVIEW.has(it.lane) ? (it.decision?`<span class="pill decided">✓ ${REC_LABEL[it.decision]}</span>`:`<span class="pill pending">cần review</span>`) : `<span class="pill ${lm.pill}">${lm.label}</span>`;
+      const cjk = it.lane==='encoding'?`<span class="tagcjk">${it.inc.gbk} GBK</span>`:'';
+      return `<div class="row lane-${it.lane} ${it.id===selectedId?'sel':''} ${on?'on':''}" data-id="${it.id}"><div class="chkbox">${on?'✓':''}</div>
+        <div><div class="name">${it.name}.var</div><div class="sub"><span>${it.creator}</span><span>${fmtMB(it.inc.mb)}</span>${cjk}</div></div><div>${sp}</div></div>`;
+    }).join('')||`<div class="empty">Không có mục nào khớp.</div>`;
+    rowsEl.querySelectorAll('.row').forEach(r=>r.onclick=()=>select(+r.dataset.id));
+  } else {
+    rowsEl.style.display='none'; galleryEl.style.display='grid';
+    galleryEl.innerHTML=list.map(it=>{ const lm=LANE_META[it.lane]; const on=isOn(it);
+      const sp = NEEDS_REVIEW.has(it.lane) ? (it.decision?`<span class="pill decided">✓</span>`:`<span class="pill pending">review</span>`) : `<span class="pill ${lm.pill}">${lm.label}</span>`;
+      const thumb = it.inc.preview!==false && it.lane!=='corrupt'
+        ? `background:linear-gradient(150deg,${it.tint},${it.tint}99)`
+        : `background:var(--bg3)`;
+      return `<div class="gcard lane-${it.lane} ${it.id===selectedId?'sel':''} ${on?'on':''}" data-id="${it.id}">
+        <div class="gthumb" style="${thumb}">${it.lane==='corrupt'?'💥':it.inc.preview===false?'🖼':lm.ic}<span class="glane">${sp}</span><span class="gchk">${on?'✓':''}</span></div>
+        <div class="gmeta"><div class="gn">${it.name}.var</div><div class="gs"><span>${it.creator}</span><span>${fmtMB(it.inc.mb)}</span></div></div></div>`;
+    }).join('')||`<div class="empty" style="grid-column:1/-1">Không có mục nào khớp.</div>`;
+    galleryEl.querySelectorAll('.gcard').forEach(c=>c.onclick=()=>select(+c.dataset.id));
+  }
+}
+function cmpRow(k,inc,ex,fmt,better){ const iv=fmt(inc),ev=ex==null?'—':fmt(ex); let ic='v',ec='v'; if(ex!=null&&better){const w=better(inc,ex); if(w==='i')ic='v win'; else if(w==='e')ec='v win';} return `<div class="rk">${k}</div><div class="${ic}">${iv}</div><div class="${ec}">${ev}</div>`; }
+
+function renderDetail(){
+  const it=ITEMS.find(i=>i.id===selectedId);
+  if(!it){ detailEl.innerHTML=`<div class="empty">Chọn một mục.<br/><br/>Các mục <b>Mới / CJK / Trùng</b> đã tự quyết — bạn chỉ xử lý <b>Tên≠meta</b>, <b>Xung đột</b>, <b>Hỏng</b>.</div>`; return; }
+  if(it.lane==='encoding'){ detailEl.innerHTML=`<div class="d-head"><h2>${it.name}.var</h2><div class="idk">${it.creator} · ${fmtMB(it.inc.mb)} · ${it.inc.entries} entries · hợp lệ ✓</div></div>
+    <div class="rec keepIncoming"><div class="ricon">🈶</div><div><div class="rt">Var hợp lệ nhưng có ${it.inc.gbk} entry tên mã GBK</div><div class="rr">Mở trong VaM sẽ lỗi ký tự. VarVault <b>tự chuyển tên entry về Unicode</b> bằng fix-encoding có sẵn khi import.</div></div></div>
+    <div class="fixrow">🔤 Fix mã hoá về Unicode khi import <div class="sw ${it.decision==='importFix'?'':'off'}" onclick="setDecision(${it.id}, this.classList.contains('off')?'importFix':'import')"></div></div>
+    <div class="decide db2"><button class="db ${it.decision==='importFix'?'on':''}" onclick="setDecision(${it.id},'importFix')"><div class="t">🈶 Import + fix</div><div class="h">Khuyến nghị</div></button><button class="db ${it.decision==='skip'?'on':''}" onclick="setDecision(${it.id},'skip')"><div class="t">⤫ Bỏ qua</div><div class="h">Không import</div></button></div>`; return; }
+  if(!NEEDS_REVIEW.has(it.lane)){ detailEl.innerHTML=`<div class="d-head"><h2>${it.name}.var</h2><div class="idk">${it.creator} · ${fmtMB(it.inc.mb)} · ${it.inc.entries} entries · ${it.inc.date}</div></div>
+    <div class="rec ${it.lane==='exact'?'keepExisting':'keepIncoming'}"><div class="ricon">${it.lane==='exact'?'♻️':'✅'}</div><div><div class="rt">${it.lane==='exact'?'Đã có trong repo — sẽ bỏ qua':'File mới — sẽ import vào D:\\VarVault'}</div><div class="rr">${it.lane==='exact'?'Khớp ContentSignature.':'Tự động chọn import.'}${it.altver?' <b>'+it.altver+'.</b> Giữ mọi version, không so sánh/thay thế.':''}</div></div></div>
+    <div class="simple"><div class="row2"><span class="k">Trạng thái</span><span class="v">Hợp lệ ✓</span></div><div class="row2"><span class="k">Dung lượng</span><span class="v">${fmtMB(it.inc.mb)}</span></div><div class="row2"><span class="k">Số entry</span><span class="v">${it.inc.entries}</span></div></div>
+    <div class="decide db2"><button class="db ${it.decision==='import'?'on':''}" onclick="setDecision(${it.id},'import')"><div class="t">✅ Import</div><div class="h">Copy vào repo</div></button><button class="db ${it.decision==='skip'?'on':''}" onclick="setDecision(${it.id},'skip')"><div class="t">⤫ Bỏ qua</div><div class="h">Không copy</div></button></div>`; return; }
+  if(it.lane==='naming'){ detailEl.innerHTML=`<div class="d-head"><h2>${it.name}.var</h2><div class="idk">tên file không khớp meta.json</div></div>
+    <div class="rec naming"><div class="ricon">🏷️</div><div><div class="rt">Cảnh báo: tên file ≠ định danh trong meta.json</div><div class="rr">${it.reason}</div></div></div>
+    <div class="cmp"><div class="rk" style="background:var(--bg1)">Định danh</div><div class="ch">Theo tên file</div><div class="ch existing">Theo meta.json</div>
+      <div class="rk">Creator.Package.Ver</div><div class="v" style="font-family:var(--mono);color:var(--susp)">${it.name}</div><div class="v win" style="font-family:var(--mono)">${it.metaName}</div>
+      <div class="rk">Zip hợp lệ</div><div class="v">Hợp lệ ✓</div><div class="v">—</div></div>
+    <p style="color:var(--text-lo);font-size:12px;margin:14px 0 7px">Quyết định:</p>
+    <div class="decide"><button class="db ${it.decision==='rename'?'on':''}" onclick="setDecision(${it.id},'rename')"><div class="t">🏷️ Đổi tên theo meta <kbd>]</kbd></div><div class="h">→ ${it.metaName}</div></button>
+      <button class="db ${it.decision==='import'?'on':''}" onclick="setDecision(${it.id},'import')"><div class="t">✅ Giữ tên file <kbd>[</kbd></div><div class="h">Import nguyên tên</div></button>
+      <button class="db ${it.decision==='discard'?'on':''}" onclick="setDecision(${it.id},'discard')"><div class="t">🗑️ Loại <kbd>Del</kbd></div><div class="h">Nghi var rác</div></button></div>
+    <div class="kbdhint"><span><kbd>J</kbd>/<kbd>K</kbd> kế</span><span><kbd>]</kbd> đổi tên</span><span><kbd>[</kbd> giữ tên</span><span><kbd>Del</kbd> loại</span></div>`; return; }
+  const rc=it.rec, inc=it.inc, ex=it.ex; const recCls=rc==='keepExisting'?'keepExisting':rc==='both'?'both':'keepIncoming'; const recIcon=rc==='both'?'🔀':rc==='keepExisting'?'↩︎':'✅';
+  let cmp=''; if(ex){ cmp=`<div class="cmp"><div class="rk" style="background:var(--bg1)"></div><div class="ch incoming">● Bản mới</div><div class="ch existing">● Trong repo</div>
+    ${cmpRow('Zip hợp lệ',inc,ex,x=>x.valid?'Hợp lệ ✓':`<span style="color:var(--crit)">${x.status||'Lỗi'} ✗</span>`,(i,e)=>i.valid&&!e.valid?'i':!i.valid&&e.valid?'e':null)}
+    ${cmpRow('Dung lượng',inc,ex,x=>fmtMB(x.mb),(i,e)=>i.mb>e.mb?'i':e.mb>i.mb?'e':null)}
+    ${cmpRow('Số entry',inc,ex,x=>x.entries,(i,e)=>i.entries>e.entries?'i':e.entries>i.entries?'e':null)}
+    ${cmpRow('Ngày file',inc,ex,x=>x.date,(i,e)=>i.date>e.date?'i':'e')}
+    <div class="rk" style="background:var(--bg1)">Preview</div><div>${inc.preview?`<div class=thumb style="background:linear-gradient(135deg,${it.tint},#26406a)"></div>`:'<div class="thumb none">—</div>'}</div><div>${ex.preview?'<div class=thumb style="background:linear-gradient(135deg,#5a3a3a,#6a4a26)"></div>':'<div class="thumb none">không có</div>'}</div></div>`; }
+  let diff=''; if(it.diff&&it.diff.length){ const c={add:0,del:0,chg:0}; it.diff.forEach(d=>c[d[0]]++); diff=`<div class="diff"><div class="diff-h">Khác biệt bên trong .var <b style="color:var(--good)">+${c.add}</b> <b style="color:var(--crit)">−${c.del}</b> <b style="color:var(--warn)">~${c.chg}</b></div><div class="diff-body">${it.diff.map(d=>`<div class="diff-line ${d[0]}"><span class="mk">${d[0]==='add'?'+':d[0]==='del'?'−':'~'}</span><span class="p">${d[1]}</span></div>`).join('')}</div></div>`; }
+  detailEl.innerHTML=`<div class="d-head"><h2>${it.name}.var</h2><div class="idk">cùng version, khác nội dung — chọn bản đúng</div></div>
+    <div class="rec ${recCls}"><div class="ricon">${recIcon}</div><div><div class="rt">Gợi ý: ${REC_LABEL[rc]}</div><div class="rr">${it.reason}</div></div></div>${cmp}${diff}
+    <p style="color:var(--text-lo);font-size:12px;margin:14px 0 7px">Quyết định:</p>
+    <div class="decide"><button class="db ${it.decision==='keepIncoming'?'on':''}" onclick="setDecision(${it.id},'keepIncoming')"><div class="t">✅ Giữ mới <kbd>]</kbd></div><div class="h">Ghi đè repo</div></button>
+      <button class="db ${it.decision==='keepExisting'?'on':''}" onclick="setDecision(${it.id},'keepExisting')"><div class="t">↩︎ Giữ cũ <kbd>[</kbd></div><div class="h">Bỏ bản mới</div></button>
+      <button class="db ${it.decision==='both'?'on':''}" onclick="setDecision(${it.id},'both')"><div class="t">🔀 Cả hai <kbd>\\</kbd></div><div class="h">Đổi tên bản mới</div></button></div>
+    <div class="discard"><button class="db" style="width:100%" onclick="setDecision(${it.id},'discard')"><div class="t">🗑️ Loại cả bản mới <kbd>Del</kbd></div></button></div>
+    <div class="kbdhint"><span><kbd>J</kbd>/<kbd>K</kbd> kế</span><span><kbd>]</kbd> mới</span><span><kbd>[</kbd> cũ</span><span><kbd>\\</kbd> cả hai</span><span><kbd>Del</kbd> loại</span></div>`;
+}
+function select(id){ selectedId=id; renderList(); renderDetail(); }
+function setDecision(id,dec){ ITEMS.find(i=>i.id===id).decision=dec; renderList(); renderDetail(); updateProgress(); }
+function updateProgress(){ const total=reviewItems().length,done=resolvedCount(),remaining=total-done;
+  $('#progText').textContent=`${done} / ${total} đã review`; $('#progBar').style.width=(total?done/total*100:100)+'%';
+  $('#workCount').textContent=remaining; $('#railBadge').textContent=remaining||'✓';
+  $('#acceptAll').textContent=remaining?`✨ Chấp nhận mọi gợi ý (${remaining})`:'✓ Đã review hết'; $('#acceptAll').disabled=!remaining;
+  const imp=ITEMS.filter(i=>['import','importFix','keepIncoming','both','rename'].includes(i.decision)).length, fix=ITEMS.filter(i=>i.decision==='importFix').length;
+  $('#applyNote').innerHTML=`Copy <b>${imp}</b> · fix Unicode <b>${fix}</b> · bỏ qua <b>${ITEMS.filter(i=>['skip','keepExisting'].includes(i.decision)).length}</b> · loại <b>${ITEMS.filter(i=>i.decision==='discard').length}</b>`;
+  $('#applyBtn').disabled=remaining!==0; $('#applyBtn').textContent=remaining?`Còn ${remaining} cần review`:`Apply → copy ${imp} file`;
+}
+function renderHistory(){ $('#histBody').innerHTML=HISTORY.map(h=>`<div class="run"><div class="rt"><span class="rdate">${h.date}</span><span class="rsrc">${h.src}</span><span class="rstat"><span class="ok">✓ ${h.ok}</span><span class="sk">↷ ${h.sk}</span>${h.fa?`<span class="fa">✗ ${h.fa}</span>`:''}</span></div>${h.fails.length?`<div class="fails">${h.fails.map(f=>`<div class="fitem"><span class="fn">${f.n}</span><span class="fr">${f.r}</span><button class="fb">Thử lại…</button></div>`).join('')}</div>`:''}</div>`).join(''); }
+
+document.querySelectorAll('#triage .chip').forEach(c=>c.onclick=()=>{ filter=c.dataset.lane; document.querySelectorAll('#triage .chip').forEach(x=>x.classList.remove('sel')); c.classList.add('sel'); renderList(); });
+$('#search').oninput=renderList;
+$('#vTable').onclick=()=>{ viewMode='table'; $('#vTable').classList.add('on'); $('#vGallery').classList.remove('on'); renderList(); };
+$('#vGallery').onclick=()=>{ viewMode='gallery'; $('#vGallery').classList.add('on'); $('#vTable').classList.remove('on'); renderList(); };
+$('#acceptAll').onclick=()=>{ reviewItems().forEach(i=>{ if(!i.decision) i.decision=i.rec; }); renderList(); renderDetail(); updateProgress(); };
+$('#applyBtn').onclick=()=>{ if(!$('#applyBtn').disabled) alert('Demo: copy file đã duyệt vào D:\\VarVault (T1), đổi tên theo meta, fix Unicode, quarantine file hỏng, ghi kết quả vào History, rồi index + tùy chọn activate.'); };
+$('#histBtn').onclick=()=>{ renderHistory(); $('#overlay').classList.add('show'); };
+$('#histClose').onclick=()=>$('#overlay').classList.remove('show');
+$('#lockedPill').onclick=()=>{ renderHistory(); $('#overlay').classList.add('show'); };
+$('#overlay').onclick=e=>{ if(e.target.id==='overlay') $('#overlay').classList.remove('show'); };
+$('#themeBtn').onclick=()=>{ const r=document.documentElement,cur=r.getAttribute('data-theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'); r.setAttribute('data-theme',cur==='dark'?'light':'dark'); };
+document.addEventListener('keydown',e=>{ if(e.target.tagName==='INPUT')return; const rv=reviewItems(),idx=rv.findIndex(i=>i.id===selectedId);
+  if(e.key==='j'||e.key==='ArrowDown'){e.preventDefault();select(rv[Math.min(rv.length-1,idx<0?0:idx+1)]?.id??selectedId);}
+  else if(e.key==='k'||e.key==='ArrowUp'){e.preventDefault();select(rv[Math.max(0,idx<0?0:idx-1)]?.id??selectedId);}
+  else if(selectedId){ const it=ITEMS.find(i=>i.id===selectedId); if(!it||!NEEDS_REVIEW.has(it.lane))return;
+    if(e.key===']')setDecision(it.id,it.lane==='naming'?'rename':'keepIncoming');
+    else if(e.key==='[')setDecision(it.id,it.lane==='naming'?'import':'keepExisting');
+    else if(e.key==='\\'&&it.lane==='conflict')setDecision(it.id,'both');
+    else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();setDecision(it.id,'discard');} }
+});
+renderList(); updateProgress(); select(1);
+</script>
+</body>
+</html>

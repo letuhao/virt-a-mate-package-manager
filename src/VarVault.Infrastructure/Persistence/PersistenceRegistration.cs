@@ -54,6 +54,10 @@ public static class PersistenceRegistration
         services.AddScoped<Sdk.Library.IMigrationService, Library.EfMigrationService>();
         services.AddScoped<Sdk.Library.IReclaimService, Library.EfReclaimService>();
         services.AddScoped<Sdk.Library.IIntakeService, Library.EfIntakeService>();
+        // Import feature (doc 31 Phase 5.8)
+        services.AddScoped<Sdk.Import.IArchiveExtractor, Import.ArchiveExtractor>();
+        services.AddScoped<Sdk.Import.IImportHistoryStore, Library.EfImportHistoryStore>();
+        services.AddScoped<Sdk.Import.IImportService, Library.EfImportService>();
         services.AddScoped<Sdk.Library.IHealthService, Library.EfHealthService>();
         services.AddScoped<SqliteDatabaseBackup>();
         services.AddScoped<Sdk.Library.ITrashQueryService, Library.EfTrashQueryService>();

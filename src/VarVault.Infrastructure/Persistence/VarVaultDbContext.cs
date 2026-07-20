@@ -49,6 +49,11 @@ public class VarVaultDbContext(DbContextOptions<VarVaultDbContext> options) : Db
     public DbSet<Setting> Settings => Set<Setting>();
     public DbSet<ActivityEntry> ActivityEntries => Set<ActivityEntry>();
 
+    // Import history
+    public DbSet<ImportRunEntity> ImportRuns => Set<ImportRunEntity>();
+    public DbSet<ImportFailedSourceEntity> ImportFailedSources => Set<ImportFailedSourceEntity>();
+    public DbSet<ImportOutcomeEntity> ImportOutcomes => Set<ImportOutcomeEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

@@ -23,8 +23,8 @@ public class GapATabWiringTests
         Assert.False(vm.IsReclaimTab);
         vm.SelectedTabIndex = 2;
         Assert.True(vm.IsNearTab);
-        vm.SelectedTabIndex = 3;
-        Assert.True(vm.IsIntakeTab);
+        // The former "Download intake" tab (index 3) was retired — the Import screen replaces it (doc 30 §10).
+        Assert.Equal(3, vm.Tabs.Count);
     }
 
     [Fact]

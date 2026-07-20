@@ -64,6 +64,8 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
     [ObservableProperty] private string? _hotThresholdDays;       // Tiers & policy
     [ObservableProperty] private bool _autoRebalance;            // Automation
     [ObservableProperty] private string? _presetExtractionDir;    // Import
+    [ObservableProperty] private string? _importTempDir;          // Import — archive extraction scratch (5.11)
+    [ObservableProperty] private string? _importHistoryKeep;      // Import — how many runs History keeps (5.11)
 
     // Per-tab visibility so each tab shows its own content (AC-21).
     public bool IsGeneralTab => SelectedTabIndex == 0;
@@ -91,6 +93,8 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
     private const string HotDaysKey = "tiers.hot_threshold_days";
     private const string AutoRebalanceKey = "automation.auto_rebalance";
     private const string PresetExtractKey = "import.preset_extraction_dir";
+    private const string ImportTempDirKey = "import.temp_dir";
+    private const string ImportHistoryKeepKey = "import.history_keep";
 
     [RelayCommand]
     public async Task LoadAsync(CancellationToken cancellationToken = default)
@@ -101,6 +105,8 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
         HotThresholdDays = await settings.GetAsync(HotDaysKey, cancellationToken).ConfigureAwait(true) ?? "30";
         AutoRebalance = await settings.GetBoolAsync(AutoRebalanceKey, false, cancellationToken).ConfigureAwait(true);
         PresetExtractionDir = await settings.GetAsync(PresetExtractKey, cancellationToken).ConfigureAwait(true);
+        ImportTempDir = await settings.GetAsync(ImportTempDirKey, cancellationToken).ConfigureAwait(true);
+        ImportHistoryKeep = await settings.GetAsync(ImportHistoryKeepKey, cancellationToken).ConfigureAwait(true) ?? "200";
         _loaded = true;
     }
 
@@ -124,6 +130,11 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
         await settings.SetAsync(HotDaysKey, HotThresholdDays ?? "30", cancellationToken).ConfigureAwait(true);
         await settings.SetBoolAsync(AutoRebalanceKey, AutoRebalance, cancellationToken).ConfigureAwait(true);
         await settings.SetAsync(PresetExtractKey, PresetExtractionDir ?? string.Empty, cancellationToken).ConfigureAwait(true);
+        await settings.SetAsync(ImportTempDirKey, ImportTempDir ?? string.Empty, cancellationToken).ConfigureAwait(true);
+        // Keep only a positive integer; blank/invalid falls back to the engine default (200).
+        await settings.SetAsync(ImportHistoryKeepKey,
+            int.TryParse(ImportHistoryKeep, out var k) && k > 0 ? k.ToString() : string.Empty,
+            cancellationToken).ConfigureAwait(true);
         StatusMessage = "Saved";
     }
 }

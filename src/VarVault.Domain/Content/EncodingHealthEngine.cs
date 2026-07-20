@@ -84,6 +84,28 @@ public static class EncodingHealthEngine
         return new EncodingHealthResult(EncodingHealth.NeedsFix, winner, 0);
     }
 
+    /// <summary>
+    /// Count entries whose names are legacy-encoded — non-ASCII, no UTF-8 flag, and not valid UTF-8 — i.e. the ones a
+    /// Unicode fix would rewrite (whether or not their codepage is detectable). This is the "N entry GBK" figure the
+    /// import UI shows; it differs from <see cref="EncodingHealthResult.BrokenEntryCount"/>, which counts only the
+    /// <em>undetectable</em> ones. (doc 31 Phase 4.)
+    /// </summary>
+    public static int CountLegacyEntries(IReadOnlyList<ZipEntryFacts> entries)
+    {
+        Guard.NotNull(entries);
+        var n = 0;
+        foreach (var e in entries)
+        {
+            if (e.IsDirectory)
+                continue;
+            var raw = e.RawNameBytes;
+            if (e.NameIsUtf8 || IsPureAscii(raw) || IsValidUtf8(raw))
+                continue;
+            n++;
+        }
+        return n;
+    }
+
     /// <summary>The first candidate codepage that decodes the raw bytes losslessly and cleanly; else null.</summary>
     public static string? DetectCodepage(byte[] raw)
     {

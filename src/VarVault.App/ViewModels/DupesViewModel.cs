@@ -7,25 +7,25 @@ namespace VarVault.App.ViewModels;
 
 /// <summary>SCR-6 · Duplicates &amp; reclaim: exact duplicate groups. (16-checklist SCR-6.)</summary>
 public sealed partial class DupesViewModel(
-    IReclaimService reclaim, Services.IDialogLauncher? launcher = null, IIntakeService? intake = null) : ObservableObject, ILoadableScreen
+    IReclaimService reclaim, Services.IDialogLauncher? launcher = null) : ObservableObject, ILoadableScreen
 {
+    // NOTE: the former "Download intake" tab was retired (doc 30 §10) — the first-class Import screen replaces it
+    // (extract + classify into 6 lanes + review + copy-into-repo + history). Folder classification lives there now.
     /// <summary>Sub-navigation tabs (GC-2).</summary>
     public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =
-        [new("Reclaim space"), new("Exact duplicates"), new("Near-duplicates"), new("Download intake")];
+        [new("Reclaim space"), new("Exact duplicates"), new("Near-duplicates")];
     [ObservableProperty] private int _selectedTabIndex;
 
     // Per-tab visibility so switching a tab actually swaps content. (24-checklist A1/A8-A10)
     public bool IsReclaimTab => SelectedTabIndex == 0;
     public bool IsExactTab => SelectedTabIndex == 1;
     public bool IsNearTab => SelectedTabIndex == 2;
-    public bool IsIntakeTab => SelectedTabIndex == 3;
 
     partial void OnSelectedTabIndexChanged(int value)
     {
         OnPropertyChanged(nameof(IsReclaimTab));
         OnPropertyChanged(nameof(IsExactTab));
         OnPropertyChanged(nameof(IsNearTab));
-        OnPropertyChanged(nameof(IsIntakeTab));
     }
 
     /// <summary>Per-group "Review" → dupe-review dialog (keep one, trash rest). (GD-10)</summary>
@@ -50,22 +50,6 @@ public sealed partial class DupesViewModel(
     /// <summary>Near-duplicate groups (same payload, different identity) for the Near tab. (24-checklist A9)</summary>
     public ObservableCollection<NearDuplicateGroup> NearGroups { get; } = [];
     public bool NearIsEmpty => NearGroups.Count == 0;
-
-    /// <summary>Download-intake tab: a folder to classify against the catalog + its results. (24-checklist A10)</summary>
-    [ObservableProperty] private string? _intakeFolder;
-    public ObservableCollection<IntakeItem> IntakeItems { get; } = [];
-    public bool IntakeIsEmpty => IntakeItems.Count == 0;
-
-    [RelayCommand]
-    public async Task ClassifyIntakeAsync(CancellationToken cancellationToken = default)
-    {
-        if (intake is null || string.IsNullOrWhiteSpace(IntakeFolder))
-            return;
-        IntakeItems.Clear();
-        foreach (var i in await intake.ClassifyFolderAsync(IntakeFolder, cancellationToken).ConfigureAwait(true))
-            IntakeItems.Add(i);
-        OnPropertyChanged(nameof(IntakeIsEmpty));
-    }
 
     [RelayCommand]
     public async Task LoadAsync(CancellationToken cancellationToken = default)
