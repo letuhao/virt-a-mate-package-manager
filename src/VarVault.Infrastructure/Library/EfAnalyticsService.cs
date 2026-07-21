@@ -2,19 +2,32 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Library;
+using VarVault.Sdk.Paging;
 
 namespace VarVault.Infrastructure.Library;
 
 /// <summary>EF analytics: space-by-creator/type over the read model, space-by-tier over VarFile→Repo. (5.16.)</summary>
 public sealed class EfAnalyticsService(VarVaultDbContext db) : IAnalyticsService
 {
+    public async Task<PageResult<SpaceByGroup>> SpaceByCreatorPageAsync(PageRequest request, CancellationToken cancellationToken = default)
+    {
+        var page = request.Normalize();
+        var query = db.PackageListItems.AsNoTracking()
+            .GroupBy(x => x.Creator)
+            .Select(g => new SpaceByGroup(g.Key, g.Sum(x => x.TotalSize), g.Count()));
+        var total = await query.CountAsync(cancellationToken).ConfigureAwait(false);
+        var items = await query
+            .OrderByDescending(x => x.TotalBytes)
+            .ThenBy(x => x.Group)
+            .Skip(page.Skip)
+            .Take(page.SafePageSize)
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        return new PageResult<SpaceByGroup>(items, total, page.SafePageNumber, page.SafePageSize);
+    }
+
     public async Task<IReadOnlyList<SpaceByGroup>> SpaceByCreatorAsync(CancellationToken cancellationToken = default)
     {
-        var rows = await db.PackageListItems.AsNoTracking()
-            .GroupBy(x => x.Creator)
-            .Select(g => new SpaceByGroup(g.Key, g.Sum(x => x.TotalSize), g.Count()))
-            .ToListAsync(cancellationToken).ConfigureAwait(false);
-        return rows.OrderByDescending(r => r.TotalBytes).ToList();
+        return (await SpaceByCreatorPageAsync(new PageRequest(1, 100), cancellationToken).ConfigureAwait(false)).Items;
     }
 
     public async Task<IReadOnlyList<SpaceByGroup>> SpaceByTypeAsync(CancellationToken cancellationToken = default)

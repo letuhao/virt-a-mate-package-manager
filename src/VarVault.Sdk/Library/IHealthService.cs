@@ -1,4 +1,5 @@
 using VarVault.Common;
+using VarVault.Sdk.Paging;
 
 namespace VarVault.Sdk.Library;
 
@@ -16,9 +17,21 @@ public sealed record IntegrityIssue(long VarFileId, string VarName, string Relat
 public interface IHealthService
 {
     Task<IReadOnlyList<EncodingGroup>> EncodingGroupsAsync(CancellationToken cancellationToken = default);
+    async Task<PageResult<IntegrityIssue>> IntegrityPageAsync(PageRequest request, CancellationToken cancellationToken = default)
+    {
+        var all = await IntegrityAsync(cancellationToken).ConfigureAwait(false);
+        var page = request.Normalize();
+        return new PageResult<IntegrityIssue>(all.Skip(page.Skip).Take(page.SafePageSize).ToList(), all.Count, page.SafePageNumber, page.SafePageSize);
+    }
     Task<IReadOnlyList<IntegrityIssue>> IntegrityAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Vars missing a parseable <c>meta.json</c> (IntegrityStatus.MissingMeta). (24-checklist A4.)</summary>
+    async Task<PageResult<IntegrityIssue>> MissingMetaPageAsync(PageRequest request, CancellationToken cancellationToken = default)
+    {
+        var all = await MissingMetaAsync(cancellationToken).ConfigureAwait(false);
+        var page = request.Normalize();
+        return new PageResult<IntegrityIssue>(all.Skip(page.Skip).Take(page.SafePageSize).ToList(), all.Count, page.SafePageNumber, page.SafePageSize);
+    }
     Task<IReadOnlyList<IntegrityIssue>> MissingMetaAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Fix one broken var → a new UTF-8 var; returns the new VarFile id.</summary>

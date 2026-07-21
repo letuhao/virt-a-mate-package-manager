@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.IO;
 using VarVault.Common;
 using VarVault.Domain.Fingerprinting;
+using VarVault.Domain.Indexing;
 
 namespace VarVault.Infrastructure.Indexing;
 
@@ -82,6 +83,8 @@ public static class ZipCentralDirectoryReader
 
         if (cdSize <= 0 || cdSize > length)
             return Corrupt("central-directory size out of range");
+        if (cdSize > IngestLimits.MaxCentralDirectoryBytes)
+            return Corrupt($"central-directory exceeds ingest cap ({cdSize} bytes)");
 
         // 3. Read the central directory. Fall back to a computed start if the recorded offset is
         //    shifted (e.g. archive with prepended data), which is common and still valid.

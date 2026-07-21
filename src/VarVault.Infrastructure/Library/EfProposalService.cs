@@ -4,6 +4,7 @@ using VarVault.Domain.Entities;
 using VarVault.Domain.Safety;
 using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Library;
+using VarVault.Sdk.Paging;
 
 namespace VarVault.Infrastructure.Library;
 
@@ -19,6 +20,26 @@ public sealed class EfProposalService(
     IMigrationService migration,
     ITrashService trash) : IProposalService
 {
+    public async Task<PageResult<Proposal>> ListPageAsync(
+        ProposalKind? kind,
+        PageRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var page = request.Normalize();
+        var rows = await ListAsync(cancellationToken).ConfigureAwait(false);
+        var filtered = rows
+            .Where(p => kind is null || p.Kind == kind.Value)
+            .OrderByDescending(p => p.AffectedBytes)
+            .ThenBy(p => p.Title, StringComparer.Ordinal)
+            .ThenBy(p => p.Id, StringComparer.Ordinal)
+            .ToList();
+        return new PageResult<Proposal>(
+            filtered.Skip(page.Skip).Take(page.SafePageSize).ToList(),
+            filtered.Count,
+            page.SafePageNumber,
+            page.SafePageSize);
+    }
+
     public async Task<IReadOnlyList<Proposal>> ListAsync(CancellationToken cancellationToken = default)
     {
         var proposals = new List<Proposal>();

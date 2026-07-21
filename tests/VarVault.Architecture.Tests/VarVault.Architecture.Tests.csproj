@@ -18,6 +18,7 @@
     <ProjectReference Include="..\..\src\VarVault.Modules.Repositories\VarVault.Modules.Repositories.csproj" />
     <ProjectReference Include="..\..\src\VarVault.Modules.Indexing\VarVault.Modules.Indexing.csproj" />
     <ProjectReference Include="..\..\src\VarVault.Host\VarVault.Host.csproj" />
+    <ProjectReference Include="..\VarVault.TestKit\VarVault.TestKit.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Xunit" />

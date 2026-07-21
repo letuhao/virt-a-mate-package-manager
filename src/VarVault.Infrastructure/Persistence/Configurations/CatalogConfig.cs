@@ -48,6 +48,8 @@ internal sealed class VarFileConfig : IEntityTypeConfiguration<VarFile>
         b.HasIndex(x => x.PayloadSignature);
         b.HasIndex(x => x.ContentSignatureNoPath);
         b.HasIndex(x => x.ContentHash).HasFilter("\"ContentHash\" IS NOT NULL");
+        b.HasIndex(x => new { x.IngestState, x.LeaseExpiresAt });
+        b.HasIndex(x => new { x.RepositoryId, x.SeenGeneration });
 
         // Owning package: nullable (unparsed names → Unrecognized bucket). Deleting a Package
         // detaches its files rather than destroying physical facts.

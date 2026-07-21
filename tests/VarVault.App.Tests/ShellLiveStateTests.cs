@@ -64,7 +64,7 @@ public class ShellLiveStateTests
             Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
                 .GetRequiredService<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>(sp),
             Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
-                .GetRequiredService<VarVault.Sdk.Threading.IJobQueue>(sp));
+                .GetService<VarVault.Sdk.Indexer.IIndexerClient>(sp));
 
         var snap = await feeds.SnapshotAsync();
         // Empty catalog → zero counts, no crash. Proves the wire to real services.
@@ -81,13 +81,29 @@ public class ShellLiveStateTests
         await using var host = TestHost.Create(withPersistence: true);
         var sf = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
             .GetRequiredService<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>(host.Host.Services);
-        var jq = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
-            .GetRequiredService<VarVault.Sdk.Threading.IJobQueue>(host.Host.Services);
-        var feeds = new ShellLiveFeeds(sf, jq);
+        var indexer = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
+            .GetService<VarVault.Sdk.Indexer.IIndexerClient>(host.Host.Services);
+        var feeds = new ShellLiveFeeds(sf, indexer);
 
         // 30 concurrent polls: with a per-snapshot scope this never throws EF's "second operation on this context".
         var snaps = await Task.WhenAll(Enumerable.Range(0, 30).Select(_ => feeds.SnapshotAsync()));
         Assert.All(snaps, s => Assert.True(s.ProposalCount >= 0));
+    }
+
+    [Trait("Category", TestCategories.Unit)]
+    [Fact]
+    public async Task Expensive_badge_counts_are_cached_across_ticks()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        var sf = Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
+            .GetRequiredService<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>(host.Host.Services);
+        var feeds = new ShellLiveFeeds(sf);
+
+        // Tick 1 refreshes expensive badges; ticks 2–4 must not zero them out.
+        var first = await feeds.SnapshotAsync();
+        var mid = await feeds.SnapshotAsync();
+        Assert.Equal(first.ProposalCount, mid.ProposalCount);
+        Assert.Equal(first.HealthCount, mid.HealthCount);
     }
 
     private static int? Badge(ShellViewModel shell, string id) =>

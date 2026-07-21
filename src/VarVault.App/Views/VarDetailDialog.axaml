@@ -26,34 +26,52 @@
 
     <!-- Tab 1: Dependency graph (forward closure) -->
     <StackPanel IsVisible="{Binding IsGraphTab}">
-      <TextBlock Text="{Binding Detail.ForwardClosure.Count, StringFormat='Forward closure: {0} dependencies'}" Opacity="0.8" Margin="0,0,0,4" />
-      <ItemsControl ItemsSource="{Binding Detail.ForwardClosure}">
+      <TextBlock Text="{Binding GraphPager.TotalCount, StringFormat='Forward closure: {0} dependencies'}" Opacity="0.8" Margin="0,0,0,4" />
+      <ItemsControl ItemsSource="{Binding GraphPager.Items}">
         <ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding StringFormat='#{0}'}" FontFamily="{DynamicResource MonoFont}" FontSize="12" /></DataTemplate></ItemsControl.ItemTemplate>
       </ItemsControl>
+      <c:PaginationBar Margin="0,8,0,0"
+                       PageNumber="{Binding GraphPager.PageNumber}"
+                       PageCount="{Binding GraphPager.PageCount}"
+                       PageSize="{Binding GraphPager.PageSize}"
+                       TotalCount="{Binding GraphPager.TotalCount}"
+                       SummaryLabel="{Binding GraphPager.SummaryLabel}" />
     </StackPanel>
 
     <!-- Tab 2: Content items -->
     <StackPanel IsVisible="{Binding IsContentTab}">
-      <TextBlock Text="{Binding Detail.ContentItems.Count, StringFormat='{}{0} content items'}" Opacity="0.8" Margin="0,0,0,4" />
-      <ItemsControl ItemsSource="{Binding Detail.ContentItems}">
+      <TextBlock Text="{Binding ContentPager.TotalCount, StringFormat='{}{0} content items'}" Opacity="0.8" Margin="0,0,0,4" />
+      <ItemsControl ItemsSource="{Binding ContentPager.Items}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="lib:ContentItemDto">
             <Grid ColumnDefinitions="90,*"><TextBlock Grid.Column="0" Text="{Binding Type}" Opacity="0.7" FontSize="12" /><TextBlock Grid.Column="1" Text="{Binding EntryPath}" FontFamily="{DynamicResource MonoFont}" FontSize="11" TextTrimming="CharacterEllipsis" /></Grid>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+      <c:PaginationBar Margin="0,8,0,0"
+                       PageNumber="{Binding ContentPager.PageNumber}"
+                       PageCount="{Binding ContentPager.PageCount}"
+                       PageSize="{Binding ContentPager.PageSize}"
+                       TotalCount="{Binding ContentPager.TotalCount}"
+                       SummaryLabel="{Binding ContentPager.SummaryLabel}" />
     </StackPanel>
 
     <!-- Tab 3: Copies & lineage -->
     <StackPanel IsVisible="{Binding IsCopiesTab}">
-      <TextBlock Text="{Binding Detail.Copies.Count, StringFormat='{}{0} copies'}" Opacity="0.8" Margin="0,0,0,4" />
-      <ItemsControl ItemsSource="{Binding Detail.Copies}">
+      <TextBlock Text="{Binding CopiesPager.TotalCount, StringFormat='{}{0} copies'}" Opacity="0.8" Margin="0,0,0,4" />
+      <ItemsControl ItemsSource="{Binding CopiesPager.Items}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="lib:CopyDto">
             <Grid ColumnDefinitions="Auto,*,Auto"><c:Tag Grid.Column="0" Content="{Binding Tier, StringFormat='T{0}'}" /><TextBlock Grid.Column="1" Text="{Binding Path}" FontFamily="{DynamicResource MonoFont}" FontSize="11" Margin="6,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" /><c:StatePill Grid.Column="2" State="Ok" Text="online" IsVisible="{Binding IsOnline}" /></Grid>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+      <c:PaginationBar Margin="0,8,0,0"
+                       PageNumber="{Binding CopiesPager.PageNumber}"
+                       PageCount="{Binding CopiesPager.PageCount}"
+                       PageSize="{Binding CopiesPager.PageSize}"
+                       TotalCount="{Binding CopiesPager.TotalCount}"
+                       SummaryLabel="{Binding CopiesPager.SummaryLabel}" />
     </StackPanel>
   </StackPanel>
 </UserControl>

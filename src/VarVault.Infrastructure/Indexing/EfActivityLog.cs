@@ -3,6 +3,7 @@ using VarVault.Common;
 using VarVault.Domain.Entities;
 using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Activation;
+using VarVault.Sdk.Paging;
 
 namespace VarVault.Infrastructure.Indexing;
 
@@ -23,16 +24,28 @@ public sealed class EfActivityLog(VarVaultDbContext db, IClock clock) : IActivit
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyList<ActivityRecord>> GetRecentAsync(int limit = 100, CancellationToken cancellationToken = default)
+    public async Task<PageResult<ActivityRecord>> GetRecentPageAsync(PageRequest request, CancellationToken cancellationToken = default)
     {
-        var rows = await db.ActivityEntries.AsNoTracking()
+        var page = request.Normalize();
+        var query = db.ActivityEntries.AsNoTracking();
+        var total = await query.CountAsync(cancellationToken).ConfigureAwait(false);
+        var rows = await query
             .OrderByDescending(e => e.TimestampUnixMs)
-            .Take(Math.Clamp(limit, 1, 1000))
+            .ThenByDescending(e => e.Id)
+            .Skip(page.Skip)
+            .Take(page.SafePageSize)
             .Select(e => new { e.Kind, e.Description, e.TimestampUnixMs })
             .ToListAsync(cancellationToken).ConfigureAwait(false);
 
-        return rows
-            .Select(r => new ActivityRecord(r.Kind, r.Description, DateTimeOffset.FromUnixTimeMilliseconds(r.TimestampUnixMs).UtcDateTime))
-            .ToList();
+        return new PageResult<ActivityRecord>(
+            rows.Select(r => new ActivityRecord(r.Kind, r.Description, DateTimeOffset.FromUnixTimeMilliseconds(r.TimestampUnixMs).UtcDateTime)).ToList(),
+            total,
+            page.SafePageNumber,
+            page.SafePageSize);
+    }
+
+    public async Task<IReadOnlyList<ActivityRecord>> GetRecentAsync(int limit = 100, CancellationToken cancellationToken = default)
+    {
+        return (await GetRecentPageAsync(new PageRequest(1, Math.Clamp(limit, 1, 100)), cancellationToken).ConfigureAwait(false)).Items;
     }
 }

@@ -1,3 +1,5 @@
+using VarVault.Sdk.Paging;
+
 namespace VarVault.Sdk.Library;
 
 /// <summary>Hot/warm/cold package counts.</summary>
@@ -29,6 +31,12 @@ public sealed record StaleVersion(long PackageId, string VarName, string Storage
 public interface ITieringService
 {
     Task<TierClassCounts> ClassCountsAsync(CancellationToken cancellationToken = default);
+    async Task<PageResult<MisplacedItem>> MisplacedPageAsync(PageRequest request, CancellationToken cancellationToken = default)
+    {
+        var all = await MisplacedAsync(cancellationToken).ConfigureAwait(false);
+        var page = request.Normalize();
+        return new PageResult<MisplacedItem>(all.Skip(page.Skip).Take(page.SafePageSize).ToList(), all.Count, page.SafePageNumber, page.SafePageSize);
+    }
     Task<IReadOnlyList<MisplacedItem>> MisplacedAsync(CancellationToken cancellationToken = default);
     Task<TierMigrationPlan> BuildPlanAsync(CancellationToken cancellationToken = default);
 
@@ -36,5 +44,11 @@ public interface ITieringService
     Task<TierPolicy> PolicyAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Superseded + cold versions (a newer version of the same identity exists). (24-checklist A7.)</summary>
+    async Task<PageResult<StaleVersion>> StaleVersionsPageAsync(PageRequest request, CancellationToken cancellationToken = default)
+    {
+        var all = await StaleVersionsAsync(cancellationToken).ConfigureAwait(false);
+        var page = request.Normalize();
+        return new PageResult<StaleVersion>(all.Skip(page.Skip).Take(page.SafePageSize).ToList(), all.Count, page.SafePageNumber, page.SafePageSize);
+    }
     Task<IReadOnlyList<StaleVersion>> StaleVersionsAsync(CancellationToken cancellationToken = default);
 }

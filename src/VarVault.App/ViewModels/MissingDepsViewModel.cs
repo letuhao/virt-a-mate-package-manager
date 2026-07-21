@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VarVault.Sdk.Library;
+using VarVault.Sdk.Paging;
 
 namespace VarVault.App.ViewModels;
 
@@ -12,41 +13,26 @@ public sealed partial class MissingDepsViewModel(
     IMissingDepsQuery query, Services.IDialogLauncher? launcher = null, IMissingLogResolver? logResolver = null)
     : ObservableObject, ILoadableScreen
 {
-    /// <summary>Initial render cap — a large library can reference thousands of missing packages; showing them all
-    /// up-front is slow and overwhelming. Most-needed-first + a "show all" toggle keeps triage fast. (D1.2)</summary>
-    private const int Cap = 200;
-
-    private readonly List<MissingDependency> _all = [];
+    public PagedListState<MissingDependency> Pager { get; } =
+        new((request, ct) => query.GetPageAsync(request, cancellationToken: ct));
 
     /// <summary>Rows currently rendered (capped subset unless <see cref="ShowAll"/>). </summary>
-    public ObservableCollection<MissingDependency> Items { get; } = [];
+    public ObservableCollection<MissingDependency> Items => Pager.Items;
 
-    public bool IsEmpty => _all.Count == 0;
+    public bool IsEmpty => Pager.IsEmpty;
 
     /// <summary>Total distinct referenced-but-absent packages (the full set, not the capped view). (D1.1)</summary>
-    public int TotalMissing => _all.Count;
-
-    [ObservableProperty] private bool _showAll;
-
-    /// <summary>True while the view is capped (more exist than are shown). (D1.2)</summary>
-    public bool IsCapped => !ShowAll && _all.Count > Cap;
-
-    /// <summary>Whether the "show all / show top" toggle is worth showing at all.</summary>
-    public bool CanToggle => _all.Count > Cap;
+    public int TotalMissing => Pager.TotalCount;
+    public bool IsCapped => false;
+    public bool CanToggle => false;
+    public string CapLabel => string.Empty;
+    public string ToggleLabel => "Show all";
 
     /// <summary>One-line framing so the number has context and the newcomer knows these are downloads, not a bug. (D1.1/D1.3)</summary>
-    public string HeaderSummary => _all.Count == 0
+    public string HeaderSummary => Pager.TotalCount == 0
         ? "No missing dependencies — every referenced package is in your library."
-        : $"{_all.Count} packages are referenced by your library but aren't in it — downloads you still need. "
+        : $"{Pager.TotalCount} packages are referenced by your library but aren't in it — downloads you still need. "
           + "VarVault can't create these; use “Export links txt” to fetch them, or “Resolve” to map a ref to a package you do have.";
-
-    /// <summary>Cap status line under the header. (D1.2)</summary>
-    public string CapLabel => _all.Count == 0
-        ? string.Empty
-        : IsCapped ? $"Showing the {Cap} most-needed of {_all.Count}." : $"Showing all {_all.Count}, most-needed first.";
-
-    /// <summary>Toggle button label. (D1.2)</summary>
-    public string ToggleLabel => ShowAll ? $"Show top {Cap}" : $"Show all {_all.Count}";
 
     /// <summary>Resolve/Edit-alias → alias dialog for the missing ref. (GD-12)</summary>
     [RelayCommand]
@@ -56,40 +42,54 @@ public sealed partial class MissingDepsViewModel(
             launcher?.OpenAlias(dep.Ref);
     }
 
-    /// <summary>Show all rows / collapse back to the top-N. (D1.2)</summary>
-    [RelayCommand]
-    private void ToggleShowAll() => ShowAll = !ShowAll;
-
-    partial void OnShowAllChanged(bool value) => Apply();
-
     /// <summary>ILoadableScreen: the shell loads this screen by refreshing it. (G-0)</summary>
     Task ILoadableScreen.LoadAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
 
     [RelayCommand]
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        _all.Clear();
-        foreach (var item in await query.GetMissingAsync(cancellationToken).ConfigureAwait(true))
-            _all.Add(item);
-        Apply();
+        await Pager.ResetAndReloadAsync(cancellationToken).ConfigureAwait(true);
+        NotifyPager();
     }
 
-    private void Apply()
+    [RelayCommand(CanExecute = nameof(CanPreviousPage))]
+    private async Task PreviousPageAsync(CancellationToken cancellationToken = default)
     {
-        Items.Clear();
-        // Most-needed first: the packages blocking the most of your library are the highest-value downloads. (D1.2)
-        IEnumerable<MissingDependency> ordered = _all
-            .OrderByDescending(i => i.NeededByCount)
-            .ThenBy(i => i.Ref, StringComparer.OrdinalIgnoreCase);
-        foreach (var item in ShowAll ? ordered : ordered.Take(Cap))
-            Items.Add(item);
+        await Pager.PreviousPageAsync(cancellationToken).ConfigureAwait(true);
+        NotifyPager();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanNextPage))]
+    private async Task NextPageAsync(CancellationToken cancellationToken = default)
+    {
+        await Pager.NextPageAsync(cancellationToken).ConfigureAwait(true);
+        NotifyPager();
+    }
+
+    [RelayCommand]
+    private async Task GoToPageAsync(int pageNumber)
+    {
+        await Pager.LoadPageAsync(pageNumber, Pager.PageSize).ConfigureAwait(true);
+        NotifyPager();
+    }
+
+    [RelayCommand]
+    private async Task ChangePageSizeAsync(int pageSize)
+    {
+        await Pager.LoadPageAsync(1, pageSize).ConfigureAwait(true);
+        NotifyPager();
+    }
+
+    private bool CanPreviousPage() => Pager.HasPreviousPage && !Pager.IsLoading;
+    private bool CanNextPage() => Pager.HasNextPage && !Pager.IsLoading;
+    [RelayCommand] private void ToggleShowAll() { }
+    private void NotifyPager()
+    {
         OnPropertyChanged(nameof(IsEmpty));
         OnPropertyChanged(nameof(TotalMissing));
-        OnPropertyChanged(nameof(IsCapped));
-        OnPropertyChanged(nameof(CanToggle));
         OnPropertyChanged(nameof(HeaderSummary));
-        OnPropertyChanged(nameof(CapLabel));
-        OnPropertyChanged(nameof(ToggleLabel));
+        PreviousPageCommand.NotifyCanExecuteChanged();
+        NextPageCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>The most recent export text (missing refs, one per line) for save-to-file. Always the FULL set. (AC-17)</summary>
@@ -97,9 +97,12 @@ public sealed partial class MissingDepsViewModel(
 
     /// <summary>Screen-head "Export links txt": export ALL the missing refs as a txt list (not just the shown page). (AC-17)</summary>
     [RelayCommand]
-    public void ExportLinks() =>
+    public async Task ExportLinksAsync(CancellationToken cancellationToken = default)
+    {
+        var all = await query.GetMissingAsync(cancellationToken).ConfigureAwait(true);
         LastExportText = string.Join(System.Environment.NewLine,
-            _all.OrderByDescending(i => i.NeededByCount).Select(i => i.Ref));
+            all.OrderByDescending(i => i.NeededByCount).ThenBy(i => i.Ref, StringComparer.Ordinal).Select(i => i.Ref));
+    }
 
     // ── VaM-log repair (QoL) ─────────────────────────────────────────────────────────────────────────────
     /// <summary>Raw VaM error-log text pasted by the user (bound to a TextBox).</summary>

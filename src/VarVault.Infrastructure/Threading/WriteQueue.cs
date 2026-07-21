@@ -23,9 +23,11 @@ internal sealed class WriteQueue : IWriteQueue, IAsyncDisposable
     private readonly CancellationTokenSource _shutdown = new();
     private readonly Task _consumer;
     private readonly ObservableGauge<int> _depthGauge;
+    private readonly IGlobalWriteLock _globalLock;
 
-    public WriteQueue()
+    public WriteQueue(IGlobalWriteLock? globalLock = null)
     {
+        _globalLock = globalLock ?? new NullWriteLock();
         _depthGauge = Telemetry.Meter.CreateObservableGauge("varvault.writequeue.depth", () => Depth);
         _consumer = Task.Run(ConsumeAsync);
     }
@@ -75,8 +77,28 @@ internal sealed class WriteQueue : IWriteQueue, IAsyncDisposable
             try { await _signal.WaitAsync(_shutdown.Token).ConfigureAwait(false); }
             catch (OperationCanceledException) { break; }
 
-            if (TryDequeue(out var work))
+            if (!TryDequeue(out var work))
+                continue;
+
+            // Serialize across processes: the GUI and the out-of-process indexer can both hold this
+            // WriteQueue, but only one may write the catalog at a time. (A12 single-writer.)
+            IAsyncDisposable? scope = null;
+            var waitStarted = Stopwatch.GetTimestamp();
+            try { scope = await _globalLock.AcquireAsync(_shutdown.Token).ConfigureAwait(false); }
+            catch (OperationCanceledException) { break; }
+            Telemetry.WriteLockWaitDurationMs.Record(Stopwatch.GetElapsedTime(waitStarted).TotalMilliseconds);
+
+            var holdStarted = Stopwatch.GetTimestamp();
+            try
+            {
                 await work(_shutdown.Token).ConfigureAwait(false);
+            }
+            finally
+            {
+                if (scope is not null)
+                    await scope.DisposeAsync().ConfigureAwait(false);
+                Telemetry.WriteLockHoldDurationMs.Record(Stopwatch.GetElapsedTime(holdStarted).TotalMilliseconds);
+            }
         }
     }
 

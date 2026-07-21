@@ -1,0 +1,241 @@
+using System.Diagnostics;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using VarVault.Common;
+using VarVault.Domain.Dependencies;
+using VarVault.Domain.Entities;
+using VarVault.Domain.Indexing;
+using VarVault.Infrastructure.Persistence;
+using VarVault.Sdk.Indexer;
+using VarVault.Sdk.Repositories;
+using VarVault.Sdk.Threading;
+
+namespace VarVault.Infrastructure.Indexing;
+
+/// <summary>
+/// Coalescing indexer worker: one active job at a time, durable stream ingest, then paged resolve.
+/// Hosted in-process (tests) or inside <c>VarVault.Indexer</c>. (A12.)
+/// </summary>
+public sealed class IndexerWorker(
+    IServiceScopeFactory scopeFactory,
+    IWriteQueue writeQueue,
+    ILogger<IndexerWorker> logger) : IIndexerWorker
+{
+    private readonly object _gate = new();
+    private readonly HashSet<int> _owners = [];
+    private IndexerStatus _status = Idle();
+    private CancellationTokenSource? _jobCts;
+    private Task? _running;
+    private Guid? _activeJob;
+
+    public IndexerStatus Snapshot
+    {
+        get { lock (_gate) return _status; }
+    }
+
+    public bool IsBusy
+    {
+        get { lock (_gate) return _running is { IsCompleted: false }; }
+    }
+
+    public bool HasLiveOwner
+    {
+        get
+        {
+            lock (_gate)
+            {
+                _owners.RemoveWhere(pid => !ProcessLiveness.IsAlive(pid));
+                return _owners.Count > 0;
+            }
+        }
+    }
+
+    public async Task<IndexerStatus> HandleAsync(IndexerCommand command, CancellationToken cancellationToken = default)
+    {
+        if (command.ProtocolVersion != IndexerProtocol.Version)
+            return Snapshot with { Error = $"protocol mismatch: {command.ProtocolVersion}" };
+
+        // Any command may carry the caller's pid; track it so the watchdog knows a GUI is attached.
+        if (command.OwnerProcessId is { } ownerPid and > 0
+            && command.Kind is not IndexerCommandKind.UnregisterOwner)
+        {
+            lock (_gate) _owners.Add(ownerPid);
+        }
+
+        switch (command.Kind)
+        {
+            case IndexerCommandKind.Ping:
+            case IndexerCommandKind.GetStatus:
+            case IndexerCommandKind.RegisterOwner:
+                return Snapshot;
+
+            case IndexerCommandKind.UnregisterOwner:
+                if (command.OwnerProcessId is { } gone)
+                    lock (_gate) _owners.Remove(gone);
+                return Snapshot;
+
+            case IndexerCommandKind.CancelJob:
+                CancelActive(command.JobId);
+                return Snapshot;
+
+            case IndexerCommandKind.Shutdown:
+                CancelActive(null);
+                if (_running is not null)
+                {
+                    try { await _running.ConfigureAwait(false); } catch { /* swallow */ }
+                }
+                Set(_ => Idle());
+                return Snapshot;
+
+            case IndexerCommandKind.StartIndexAll:
+                return Start(null, command.ForceFull);
+
+            case IndexerCommandKind.StartIndexRepository:
+                if (command.RepositoryId is not { } rid)
+                    return Snapshot with { Error = "repositoryId required" };
+                return Start(rid, command.ForceFull);
+
+            default:
+                return Snapshot with { Error = "unknown command" };
+        }
+    }
+
+    private IndexerStatus Start(Guid? repositoryId, bool forceFull)
+    {
+        lock (_gate)
+        {
+            // Coalesce: if already indexing, return the active job id.
+            if (_running is { IsCompleted: false } && _activeJob is { } existing)
+                return _status with { JobId = existing, PhaseMessage = "Coalesced into active job" };
+
+            var jobId = Guid.NewGuid();
+            _activeJob = jobId;
+            // Job lifetime is independent of the pipe/request CT (those end when the command returns).
+            // Cancellation is only via CancelJob / Shutdown.
+            _jobCts?.Dispose();
+            _jobCts = new CancellationTokenSource();
+            var ct = _jobCts.Token;
+            _status = new IndexerStatus(
+                IndexerProtocol.Version, IndexerJobState.Discovering, jobId,
+                "Starting…", 0, 0, Process.GetCurrentProcess().WorkingSet64, 0, 0, 0, null);
+            _running = Task.Run(() => RunJobAsync(jobId, repositoryId, forceFull, ct), CancellationToken.None);
+            return _status;
+        }
+    }
+
+    private async Task RunJobAsync(Guid jobId, Guid? repositoryId, bool forceFull, CancellationToken cancellationToken)
+    {
+        var jobSw = Stopwatch.StartNew();
+        logger.LogInformation(
+            "Indexer job {JobId} started (scope: {Scope})",
+            jobId, repositoryId is { } r ? $"repository {r}" : "all repositories");
+        try
+        {
+            using var scope = scopeFactory.CreateScope();
+            var repos = scope.ServiceProvider.GetRequiredService<IRepositoryService>();
+            var resolver = scope.ServiceProvider.GetRequiredService<IDependencyResolver>();
+            var streamIndexer = scope.ServiceProvider.GetRequiredService<IStreamIndexer>();
+            var list = await repos.ListAsync(cancellationToken).ConfigureAwait(false);
+            var targets = list.Where(r => r is { IsOnline: true, IsEnabled: true }
+                                          && (repositoryId is null || r.Id == repositoryId))
+                .ToList();
+
+            int indexed = 0, skipped = 0, pruned = 0, errors = 0;
+            for (var i = 0; i < targets.Count; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var repo = targets[i];
+                Set(s => s with
+                {
+                    State = IndexerJobState.Ingesting,
+                    PhaseMessage = $"Ingesting {repo.Name}",
+                    Done = i,
+                    Total = targets.Count,
+                    WorkingSetBytes = Process.GetCurrentProcess().WorkingSet64,
+                });
+
+                var progress = new CallbackProgress(report =>
+                {
+                    Set(s => s with
+                    {
+                        State = IndexerJobState.Ingesting,
+                        PhaseMessage = report.Message,
+                        Done = report.Done,
+                        Total = report.Total > 0 ? report.Total : s.Total,
+                        WorkingSetBytes = Process.GetCurrentProcess().WorkingSet64,
+                    });
+                });
+
+                var media = Enum.TryParse<MediaType>(repo.MediaType, ignoreCase: true, out var mt)
+                    ? mt
+                    : MediaType.Unknown;
+
+                var outcome = await streamIndexer.IndexRepositoryAsync(
+                    repo.Id, repo.MountPath, media, progress, forceFull, cancellationToken).ConfigureAwait(false);
+                indexed += outcome.Indexed;
+                skipped += outcome.Skipped;
+                pruned += outcome.Pruned;
+                errors += outcome.Corrupt;
+            }
+
+            Set(s => s with { State = IndexerJobState.Resolving, PhaseMessage = "Resolving dependencies…" });
+            await writeQueue.EnqueueAsync(
+                async ct => { await resolver.ResolveAllAsync(ct).ConfigureAwait(false); return true; },
+                WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+
+            Set(_ => new IndexerStatus(
+                IndexerProtocol.Version, IndexerJobState.Completed, jobId,
+                $"Indexed {indexed} (skipped {skipped}, pruned {pruned})",
+                indexed, Math.Max(1, indexed), Process.GetCurrentProcess().WorkingSet64,
+                0, errors, DateTime.UtcNow.Ticks, null));
+            logger.LogInformation(
+                "Indexer job {JobId} completed in {ElapsedMs} ms: {Indexed} indexed, {Skipped} skipped, " +
+                "{Pruned} pruned, {Errors} errors across {Repos} repositories (working set {WorkingSetMb} MB)",
+                jobId, jobSw.ElapsedMilliseconds, indexed, skipped, pruned, errors, targets.Count,
+                Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024));
+        }
+        catch (OperationCanceledException)
+        {
+            Set(s => s with { State = IndexerJobState.Cancelled, PhaseMessage = "Cancelled" });
+            logger.LogInformation("Indexer job {JobId} cancelled after {ElapsedMs} ms", jobId, jobSw.ElapsedMilliseconds);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Indexer job {JobId} failed", jobId);
+            Set(s => s with { State = IndexerJobState.Failed, Error = ex.Message, PhaseMessage = "Failed" });
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                if (_activeJob == jobId)
+                    _activeJob = null;
+            }
+        }
+    }
+
+    private void CancelActive(Guid? jobId)
+    {
+        lock (_gate)
+        {
+            if (jobId is { } id && _activeJob != id)
+                return;
+            _jobCts?.Cancel();
+        }
+    }
+
+    private void Set(Func<IndexerStatus, IndexerStatus> mutate)
+    {
+        lock (_gate) _status = mutate(_status);
+    }
+
+    private static IndexerStatus Idle() =>
+        new(IndexerProtocol.Version, IndexerJobState.Idle, null, null, 0, 0,
+            Process.GetCurrentProcess().WorkingSet64, 0, 0, 0, null);
+
+    private sealed class CallbackProgress(Action<ProgressReport> onReport) : IProgressSink
+    {
+        public void Report(ProgressReport report) => onReport(report);
+    }
+}

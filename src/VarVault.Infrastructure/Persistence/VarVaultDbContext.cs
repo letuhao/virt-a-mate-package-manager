@@ -54,6 +54,10 @@ public class VarVaultDbContext(DbContextOptions<VarVaultDbContext> options) : Db
     public DbSet<ImportFailedSourceEntity> ImportFailedSources => Set<ImportFailedSourceEntity>();
     public DbSet<ImportOutcomeEntity> ImportOutcomes => Set<ImportOutcomeEntity>();
 
+    // Durable indexing ledger (A15)
+    public DbSet<ScanRun> ScanRuns => Set<ScanRun>();
+    public DbSet<DirtyPackage> DirtyPackages => Set<DirtyPackage>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

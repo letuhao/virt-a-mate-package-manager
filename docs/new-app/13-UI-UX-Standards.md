@@ -23,6 +23,9 @@ Rules for the Avalonia presentation layer. Complements the engineering standards
 ## 3. The big data surfaces
 - The library grid uses **TreeDataGrid** (virtualized) bound to the materialized read model via an **`OrderedSnapshot`** — O(1) scrollbar, no paging. The gallery is likewise virtualized with a **bounded thumbnail cache** and scroll-ahead prefetch; thumbnails decode **off the UI thread**.
 - Never materialize the full 70k-row list into VM collections. Query page/slice on demand.
+- Every potentially unbounded **secondary** list (missing deps, duplicates, integrity issues, stale versions, trash, proposals, preset members, package-detail tabs, creator analytics, activity history, import review) uses **numbered paging** with `Previous` / page numbers / `Next` and a page-size selector of **25 / 50 / 100**. Default = **50**.
+- Reset secondary lists to page 1 when search/filter/sort changes; preserve page per tab for the current session; cancel stale requests; after mutations, reload and clamp to the last valid page.
+- Allowed exceptions must stay explicit: the primary **Library** surface keeps the sealed A9 virtualized ordered snapshot, and **bounded summaries** (repositories, profiles, placement policy, encoding group summaries, backups, jobs, dashboard recent items, small cards) stay unpaged by design.
 - Column sort is click-header with a direction indicator (not only the sort dropdown).
 
 ## 4. State: every surface handles all states

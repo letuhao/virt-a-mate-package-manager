@@ -33,6 +33,16 @@
       <!-- Exact duplicates (tab 1): groups table -->
       <DockPanel IsVisible="{Binding IsExactTab}">
         <TextBlock DockPanel.Dock="Bottom" Text="No duplicate groups found." Opacity="0.6" IsVisible="{Binding IsEmpty}" Margin="0,8,0,0" />
+        <c:PaginationBar DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                         PageNumber="{Binding ExactPager.PageNumber}"
+                         PageCount="{Binding ExactPager.PageCount}"
+                         PageSize="{Binding ExactPager.PageSize}"
+                         TotalCount="{Binding ExactPager.TotalCount}"
+                         SummaryLabel="{Binding ExactPager.SummaryLabel}"
+                         PreviousCommand="{Binding ExactPreviousPageCommand}"
+                         NextCommand="{Binding ExactNextPageCommand}"
+                         GoToPageCommand="{Binding ExactGoToPageCommand}"
+                         PageSizeChangedCommand="{Binding ExactChangePageSizeCommand}" />
         <c:Card Header="Exact duplicate groups">
           <ScrollViewer>
             <ItemsControl ItemsSource="{Binding Groups}">
@@ -59,6 +69,16 @@
       <!-- Near-duplicates (tab 2): same payload, different identity (24-checklist A9) -->
       <DockPanel IsVisible="{Binding IsNearTab}">
         <TextBlock DockPanel.Dock="Bottom" Text="No near-duplicates found." Opacity="0.6" IsVisible="{Binding NearIsEmpty}" Margin="0,8,0,0" />
+        <c:PaginationBar DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                         PageNumber="{Binding NearPager.PageNumber}"
+                         PageCount="{Binding NearPager.PageCount}"
+                         PageSize="{Binding NearPager.PageSize}"
+                         TotalCount="{Binding NearPager.TotalCount}"
+                         SummaryLabel="{Binding NearPager.SummaryLabel}"
+                         PreviousCommand="{Binding NearPreviousPageCommand}"
+                         NextCommand="{Binding NearNextPageCommand}"
+                         GoToPageCommand="{Binding NearGoToPageCommand}"
+                         PageSizeChangedCommand="{Binding NearChangePageSizeCommand}" />
         <c:Card Header="Near-duplicates — same content payload, different name / meta.json">
           <ScrollViewer>
             <ItemsControl ItemsSource="{Binding NearGroups}">

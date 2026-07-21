@@ -24,14 +24,26 @@ public partial class MainWindow : Window
         if (DataContext is ShellViewModel s)
             s.MaybeShowOnboarding();
 
-        _pollTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(750) };
+        _pollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
         _pollTimer.Tick += async (_, _) =>
         {
-            if (DataContext is ShellViewModel shell)
-                await shell.RefreshLiveStateAsync().ConfigureAwait(true);
+            if (_polling)
+                return;
+            _polling = true;
+            try
+            {
+                if (DataContext is ShellViewModel shell)
+                    await shell.RefreshLiveStateAsync().ConfigureAwait(true);
+            }
+            finally
+            {
+                _polling = false;
+            }
         };
         _pollTimer.Start();
     }
+
+    private bool _polling;
 
     protected override void OnUnloaded(RoutedEventArgs e)
     {

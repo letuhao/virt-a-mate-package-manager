@@ -51,6 +51,16 @@
           </c:Card>
         </WrapPanel>
         <TextBlock DockPanel.Dock="Bottom" Text="No misplaced packages — tiering is balanced." Opacity="0.6" IsVisible="{Binding IsEmpty}" Margin="0,8,0,0" />
+        <c:PaginationBar DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                         PageNumber="{Binding MisplacedPager.PageNumber}"
+                         PageCount="{Binding MisplacedPager.PageCount}"
+                         PageSize="{Binding MisplacedPager.PageSize}"
+                         TotalCount="{Binding MisplacedPager.TotalCount}"
+                         SummaryLabel="{Binding MisplacedPager.SummaryLabel}"
+                         PreviousCommand="{Binding MisplacedPreviousPageCommand}"
+                         NextCommand="{Binding MisplacedNextPageCommand}"
+                         GoToPageCommand="{Binding MisplacedGoToPageCommand}"
+                         PageSizeChangedCommand="{Binding MisplacedChangePageSizeCommand}" />
         <c:Card Header="Misplaced — proposals awaiting approval">
           <ScrollViewer>
             <ItemsControl ItemsSource="{Binding Misplaced}">
@@ -107,6 +117,16 @@
       <!-- Stale / old versions (tab 3): superseded cold versions (24-checklist A7) -->
       <DockPanel IsVisible="{Binding IsStaleTab}">
         <TextBlock DockPanel.Dock="Bottom" Text="No stale versions — every cold version is the latest." Opacity="0.6" IsVisible="{Binding StaleIsEmpty}" Margin="0,8,0,0" />
+        <c:PaginationBar DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                         PageNumber="{Binding StalePager.PageNumber}"
+                         PageCount="{Binding StalePager.PageCount}"
+                         PageSize="{Binding StalePager.PageSize}"
+                         TotalCount="{Binding StalePager.TotalCount}"
+                         SummaryLabel="{Binding StalePager.SummaryLabel}"
+                         PreviousCommand="{Binding StalePreviousPageCommand}"
+                         NextCommand="{Binding StaleNextPageCommand}"
+                         GoToPageCommand="{Binding StaleGoToPageCommand}"
+                         PageSizeChangedCommand="{Binding StaleChangePageSizeCommand}" />
         <c:Card Header="Stale / superseded cold versions">
           <ScrollViewer>
             <ItemsControl ItemsSource="{Binding StaleVersions}">

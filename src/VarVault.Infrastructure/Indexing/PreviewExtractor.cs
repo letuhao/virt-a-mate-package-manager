@@ -3,6 +3,7 @@ using System.IO.Compression;
 using SkiaSharp;
 using VarVault.Common;
 using VarVault.Domain.Content;
+using VarVault.Domain.Indexing;
 
 namespace VarVault.Infrastructure.Indexing;
 
@@ -51,11 +52,23 @@ public sealed class PreviewExtractor
     /// decoded, or is already within the cap, the original bytes are returned unchanged (never lose a preview to a
     /// resize failure). Pure/allocating; safe to call on the indexing background thread.
     /// </summary>
-    public static byte[] Downscale(byte[] jpeg)
+    public static byte[]? Downscale(byte[] jpeg)
     {
         try
         {
-            using var bitmap = SKBitmap.Decode(jpeg);
+            // Inspect dimensions before decoding pixels. SKBitmap.Decode(byte[]) allocates the full
+            // uncompressed bitmap first, so a tiny compressed image with extreme dimensions could
+            // otherwise consume hundreds of MB before the configured cap was checked.
+            using var encoded = new SKMemoryStream(jpeg);
+            using var codec = SKCodec.Create(encoded);
+            if (codec is null)
+                return jpeg;
+            var sourceInfo = codec.Info;
+            var pixels = (long)sourceInfo.Width * sourceInfo.Height;
+            if (sourceInfo.Width <= 0 || sourceInfo.Height <= 0 || pixels > IngestLimits.MaxPreviewPixels)
+                return null;
+
+            using var bitmap = SKBitmap.Decode(codec);
             if (bitmap is null)
                 return jpeg; // undecodable (or not really an image) → keep the original bytes
 

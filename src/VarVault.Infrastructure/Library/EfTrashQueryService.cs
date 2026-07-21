@@ -4,6 +4,7 @@ using VarVault.Common;
 using VarVault.Domain.Safety;
 using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Library;
+using VarVault.Sdk.Paging;
 
 namespace VarVault.Infrastructure.Library;
 
@@ -16,13 +17,32 @@ public sealed class EfTrashQueryService(VarVaultDbContext db, ITrashService tras
     private string BackupDir =>
         Path.Combine(Path.GetDirectoryName(Path.GetFullPath(db.Database.GetDbConnection().DataSource)) ?? ".", "backups");
 
-    public async Task<IReadOnlyList<TrashItemDto>> ListAsync(CancellationToken cancellationToken = default)
+    public async Task<PageResult<TrashItemDto>> ListPageAsync(
+        PageRequest request,
+        string? searchText = null,
+        CancellationToken cancellationToken = default)
     {
+        var page = request.Normalize();
         var entries = await trash.ListAsync(cancellationToken).ConfigureAwait(false);
-        return entries
+        var ordered = entries
+            .Where(e => string.IsNullOrWhiteSpace(searchText)
+                || e.OriginalPath.Contains(searchText, StringComparison.OrdinalIgnoreCase)
+                || e.Reason.Contains(searchText, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(e => e.TrashedAtUtc)
+            .ThenBy(e => e.Id, StringComparer.Ordinal)
+            .ToList();
+
+        var items = ordered
+            .Skip(page.Skip)
+            .Take(page.SafePageSize)
             .Select(e => new TrashItemDto(e.Id, e.OriginalPath, e.Reason, e.TrashedAtUtc, e.Bytes))
             .ToList();
+        return new PageResult<TrashItemDto>(items, ordered.Count, page.SafePageNumber, page.SafePageSize);
+    }
+
+    public async Task<IReadOnlyList<TrashItemDto>> ListAsync(CancellationToken cancellationToken = default)
+    {
+        return (await ListPageAsync(new PageRequest(1, 100), cancellationToken: cancellationToken).ConfigureAwait(false)).Items;
     }
 
     public Task<Result> RestoreAsync(string trashId, CancellationToken cancellationToken = default) =>

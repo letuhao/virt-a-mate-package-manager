@@ -9,6 +9,7 @@ using VarVault.Domain.Safety;
 using VarVault.Infrastructure.Indexing;
 using VarVault.Infrastructure.Repositories;
 using VarVault.Infrastructure.Safety;
+using VarVault.Sdk.Indexer;
 using VarVault.Sdk.Persistence;
 
 namespace VarVault.Infrastructure.Persistence;
@@ -22,10 +23,22 @@ public static class PersistenceRegistration
     public static IServiceCollection AddVarVaultPersistence(this IServiceCollection services, string databasePath)
     {
         services.AddDbContext<VarVaultDbContext>(options =>
-            options.UseSqlite($"Data Source={databasePath}"));
+            options.UseSqlite($"Data Source={databasePath}")
+                .AddInterceptors(new SqlitePragmaInterceptor()));
+
+        // Cross-process single-writer: every WriteQueue action (GUI or indexer) serializes on this file lock,
+        // so at most one process writes the catalog at any instant. Overrides the no-op default. (A12.)
+        var writeLockPath = Threading.FileGlobalWriteLock.PathFor(databasePath);
+        services.AddSingleton<Sdk.Threading.IGlobalWriteLock>(_ => new Threading.FileGlobalWriteLock(writeLockPath));
 
         services.AddScoped<IUnitOfWork>(sp => new EfUnitOfWork(sp.GetRequiredService<VarVaultDbContext>()));
         services.AddScoped<ICatalogStore, EfCatalogStore>();
+        services.AddScoped<IScanLedger, ScanLedger>();
+        services.AddScoped<IDurableDirtySet, DurableDirtySet>();
+        services.AddScoped<IStreamIndexer, StreamIndexer>();
+        services.AddSingleton<OneHandleVarInspector>();
+        services.AddSingleton<IIndexerWorker, IndexerWorker>();
+        services.AddSingleton<IIndexerClient, InProcessIndexerClient>();
 
         // Staged-index pass-2: preview extraction into a packed, SHARDED thumbnail store (thumbnails/thumb_*.db) so it
         // scales to 700k items / tens of GB — per-shard VACUUM, parallel writes, isolated corruption. (1.23/1.32/1.33)

@@ -16,7 +16,7 @@ using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Activation;
 using VarVault.Sdk.Events;
 using VarVault.Sdk.Import;
-using VarVault.Sdk.Indexing;
+using VarVault.Sdk.Indexer;
 using VarVault.Sdk.Presets;
 using VarVault.Sdk.Settings;
 
@@ -31,7 +31,7 @@ namespace VarVault.Infrastructure.Library;
 /// </summary>
 public sealed class EfImportService(
     VarVaultDbContext db, IVarInspector inspector, IArchiveExtractor extractor, ISettingsService settings,
-    IDurableFileMover mover, IEncodingFixer fixer, IIndexOrchestrator orchestrator, IImportHistoryStore history,
+    IDurableFileMover mover, IEncodingFixer fixer, IIndexerClient indexer, IImportHistoryStore history,
     IPresetService presets, IActivationService activation, IEventBus events)
     : IImportService
 {
@@ -588,7 +588,7 @@ public sealed class EfImportService(
             if (!cancelled)
             {
                 if (didImport)
-                    await orchestrator.IndexRepositoryAsync(session.TargetRepositoryId, cancellationToken: cancellationToken).ConfigureAwait(false);
+                    await WaitForIndexAsync(session.TargetRepositoryId, cancellationToken).ConfigureAwait(false);
 
                 // Optional activate-after (D2/5.9): link the just-imported vars into VaM via the existing preset flow.
                 if (session.ActivateAfter && importedRefs.Count > 0)
@@ -705,6 +705,31 @@ public sealed class EfImportService(
 
         foreach (var b in bases)
             Import.TempWorkspace.SweepOrphans(b);
+    }
+
+    private async Task WaitForIndexAsync(Guid repositoryId, CancellationToken cancellationToken)
+    {
+        var start = await indexer.StartIndexRepositoryAsync(repositoryId, cancellationToken: cancellationToken).ConfigureAwait(false);
+        if (start.IsFailure)
+            throw new InvalidOperationException(start.Error.Message);
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var status = await indexer.GetStatusAsync(cancellationToken).ConfigureAwait(false);
+            if (status.IsFailure)
+                throw new InvalidOperationException(status.Error.Message);
+            var s = status.Value;
+            if (s.State is IndexerJobState.Completed or IndexerJobState.Failed
+                or IndexerJobState.Cancelled or IndexerJobState.Idle)
+            {
+                if (s.State == IndexerJobState.Failed)
+                    throw new InvalidOperationException(s.Error ?? "index failed");
+                return;
+            }
+            await Task.Delay(200, cancellationToken).ConfigureAwait(false);
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
     }
 
     /// <summary>Copy one incoming var into the repo, optionally fixing CJK encoding on the way. Never overwrites. (§7)</summary>

@@ -68,6 +68,17 @@ Every open question across the design, resolved. **Sealed** = the decision the b
 |---|----------|
 | F1 | **Import &amp; Dedup-Review** feature sealed 2026-07-20 in [30-Import-And-Dedup-Review-Spec §13](./30-Import-And-Dedup-Review-Spec.md#13-decisions-log--sealed) (checklist [31](./31-Import-Implementation-Checklist.md)): whole-library dedup, optional post-import activate, per-var name≠meta choice, configurable temp dir, encoding-fix as copy modifier, durable copy + import history. Replaces the read-only "Download intake" tab. |
 
+## Amendments (dated)
+
+| # | Date | Amendment | Rationale |
+|---|------|-----------|-----------|
+| A12 | 2026-07-21 | **Separate `VarVault.Indexer` worker process** owns discovery, one-handle ingestion, catalog mutations, checkpoints, and derived phases. GUI is a read-only catalog client + named-pipe command/status peer. Interactive mutations route to the worker at high priority so there is one process-level SQLite writer. | 5 TB scans must survive GUI close/crash; CPU/RAM isolation; overlapping in-process writers caused lag and contention. Revisit only if IPC cost dominates small libraries — keep protocol versioned. |
+| A13 | 2026-07-21 | **Raw-first ingestion:** discover → one-handle extract (central directory + meta + raw deps + signatures/encoding + **representative thumbnail**) → durable `RawStored` → **later** paged dependency resolve / usage / deep analysis. Incomplete rows never authorize dedup/delete/migration. | Avoid holding whole-catalog graphs in RAM; avoid reopening vars for dependency building; I/O once per changed var. |
+| A14 | 2026-07-21 | **Representative thumbnail in the same one-handle pass** supersedes IDX-1’s “previews only in Stage 2” for the package representative image only. Non-representative images remain deferred/never. Entry-size + pixel + decompression caps apply. | User I/O constraint: reopen-for-preview doubles random reads on HDD/5 TB libraries. |
+| A15 | 2026-07-21 | **Durable scan/phase ledger** (`ScanRun` + per-file ingest state/leases/generation). Dirty packages and phase checkpoints are rows, not in-memory sets. Crash → reclaim expired leases → resume. | Restores sealed M7 durable dirty-queue intent; fixes permanent stale read-model after mid-run crash. |
+| D2′ | 2026-07-21 | Thumbnail store = **sharded SQLite** (`thumbnails/thumb_XX.db`, 256 shards by PackageId low byte), not a single `thumbs.db`. | Scale/VACUUM/corruption isolation at 700k+; regenerable cache. Supersedes D2 file layout only. |
+| A16 | 2026-07-21 | Potentially unbounded **secondary UI lists** use **server-side numbered paging** with default page size **50** and allowed sizes **25 / 50 / 100**; the primary Library remains the sealed **A9** virtualized ordered-snapshot exception. | Secondary surfaces can grow with the library and must not materialize all rows into Avalonia controls; the primary browser still needs O(1) scrolling rather than a pager. |
+
 ---
 
 *No open questions remain. Any future change to a sealed decision is logged here as a dated amendment.*

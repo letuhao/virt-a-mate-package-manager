@@ -9,6 +9,11 @@ namespace VarVault.App.ViewModels;
 public sealed partial class DupesViewModel(
     IReclaimService reclaim, Services.IDialogLauncher? launcher = null) : ObservableObject, ILoadableScreen
 {
+    public PagedListState<DuplicateGroup> ExactPager { get; } =
+        new((request, ct) => reclaim.ExactGroupsPageAsync(request, ct));
+    public PagedListState<NearDuplicateGroup> NearPager { get; } =
+        new((request, ct) => reclaim.NearDuplicateGroupsPageAsync(request, ct));
+
     // NOTE: the former "Download intake" tab was retired (doc 30 §10) — the first-class Import screen replaces it
     // (extract + classify into 6 lanes + review + copy-into-repo + history). Folder classification lives there now.
     /// <summary>Sub-navigation tabs (GC-2).</summary>
@@ -36,40 +41,28 @@ public sealed partial class DupesViewModel(
             launcher?.OpenDupeReview(group);
     }
 
-    public ObservableCollection<DuplicateGroup> Groups { get; } = [];
+    public ObservableCollection<DuplicateGroup> Groups => ExactPager.Items;
 
     [ObservableProperty] private long _reclaimableBytes;
 
     /// <summary>Reclaim summary card: number of duplicate groups. (AC-15)</summary>
-    public int GroupCount => Groups.Count;
+    public int GroupCount => ExactPager.TotalCount;
     /// <summary>Total redundant copies across all groups (each group keeps one). (AC-15)</summary>
     public int RedundantCopies => Groups.Sum(g => Math.Max(0, g.Copies.Count - 1));
 
-    public bool IsEmpty => Groups.Count == 0;
+    public bool IsEmpty => ExactPager.IsEmpty;
 
     /// <summary>Near-duplicate groups (same payload, different identity) for the Near tab. (24-checklist A9)</summary>
-    public ObservableCollection<NearDuplicateGroup> NearGroups { get; } = [];
-    public bool NearIsEmpty => NearGroups.Count == 0;
+    public ObservableCollection<NearDuplicateGroup> NearGroups => NearPager.Items;
+    public bool NearIsEmpty => NearPager.IsEmpty;
 
     [RelayCommand]
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
-        Groups.Clear();
-        long reclaim2 = 0;
-        foreach (var g in await reclaim.ExactGroupsAsync(cancellationToken).ConfigureAwait(true))
-        {
-            Groups.Add(g);
-            reclaim2 += g.Copies.Skip(1).Sum(c => c.SizeBytes);
-        }
-        ReclaimableBytes = reclaim2;
-        OnPropertyChanged(nameof(IsEmpty));
-        OnPropertyChanged(nameof(GroupCount));
-        OnPropertyChanged(nameof(RedundantCopies));
-
-        NearGroups.Clear();
-        foreach (var g in await reclaim.NearDuplicateGroupsAsync(cancellationToken).ConfigureAwait(true))
-            NearGroups.Add(g);
-        OnPropertyChanged(nameof(NearIsEmpty));
+        await ExactPager.ResetAndReloadAsync(cancellationToken).ConfigureAwait(true);
+        await NearPager.ResetAndReloadAsync(cancellationToken).ConfigureAwait(true);
+        NotifyExact();
+        NotifyNear();
     }
 
     [RelayCommand]
@@ -80,6 +73,85 @@ public sealed partial class DupesViewModel(
         var keep = group.Copies[0].VarFileId;
         var rest = group.Copies.Skip(1).Select(c => c.VarFileId).ToList();
         await reclaim.TrashRedundantAsync(keep, rest, cancellationToken).ConfigureAwait(true);
-        await LoadAsync(cancellationToken).ConfigureAwait(true);
+        await ExactPager.ReloadAsync(cancellationToken).ConfigureAwait(true);
+        NotifyExact();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanExactPreviousPage))]
+    private async Task ExactPreviousPageAsync(CancellationToken cancellationToken = default)
+    {
+        await ExactPager.PreviousPageAsync(cancellationToken).ConfigureAwait(true);
+        NotifyExact();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanExactNextPage))]
+    private async Task ExactNextPageAsync(CancellationToken cancellationToken = default)
+    {
+        await ExactPager.NextPageAsync(cancellationToken).ConfigureAwait(true);
+        NotifyExact();
+    }
+
+    [RelayCommand]
+    private async Task ExactGoToPageAsync(int pageNumber)
+    {
+        await ExactPager.LoadPageAsync(pageNumber, ExactPager.PageSize).ConfigureAwait(true);
+        NotifyExact();
+    }
+
+    [RelayCommand]
+    private async Task ExactChangePageSizeAsync(int pageSize)
+    {
+        await ExactPager.LoadPageAsync(1, pageSize).ConfigureAwait(true);
+        NotifyExact();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanNearPreviousPage))]
+    private async Task NearPreviousPageAsync(CancellationToken cancellationToken = default)
+    {
+        await NearPager.PreviousPageAsync(cancellationToken).ConfigureAwait(true);
+        NotifyNear();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanNearNextPage))]
+    private async Task NearNextPageAsync(CancellationToken cancellationToken = default)
+    {
+        await NearPager.NextPageAsync(cancellationToken).ConfigureAwait(true);
+        NotifyNear();
+    }
+
+    [RelayCommand]
+    private async Task NearGoToPageAsync(int pageNumber)
+    {
+        await NearPager.LoadPageAsync(pageNumber, NearPager.PageSize).ConfigureAwait(true);
+        NotifyNear();
+    }
+
+    [RelayCommand]
+    private async Task NearChangePageSizeAsync(int pageSize)
+    {
+        await NearPager.LoadPageAsync(1, pageSize).ConfigureAwait(true);
+        NotifyNear();
+    }
+
+    private bool CanExactPreviousPage() => ExactPager.HasPreviousPage && !ExactPager.IsLoading;
+    private bool CanExactNextPage() => ExactPager.HasNextPage && !ExactPager.IsLoading;
+    private bool CanNearPreviousPage() => NearPager.HasPreviousPage && !NearPager.IsLoading;
+    private bool CanNearNextPage() => NearPager.HasNextPage && !NearPager.IsLoading;
+
+    private void NotifyExact()
+    {
+        ReclaimableBytes = Groups.Sum(g => g.Copies.Skip(1).Sum(c => c.SizeBytes));
+        OnPropertyChanged(nameof(IsEmpty));
+        OnPropertyChanged(nameof(GroupCount));
+        OnPropertyChanged(nameof(RedundantCopies));
+        ExactPreviousPageCommand.NotifyCanExecuteChanged();
+        ExactNextPageCommand.NotifyCanExecuteChanged();
+    }
+
+    private void NotifyNear()
+    {
+        OnPropertyChanged(nameof(NearIsEmpty));
+        NearPreviousPageCommand.NotifyCanExecuteChanged();
+        NearNextPageCommand.NotifyCanExecuteChanged();
     }
 }

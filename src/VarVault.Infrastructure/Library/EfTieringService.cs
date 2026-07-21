@@ -4,6 +4,7 @@ using VarVault.Domain.Entities;
 using VarVault.Domain.Identity;
 using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Library;
+using VarVault.Sdk.Paging;
 using VarVault.Sdk.Repositories;
 
 namespace VarVault.Infrastructure.Library;
@@ -28,25 +29,45 @@ public sealed class EfTieringService(VarVaultDbContext db, IRepositoryService re
             byClass.GetValueOrDefault(ContentClass.Cold));
     }
 
+    public async Task<PageResult<MisplacedItem>> MisplacedPageAsync(PageRequest request, CancellationToken cancellationToken = default)
+    {
+        var page = request.Normalize();
+        var query = db.PackageListItems.AsNoTracking()
+            .Where(x => x.ActualTierMin != null)
+            .Select(x => new
+            {
+                x.PackageId,
+                x.VarName,
+                x.Class,
+                Actual = x.ActualTierMin!.Value,
+                Desired = x.Class == ContentClass.Hot ? 0 : x.Class == ContentClass.Warm ? 1 : 2,
+                x.TotalSize,
+            })
+            .Where(x => x.Actual != x.Desired);
+
+        var total = await query.CountAsync(cancellationToken).ConfigureAwait(false);
+        var items = await query
+            .OrderByDescending(x => x.TotalSize)
+            .ThenBy(x => x.VarName)
+            .ThenBy(x => x.PackageId)
+            .Skip(page.Skip)
+            .Take(page.SafePageSize)
+            .Select(x => new MisplacedItem(
+                x.PackageId,
+                x.VarName,
+                x.Class.ToString(),
+                x.Actual,
+                x.Desired,
+                x.TotalSize,
+                x.Desired < x.Actual ? $"{x.Class} sitting on slower tier" : $"{x.Class} wasting faster tier"))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+        return new PageResult<MisplacedItem>(items, total, page.SafePageNumber, page.SafePageSize);
+    }
+
     public async Task<IReadOnlyList<MisplacedItem>> MisplacedAsync(CancellationToken cancellationToken = default)
     {
-        var candidates = await db.PackageListItems
-            .Where(x => x.ActualTierMin != null)
-            .Select(x => new { x.PackageId, x.VarName, x.Class, x.ActualTierMin, x.TotalSize })
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        var result = new List<MisplacedItem>();
-        foreach (var c in candidates)
-        {
-            var actual = c.ActualTierMin!.Value;
-            if (!PlacementPolicy.IsMisplaced(c.Class, actual))
-                continue;
-            var desired = PlacementPolicy.DesiredTier(c.Class);
-            var why = desired < actual ? $"{c.Class} sitting on slower tier" : $"{c.Class} wasting faster tier";
-            result.Add(new MisplacedItem(c.PackageId, c.VarName, c.Class.ToString(), actual, desired, c.TotalSize, why));
-        }
-        return result;
+        return (await MisplacedPageAsync(new PageRequest(1, 100), cancellationToken).ConfigureAwait(false)).Items;
     }
 
     public async Task<TierMigrationPlan> BuildPlanAsync(CancellationToken cancellationToken = default)
@@ -96,22 +117,36 @@ public sealed class EfTieringService(VarVaultDbContext db, IRepositoryService re
             new(nameof(ContentClass.Cold), PlacementPolicy.DesiredTier(ContentClass.Cold)),
         ]));
 
+    public async Task<PageResult<StaleVersion>> StaleVersionsPageAsync(PageRequest request, CancellationToken cancellationToken = default)
+    {
+        var page = request.Normalize();
+        var items = db.PackageListItems.AsNoTracking();
+        var latestByFamily = db.Packages.AsNoTracking()
+            .GroupBy(p => new { p.Creator, p.PackageName })
+            .Select(g => new { g.Key.Creator, g.Key.PackageName, MaxSort = g.Max(x => x.VersionSort) });
+
+        var query = items
+            .Join(db.Packages.AsNoTracking(), i => i.PackageId, p => p.Id, (i, p) => new { i, p })
+            .Join(latestByFamily,
+                x => new { x.p.Creator, x.p.PackageName },
+                g => new { g.Creator, g.PackageName },
+                (x, g) => new { x.i, x.p, g.MaxSort })
+            .Where(x => x.i.Class == ContentClass.Cold && x.p.VersionSort < x.MaxSort);
+
+        var total = await query.CountAsync(cancellationToken).ConfigureAwait(false);
+        var rows = await query
+            .OrderByDescending(x => x.i.TotalSize)
+            .ThenBy(x => x.i.VarName)
+            .ThenBy(x => x.i.PackageId)
+            .Skip(page.Skip)
+            .Take(page.SafePageSize)
+            .Select(x => new StaleVersion(x.i.PackageId, x.i.VarName, x.i.Class.ToString(), x.i.TotalSize))
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        return new PageResult<StaleVersion>(rows, total, page.SafePageNumber, page.SafePageSize);
+    }
+
     public async Task<IReadOnlyList<StaleVersion>> StaleVersionsAsync(CancellationToken cancellationToken = default)
     {
-        // Stale = a newer version of the same identity family (Creator.Package) exists AND this one is Cold. (24-checklist A7.)
-        var items = await db.PackageListItems
-            .Select(x => new { x.PackageId, x.VarName, x.Creator, x.PackageName, x.Class, x.TotalSize, Sort = x.Package!.VersionSort })
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        var stale = new List<StaleVersion>();
-        foreach (var family in items.GroupBy(i => (IdentityFold.Compute(i.Creator), IdentityFold.Compute(i.PackageName))))
-        {
-            var maxSort = family.Max(i => i.Sort);
-            foreach (var i in family)
-                if (i.Sort < maxSort && i.Class == ContentClass.Cold)
-                    stale.Add(new StaleVersion(i.PackageId, i.VarName, i.Class.ToString(), i.TotalSize));
-        }
-        return stale;
+        return (await StaleVersionsPageAsync(new PageRequest(1, 100), cancellationToken).ConfigureAwait(false)).Items;
     }
 }

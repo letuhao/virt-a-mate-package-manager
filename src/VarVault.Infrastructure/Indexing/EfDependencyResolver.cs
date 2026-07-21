@@ -20,86 +20,135 @@ public sealed class EfDependencyResolver(VarVaultDbContext db) : IDependencyReso
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         using var activity = Telemetry.StartActivity("index.resolve");
-        // Family map: folded Creator.Package → its available versions.
-        var packages = await db.Packages
-            .Select(p => new { p.Id, p.Creator, p.PackageName, p.VersionSort })
-            .ToListAsync(cancellationToken).ConfigureAwait(false);
 
+        // Page packages into a compact family map — never track full Package entities for the whole catalog.
         var familyMap = new Dictionary<string, List<AvailableVersion>>(StringComparer.Ordinal);
         var packageFamily = new Dictionary<long, string>();
-        foreach (var p in packages)
+        const int pageSize = 2_000;
+        long lastId = 0;
+        while (true)
         {
-            var family = IdentityFold.Compute($"{p.Creator}.{p.PackageName}");
-            packageFamily[p.Id] = family;
-            if (!familyMap.TryGetValue(family, out var list))
-                familyMap[family] = list = [];
-            list.Add(new AvailableVersion(p.VersionSort, p.Id));
+            var page = await db.Packages.AsNoTracking()
+                .Where(p => p.Id > lastId)
+                .OrderBy(p => p.Id)
+                .Take(pageSize)
+                .Select(p => new { p.Id, p.Creator, p.PackageName, p.VersionSort })
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            if (page.Count == 0)
+                break;
+            foreach (var p in page)
+            {
+                var family = IdentityFold.Compute($"{p.Creator}.{p.PackageName}");
+                packageFamily[p.Id] = family;
+                if (!familyMap.TryGetValue(family, out var list))
+                    familyMap[family] = list = [];
+                list.Add(new AvailableVersion(p.VersionSort, p.Id));
+            }
+            lastId = page[^1].Id;
         }
 
-        var varFilePackage = await db.VarFiles
-            .Where(v => v.PackageId != null)
-            .Select(v => new { v.Id, PackageId = v.PackageId!.Value })
-            .ToDictionaryAsync(v => v.Id, v => v.PackageId, cancellationToken).ConfigureAwait(false);
+        var varFilePackage = new Dictionary<long, long>();
+        lastId = 0;
+        while (true)
+        {
+            var page = await db.VarFiles.AsNoTracking()
+                .Where(v => v.PackageId != null && v.Id > lastId)
+                .OrderBy(v => v.Id)
+                .Take(pageSize)
+                .Select(v => new { v.Id, PackageId = v.PackageId!.Value })
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            if (page.Count == 0)
+                break;
+            foreach (var v in page)
+                varFilePackage[v.Id] = v.PackageId;
+            lastId = page[^1].Id;
+        }
 
-        var aliasMap = await db.VarAliases
+        var aliasMap = await db.VarAliases.AsNoTracking()
             .Where(a => a.ResolvedPackageId != null)
             .Select(a => new { a.MissingRefKey, PackageId = a.ResolvedPackageId!.Value })
             .ToDictionaryAsync(a => a.MissingRefKey, a => a.PackageId, cancellationToken).ConfigureAwait(false);
 
-        var dependencies = await db.Dependencies.ToListAsync(cancellationToken).ConfigureAwait(false);
-
-        // reverseSources[target] = distinct source packages that depend on it.
         var reverseSources = new Dictionary<long, HashSet<long>>();
         var missing = 0;
-
-        foreach (var dep in dependencies)
+        var resolved = 0;
+        lastId = 0;
+        while (true)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            var deps = await db.Dependencies
+                .Where(d => d.Id > lastId)
+                .OrderBy(d => d.Id)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            if (deps.Count == 0)
+                break;
 
-            long? containerPackage = varFilePackage.TryGetValue(dep.VarFileId, out var cp) ? cp : null;
-            var containerFamily = containerPackage is { } cpid && packageFamily.TryGetValue(cpid, out var cf) ? cf : null;
-
-            ResolveOne(dep, containerPackage, containerFamily, familyMap, aliasMap);
-
-            if (dep.IsMissing)
-                missing++;
-            else if (dep.ResolvedPackageId is { } target && containerPackage is { } source && target != source)
+            foreach (var dep in deps)
             {
-                if (!reverseSources.TryGetValue(target, out var set))
-                    reverseSources[target] = set = [];
-                set.Add(source);
+                cancellationToken.ThrowIfCancellationRequested();
+                long? containerPackage = varFilePackage.TryGetValue(dep.VarFileId, out var cp) ? cp : null;
+                var containerFamily = containerPackage is { } cpid && packageFamily.TryGetValue(cpid, out var cf) ? cf : null;
+                ResolveOne(dep, containerPackage, containerFamily, familyMap, aliasMap);
+                if (dep.IsMissing)
+                    missing++;
+                else
+                {
+                    resolved++;
+                    if (dep.ResolvedPackageId is { } target && containerPackage is { } source && target != source)
+                    {
+                        if (!reverseSources.TryGetValue(target, out var set))
+                            reverseSources[target] = set = [];
+                        set.Add(source);
+                    }
+                }
             }
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            db.ChangeTracker.Clear();
+            lastId = deps[^1].Id;
         }
 
-        // Reverse-dependent counts + foundational flag (2.11).
+        // Reverse counts in pages — update via ExecuteUpdate to avoid tracking every Package.
+        lastId = 0;
         var foundational = 0;
-        var trackedPackages = await db.Packages.ToListAsync(cancellationToken).ConfigureAwait(false);
-        foreach (var pkg in trackedPackages)
+        while (true)
         {
-            var count = reverseSources.TryGetValue(pkg.Id, out var set) ? set.Count : 0;
-            pkg.ReverseDependentCount = count;
-            pkg.IsFoundational = count >= FoundationalThreshold;
-            if (pkg.IsFoundational)
-                foundational++;
+            var page = await db.Packages.AsNoTracking()
+                .Where(p => p.Id > lastId)
+                .OrderBy(p => p.Id)
+                .Take(pageSize)
+                .Select(p => p.Id)
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            if (page.Count == 0)
+                break;
+            foreach (var id in page)
+            {
+                var count = reverseSources.TryGetValue(id, out var set) ? set.Count : 0;
+                var isFoundational = count >= FoundationalThreshold;
+                if (isFoundational)
+                    foundational++;
+                await db.Packages.Where(p => p.Id == id)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(p => p.ReverseDependentCount, count)
+                        .SetProperty(p => p.IsFoundational, isFoundational), cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            lastId = page[^1];
         }
 
-        // HasMissingDeps materialized bit — direct deps of each package's canonical var (2.15).
-        await UpdateHasMissingDepsAsync(dependencies, cancellationToken).ConfigureAwait(false);
-
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await UpdateHasMissingDepsPagedAsync(cancellationToken).ConfigureAwait(false);
         Telemetry.IndexResolveDurationMs.Record(sw.Elapsed.TotalMilliseconds);
-        return new DependencyResolutionResult(dependencies.Count - missing, missing, foundational);
+        return new DependencyResolutionResult(resolved, missing, foundational);
     }
 
     public async Task<int> ResolveFamilyAsync(string creator, string packageName, CancellationToken cancellationToken = default)
     {
         var targetFamily = IdentityFold.Compute($"{creator}.{packageName}");
 
-        var packages = await db.Packages
-            .Select(p => new { p.Id, p.Creator, p.PackageName, p.VersionSort })
-            .ToListAsync(cancellationToken).ConfigureAwait(false);
         var familyMap = new Dictionary<string, List<AvailableVersion>>(StringComparer.Ordinal);
         var packageFamily = new Dictionary<long, string>();
+        var packages = await db.Packages.AsNoTracking()
+            .Select(p => new { p.Id, p.Creator, p.PackageName, p.VersionSort })
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
         foreach (var p in packages)
         {
             var family = IdentityFold.Compute($"{p.Creator}.{p.PackageName}");
@@ -109,30 +158,45 @@ public sealed class EfDependencyResolver(VarVaultDbContext db) : IDependencyReso
             list.Add(new AvailableVersion(p.VersionSort, p.Id));
         }
 
-        var varFilePackage = await db.VarFiles
+        var varFilePackage = await db.VarFiles.AsNoTracking()
             .Where(v => v.PackageId != null)
             .Select(v => new { v.Id, PackageId = v.PackageId!.Value })
             .ToDictionaryAsync(v => v.Id, v => v.PackageId, cancellationToken).ConfigureAwait(false);
-        var aliasMap = await db.VarAliases
+        var aliasMap = await db.VarAliases.AsNoTracking()
             .Where(a => a.ResolvedPackageId != null)
             .Select(a => new { a.MissingRefKey, PackageId = a.ResolvedPackageId!.Value })
             .ToDictionaryAsync(a => a.MissingRefKey, a => a.PackageId, cancellationToken).ConfigureAwait(false);
 
-        var dependencies = await db.Dependencies.ToListAsync(cancellationToken).ConfigureAwait(false);
+        // SQL-filter to edges whose folded key starts with the family (exact family match via parse).
         var touched = 0;
-        foreach (var dep in dependencies)
+        const int pageSize = 1_000;
+        long lastId = 0;
+        while (true)
         {
-            var parsed = DependencyRef.Parse(dep.DependsOnRefRaw);
-            if (parsed.IsFailure || !string.Equals(parsed.Value.FamilyKey, targetFamily, StringComparison.Ordinal))
-                continue; // only edges targeting the changed family
+            var deps = await db.Dependencies
+                .Where(d => d.Id > lastId)
+                .OrderBy(d => d.Id)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            if (deps.Count == 0)
+                break;
 
-            long? containerPackage = varFilePackage.TryGetValue(dep.VarFileId, out var cp) ? cp : null;
-            var containerFamily = containerPackage is { } cpid && packageFamily.TryGetValue(cpid, out var cf) ? cf : null;
-            ResolveOne(dep, containerPackage, containerFamily, familyMap, aliasMap);
-            touched++;
+            foreach (var dep in deps)
+            {
+                var parsed = DependencyRef.Parse(dep.DependsOnRefRaw);
+                if (parsed.IsFailure || !string.Equals(parsed.Value.FamilyKey, targetFamily, StringComparison.Ordinal))
+                    continue;
+
+                long? containerPackage = varFilePackage.TryGetValue(dep.VarFileId, out var cp) ? cp : null;
+                var containerFamily = containerPackage is { } cpid && packageFamily.TryGetValue(cpid, out var cf) ? cf : null;
+                ResolveOne(dep, containerPackage, containerFamily, familyMap, aliasMap);
+                touched++;
+            }
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            db.ChangeTracker.Clear();
+            lastId = deps[^1].Id;
         }
 
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return touched;
     }
 
@@ -195,24 +259,37 @@ public sealed class EfDependencyResolver(VarVaultDbContext db) : IDependencyReso
         dep.ResolvedVia = ResolvedVia.None;
     }
 
-    private async Task UpdateHasMissingDepsAsync(List<Dependency> dependencies, CancellationToken cancellationToken)
+    private async Task UpdateHasMissingDepsPagedAsync(CancellationToken cancellationToken)
     {
-        // Canonical var → package.
-        var canonical = await db.Packages
-            .Where(p => p.CanonicalVarFileId != null)
-            .Select(p => new { p.Id, VarFileId = p.CanonicalVarFileId!.Value })
-            .ToListAsync(cancellationToken).ConfigureAwait(false);
-        var canonicalVarToPackage = canonical.ToDictionary(c => c.VarFileId, c => c.Id);
-
-        var missingByPackage = new HashSet<long>();
-        foreach (var dep in dependencies)
+        const int pageSize = 2_000;
+        long lastId = 0;
+        while (true)
         {
-            if (dep.IsMissing && canonicalVarToPackage.TryGetValue(dep.VarFileId, out var pkgId))
-                missingByPackage.Add(pkgId);
-        }
+            var page = await db.Packages.AsNoTracking()
+                .Where(p => p.CanonicalVarFileId != null && p.Id > lastId)
+                .OrderBy(p => p.Id)
+                .Take(pageSize)
+                .Select(p => new { p.Id, VarFileId = p.CanonicalVarFileId!.Value })
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            if (page.Count == 0)
+                break;
 
-        var listItems = await db.PackageListItems.ToListAsync(cancellationToken).ConfigureAwait(false);
-        foreach (var item in listItems)
-            item.HasMissingDeps = missingByPackage.Contains(item.PackageId);
+            var varIds = page.Select(p => p.VarFileId).ToList();
+            var missingVars = await db.Dependencies.AsNoTracking()
+                .Where(d => varIds.Contains(d.VarFileId) && d.IsMissing)
+                .Select(d => d.VarFileId)
+                .Distinct()
+                .ToListAsync(cancellationToken).ConfigureAwait(false);
+            var missingSet = missingVars.ToHashSet();
+
+            foreach (var pkg in page)
+            {
+                var hasMissing = missingSet.Contains(pkg.VarFileId);
+                await db.PackageListItems.Where(i => i.PackageId == pkg.Id)
+                    .ExecuteUpdateAsync(s => s.SetProperty(i => i.HasMissingDeps, hasMissing), cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            lastId = page[^1].Id;
+        }
     }
 }

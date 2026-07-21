@@ -20,7 +20,9 @@ public static class InfrastructureRegistration
     {
         services.AddSingleton<IClock>(SystemClock.Instance);
         services.AddSingleton<IJobQueue>(_ => new BackgroundJobQueue());
-        services.AddSingleton<IWriteQueue>(_ => new WriteQueue());
+        // Default no-op cross-process lock; persistence overrides it with a file lock once the DB path is known.
+        services.AddSingleton<IGlobalWriteLock, NullWriteLock>();
+        services.AddSingleton<IWriteQueue>(sp => new WriteQueue(sp.GetService<IGlobalWriteLock>()));
         services.AddSingleton<IUiDispatcher, InlineUiDispatcher>();
         services.AddSingleton<IRepositoryEnumerator, RepositoryEnumerator>();
         services.AddSingleton<IVarInspector, VarInspector>();

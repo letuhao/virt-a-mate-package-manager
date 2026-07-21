@@ -20,6 +20,9 @@ public partial class App : Application
             desktop.MainWindow = error is not null
                 ? new StartupErrorWindow { DataContext = error }
                 : new MainWindow { DataContext = shell };
+
+            // Clean detach: tell the worker this owner is leaving and release the writer lease. (A12 liveness.)
+            desktop.ShutdownRequested += (_, _) => IndexerClientOverride.ShutdownAsync().GetAwaiter().GetResult();
         }
 
         base.OnFrameworkInitializationCompleted();

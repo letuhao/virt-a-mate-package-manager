@@ -130,10 +130,20 @@
           <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,6">
             <TextBox Grid.Column="0" Text="{Binding SearchText}" Watermark="Filter by name / creator…"
                      FontSize="12" Margin="0,0,8,0" />
-            <TextBlock Grid.Column="1" Text="{Binding Items.Count, StringFormat='{}{0} items'}" Opacity="0.6" FontSize="12"
+            <TextBlock Grid.Column="1" Text="{Binding Pager.TotalCount, StringFormat='{}{0} items'}" Opacity="0.6" FontSize="12"
                        VerticalAlignment="Center" Margin="0,0,8,0" />
             <Button Grid.Column="2" Content="▤ / ▦" Command="{Binding ToggleViewCommand}" />
           </Grid>
+          <c:PaginationBar DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                           PageNumber="{Binding Pager.PageNumber}"
+                           PageCount="{Binding Pager.PageCount}"
+                           PageSize="{Binding Pager.PageSize}"
+                           TotalCount="{Binding Pager.TotalCount}"
+                           SummaryLabel="{Binding Pager.SummaryLabel}"
+                           PreviousCommand="{Binding PreviousPageCommand}"
+                           NextCommand="{Binding NextPageCommand}"
+                           GoToPageCommand="{Binding GoToPageCommand}"
+                           PageSizeChangedCommand="{Binding ChangePageSizeCommand}" />
           <!-- Table -->
           <ListBox IsVisible="{Binding !GalleryView}" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}"
                    Background="Transparent">

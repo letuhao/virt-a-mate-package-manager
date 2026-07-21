@@ -20,9 +20,20 @@
     </StackPanel>
 
     <!-- Tab 0: Trash (recoverable) -->
-    <c:Card Header="Trash (recoverable)" IsVisible="{Binding IsTrashTab}">
-      <ScrollViewer>
-        <ItemsControl ItemsSource="{Binding Items}">
+    <DockPanel IsVisible="{Binding IsTrashTab}">
+      <c:PaginationBar DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                       PageNumber="{Binding Pager.PageNumber}"
+                       PageCount="{Binding Pager.PageCount}"
+                       PageSize="{Binding Pager.PageSize}"
+                       TotalCount="{Binding Pager.TotalCount}"
+                       SummaryLabel="{Binding Pager.SummaryLabel}"
+                       PreviousCommand="{Binding PreviousPageCommand}"
+                       NextCommand="{Binding NextPageCommand}"
+                       GoToPageCommand="{Binding GoToPageCommand}"
+                       PageSizeChangedCommand="{Binding ChangePageSizeCommand}" />
+      <c:Card Header="Trash (recoverable)">
+        <ScrollViewer>
+          <ItemsControl ItemsSource="{Binding Items}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="lib:TrashItemDto">
               <Grid ColumnDefinitions="28,*,*,Auto,Auto,Auto,Auto" Height="26">
@@ -42,9 +53,10 @@
               </Grid>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </ScrollViewer>
-    </c:Card>
+          </ItemsControl>
+        </ScrollViewer>
+      </c:Card>
+    </DockPanel>
 
     <!-- Tab 1: Catalog backups -->
     <c:Card Header="Catalog backups" IsVisible="{Binding IsBackupsTab}">

@@ -11,28 +11,40 @@
                  Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center" />
       <ComboBox Grid.Column="1" ItemsSource="{Binding Filters}" SelectedItem="{Binding SelectedFilter}" MinWidth="140" />
     </Grid>
-    <c:Card Header="Audit log">
-      <Panel>
-        <ScrollViewer>
-          <ItemsControl ItemsSource="{Binding Items}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="act:ActivityRecord">
-                <Grid ColumnDefinitions="120,90,*" Height="24">
-                  <TextBlock Grid.Column="0" Text="{Binding AtUtc}" VerticalAlignment="Center" Opacity="0.6" FontSize="11" />
-                  <TextBlock Grid.Column="1" Text="{Binding Kind}" VerticalAlignment="Center" FontWeight="SemiBold" />
-                  <TextBlock Grid.Column="2" Text="{Binding Description}" VerticalAlignment="Center" Opacity="0.85" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
-        <!-- 28-checklist B2.1 · empty-state so a fresh install shows guidance, not a blank card -->
-        <StackPanel IsVisible="{Binding IsEmpty}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4" Margin="0,40">
-          <TextBlock Text="No activity yet" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
-          <TextBlock Text="Actions you take — installs, migrations, fixes, deletes — will appear here."
-                     HorizontalAlignment="Center" Opacity="0.6" FontSize="12" />
-        </StackPanel>
-      </Panel>
-    </c:Card>
+    <DockPanel>
+      <c:PaginationBar DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                       PageNumber="{Binding Pager.PageNumber}"
+                       PageCount="{Binding Pager.PageCount}"
+                       PageSize="{Binding Pager.PageSize}"
+                       TotalCount="{Binding Pager.TotalCount}"
+                       SummaryLabel="{Binding Pager.SummaryLabel}"
+                       PreviousCommand="{Binding PreviousPageCommand}"
+                       NextCommand="{Binding NextPageCommand}"
+                       GoToPageCommand="{Binding GoToPageCommand}"
+                       PageSizeChangedCommand="{Binding ChangePageSizeCommand}" />
+      <c:Card Header="Audit log">
+        <Panel>
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding Items}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="act:ActivityRecord">
+                  <Grid ColumnDefinitions="120,90,*" Height="24">
+                    <TextBlock Grid.Column="0" Text="{Binding AtUtc}" VerticalAlignment="Center" Opacity="0.6" FontSize="11" />
+                    <TextBlock Grid.Column="1" Text="{Binding Kind}" VerticalAlignment="Center" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="2" Text="{Binding Description}" VerticalAlignment="Center" Opacity="0.85" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+          <!-- 28-checklist B2.1 · empty-state so a fresh install shows guidance, not a blank card -->
+          <StackPanel IsVisible="{Binding IsEmpty}" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4" Margin="0,40">
+            <TextBlock Text="No activity yet" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+            <TextBlock Text="Actions you take — installs, migrations, fixes, deletes — will appear here."
+                       HorizontalAlignment="Center" Opacity="0.6" FontSize="12" />
+          </StackPanel>
+        </Panel>
+      </c:Card>
+    </DockPanel>
   </DockPanel>
 </UserControl>

@@ -36,7 +36,11 @@ public static class Bootstrap
             [.. BuiltInModules()]);
 
         using var scope = host.Services.CreateScope();
-        scope.ServiceProvider.GetRequiredService<VarVaultDbContext>().Database.Migrate();
+        var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+        var initializer = scope.ServiceProvider.GetRequiredService<CatalogDatabaseInitializer>();
+        var prepared = initializer.PrepareAsync(db, dbPath, repositoryPaths: []).GetAwaiter().GetResult();
+        if (prepared.IsFailure)
+            throw new InvalidOperationException($"Catalog prepare failed: {prepared.Error}");
         return host;
     }
 }

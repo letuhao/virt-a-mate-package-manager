@@ -4,42 +4,46 @@ Detailed specs for the indexing subsystem — how a `.var` on disk becomes catal
 
 > **[ID] Name** (priority) — **Purpose · Trigger · Inputs/Preconditions · Algorithm/Workflow · Entities written · Edge cases · Acceptance.**
 
-Overview: indexing is a **two-stage, per-physical-drive-parallel, incremental** pipeline. Stage 1 (fast) lights up the catalog from names + `meta.json` + dependency edges. Stage 2 (background, resumable) fills content signatures, previews, and encoding health.
+Overview: indexing runs in a **separate `VarVault.Indexer` process** as a **durable, per-physical-drive-parallel, incremental** pipeline. Discovery streams into a scan ledger; each changed var is opened **once**; raw facts + representative thumbnail commit to `RawStored`; dependency resolution and other derived work are **later, paged, resumable** phases. (Amendments A12–A15, 2026-07-21.)
 
 ---
 
 ## IDX-1 — Staged repository scan  [core]
 
-**Purpose:** discover and index every `.var` in a repository without blocking the UI or thrashing HDDs.
-**Trigger:** repo registered; manual "rescan"; filesystem-watch event; app start (incremental pass).
-**Inputs/Preconditions:** an online, enabled `Repository`; its `MediaType` known.
+**Purpose:** discover and index every `.var` in a repository without blocking the UI, thrashing HDDs, or unbounded RAM.
+**Trigger:** repo registered; manual "rescan"; filesystem-watch event; app start (incremental pass) — all via indexer IPC.
+**Inputs/Preconditions:** an online, enabled `Repository`; its `MediaType` known; indexer process holding the catalog write lease.
 
 **Algorithm:**
 ```
 scanRepository(repo, cancel, progress):
-    # cheap discovery — directory entries only, NO file opens
-    entries = enumerateFiles(repo.MountPath, "*.var", recursive,
-                             skipDirs = ["___VarRedundant___","___StaleVars___",
-                                         "___OldVersionVars___","___DeletedVars___", link dirs],
-                             skipReparsePoints = true)
-    # reconcile deletions: VarFiles in DB under this repo not seen → mark unavailable, prune only if repo confirmed online (never for offline)
-    dbFiles = load VarFile rows for repo
-    plan = diff(entries, dbFiles)                 # new / changed / vanished
-    # STAGE 1 (blocking-ish, fast): identity + meta + deps
-    for batch in chunk(plan.newOrChanged, 5000):
-        parallelPerDrive(batch, repo.MediaType):   # see IDX-3
-            rec = readStage1(file)                  # open zip, read meta.json + entry NAMES only
-            upsert Package, VarFile(stage1 fields), Dependency edges (harvest meta + embedded)
-        commit transaction; progress.report()
-    enqueue plan.newOrChanged into STAGE-2 queue   # signatures, previews, encoding (IDX-6/7/8)
-    for vanished in plan.vanished: markUnavailableOrPrune(vanished)
+    run = beginScanRun(repo)                      # durable generation + phase = Discovering
+    # cheap discovery — directory entries only, NO file opens; upsert in small batches (no full path set in RAM)
+    for entry in enumerateFiles(repo.MountPath, "*.var", recursive,
+                             skipDirs = quarantine + link dirs, skipReparsePoints = true):
+        upsertDiscovery(run, entry)               # path/size/mtime/quarantine; mark SeenInGeneration
+        progress.report(discovered++)
+    markVanished(run)                             # SQL: rows not seen in this generation
+    # INGEST (one-handle, bounded channels, per-drive DOP from ParallelismPolicy):
+    while claimWork(run, lease) as batch:         # Pending/Failed-with-retries; capacity-bounded
+        parallelPerDrive(batch, repo.MediaType):
+            with oneSeekableHandle(file):
+                cd = readCentralDirectory(handle) # signatures + classify + encoding
+                meta, rawDeps = streamJson(handle)# caps; no ReadToEnd of unbounded entries
+                thumb = extractRepresentativeJpg(handle)  # optional; size/pixel capped
+            persistRawBatch(...)                  # Package/VarFile/ContentItem/Dependency(raw)/thumb ref
+            mark RawStored; dirtyPackage(id)      # durable dirty row
+        wal_checkpoint; progress.report()
+    if repo online: pruneVanished(run)
+    phase = ResolveDependencies (paged SQL) → RefreshReadModel (chunked) → Usage (optional)
 ```
-- **Stage 1 opens each new/changed var once** and reads only `meta.json` + the central-directory entry **names** (for classification) — not full content.
-- **Stage 2** (IDX-6/7/8) runs as a separate background pass so the catalog is browsable immediately.
+- **One seekable handle per changed var** covers central directory, meta, embedded refs, signatures/encoding, and the **representative** thumbnail (A14). Do not reopen for preview.
+- **Raw dependency strings** are stored unresolved during ingest; graph resolution is a separate paged phase (A13).
+- **Incomplete / non-`RawStored` rows** never authorize dedup, delete, or migration.
 
-**Entities written:** `Package`, `VarFile` (stage-1 fields), `Dependency`, `PackageContentCount`, `PackageListItem` (via recompute pipeline).
-**Edge cases:** repo goes offline mid-scan → stop, keep partial, resume later; file locked by another process → retry/skip+flag; symlink/reparse encountered → skipped (never index a link as a var).
-**Acceptance:** a 70K-var repo is browsable (names/deps) before Stage 2 finishes; re-scan of an unchanged repo touches **zero** file contents.
+**Entities written:** `ScanRun`, ingest-state on `VarFile`, `Package`, `VarFile`, `ContentItem`, `Dependency` (unresolved), `PackageContentCount`, thumbnail shard + `PreviewThumbRef`, later `PackageListItem` / resolution bits.
+**Edge cases:** repo goes offline mid-scan → stop, keep partial, resume later; file locked → retry/skip+flag; worker crash → expire leases, resume; symlink/reparse → skipped.
+**Acceptance:** working set bounded by channel capacity (not repo size); HDD DOP=1; second scan of unchanged repo opens 0 files; kill worker mid-run and restart → no duplicate rows, dirty packages refresh; catalog browsable as `RawStored` rows accumulate.
 
 ---
 

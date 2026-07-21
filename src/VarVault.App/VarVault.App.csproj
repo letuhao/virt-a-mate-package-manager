@@ -25,7 +25,21 @@
     <ProjectReference Include="..\VarVault.Common\VarVault.Common.csproj" />
     <ProjectReference Include="..\VarVault.Sdk\VarVault.Sdk.csproj" />
     <ProjectReference Include="..\VarVault.Host\VarVault.Host.csproj" />
+    <!-- Build the worker exe alongside the GUI so IndexerProcessHost can spawn it. (A12.) -->
+    <ProjectReference Include="..\VarVault.Indexer\VarVault.Indexer.csproj">
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <Private>false</Private>
+    </ProjectReference>
   </ItemGroup>
+
+  <Target Name="CopyIndexerWorker" AfterTargets="Build">
+    <ItemGroup>
+      <_IndexerFiles Include="..\VarVault.Indexer\bin\$(Configuration)\$(TargetFramework)\VarVault.Indexer*" />
+      <_IndexerFiles Include="..\VarVault.Indexer\bin\$(Configuration)\$(TargetFramework)\*.dll" />
+      <_IndexerFiles Include="..\VarVault.Indexer\bin\$(Configuration)\$(TargetFramework)\*.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_IndexerFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" />

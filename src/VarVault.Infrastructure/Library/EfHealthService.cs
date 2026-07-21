@@ -5,6 +5,7 @@ using VarVault.Domain.Entities;
 using VarVault.Infrastructure.Indexing;
 using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Library;
+using VarVault.Sdk.Paging;
 
 namespace VarVault.Infrastructure.Library;
 
@@ -27,23 +28,20 @@ public sealed class EfHealthService(VarVaultDbContext db, EncodingFixCoordinator
         return groups;
     }
 
+    public Task<PageResult<IntegrityIssue>> IntegrityPageAsync(PageRequest request, CancellationToken cancellationToken = default) =>
+        PageIssuesAsync(IntegrityStatus.CorruptZip, request, cancellationToken);
+
     public async Task<IReadOnlyList<IntegrityIssue>> IntegrityAsync(CancellationToken cancellationToken = default)
     {
-        return await db.VarFiles
-            .Where(v => v.IntegrityStatus == IntegrityStatus.CorruptZip)
-            .Select(v => new IntegrityIssue(v.Id, v.Package != null ? v.Package.VarName : v.RelativePath, v.RelativePath))
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
+        return (await IntegrityPageAsync(new PageRequest(1, 100), cancellationToken).ConfigureAwait(false)).Items;
     }
+
+    public Task<PageResult<IntegrityIssue>> MissingMetaPageAsync(PageRequest request, CancellationToken cancellationToken = default) =>
+        PageIssuesAsync(IntegrityStatus.MissingMeta, request, cancellationToken);
 
     public async Task<IReadOnlyList<IntegrityIssue>> MissingMetaAsync(CancellationToken cancellationToken = default)
     {
-        // Missing-meta is already detected + stored by VarInspector; this just surfaces it. (24-checklist A4.)
-        return await db.VarFiles
-            .Where(v => v.IntegrityStatus == IntegrityStatus.MissingMeta)
-            .Select(v => new IntegrityIssue(v.Id, v.Package != null ? v.Package.VarName : v.RelativePath, v.RelativePath))
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
+        return (await MissingMetaPageAsync(new PageRequest(1, 100), cancellationToken).ConfigureAwait(false)).Items;
     }
 
     public async Task<Result<long>> FixAsync(long varFileId, CancellationToken cancellationToken = default)
@@ -63,5 +61,23 @@ public sealed class EfHealthService(VarVaultDbContext db, EncodingFixCoordinator
             : sourcePath + ".fixed.var";
 
         return await coordinator.FixAsync(varFileId, outputPath, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<PageResult<IntegrityIssue>> PageIssuesAsync(
+        IntegrityStatus status,
+        PageRequest request,
+        CancellationToken cancellationToken)
+    {
+        var page = request.Normalize();
+        var query = db.VarFiles.AsNoTracking().Where(v => v.IntegrityStatus == status);
+        var total = await query.CountAsync(cancellationToken).ConfigureAwait(false);
+        var items = await query
+            .OrderBy(v => v.Id)
+            .Skip(page.Skip)
+            .Take(page.SafePageSize)
+            .Select(v => new IntegrityIssue(v.Id, v.Package != null ? v.Package.VarName : v.RelativePath, v.RelativePath))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return new PageResult<IntegrityIssue>(items, total, page.SafePageNumber, page.SafePageSize);
     }
 }

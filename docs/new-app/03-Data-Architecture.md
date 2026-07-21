@@ -193,9 +193,11 @@ Trash = same-volume move where possible (instant, no cross-drive copy), capacity
 ## 6. Performance architecture
 
 - **Freshness without opening files:** decide re-index from the **directory entry `(size, mtime)`** alone. Open only changed/new files.
-- **Staged indexing:** pass 1 = names + `meta.json` + dependencies (fast, lights up the catalog). Pass 2 (background, resumable) = `ContentSignature` + preview extraction. Parallelize **per physical drive** — degree 1 on HDD (avoid head thrash), high on NVMe; media type known from `Repository`.
-- **Bulk writes** batched in transactions; **FTS triggers disabled during bulk**, then `rebuild` once; `ANALYZE` after bulk.
-- **WAL discipline:** short-lived UI read transactions; `wal_autocheckpoint` + periodic `wal_checkpoint(TRUNCATE)` between modest batches; a dedicated write connection/queue with **interactive writes prioritized** over bulk.
+- **Worker-process indexing (A12):** `VarVault.Indexer` is the sole catalog writer. GUI reads paged; commands/status over a versioned named pipe. Coalesce duplicate index requests.
+- **Raw-first, one-handle ingest (A13/A14):** discovery streams into a durable ledger; each changed var is opened once (central directory + meta/refs + fingerprints/encoding + representative thumbnail under size/pixel caps). Dependency **resolution** is a later paged SQL phase — never `ToListAsync` of the whole graph during ingest. Parallelize **per physical drive** — degree 1 on HDD, higher on NVMe.
+- **Durable dirty/phase state (A15):** dirty package IDs and scan phases are rows; crash after upsert still refreshes derived state on resume.
+- **Bulk writes** batched in short transactions via raw SQL where hot; FTS maintained in chunks; `ANALYZE` after bulk; `wal_checkpoint` between batches.
+- **WAL discipline:** short-lived UI read transactions; pragmas applied on **every** connection open; interactive mutations prioritized over bulk on the worker command queue.
 - **Migrations:** prefer additive nullable columns; run large migrations in the **background with progress**; keep churny tables (`UsageEvent`, `ContentItem`) lean; test against a synthetic 2M-row DB before schema lock.
 - **Indexes (initial):** `VarFile(RepositoryId, RelativePath)` unique, `VarFile(PackageId)`, **`VarFile(ContentSignature)`**, **`VarFile(PayloadSignature)`**, `VarFile(ContentSignatureNoPath)`, `VarFile(ContentHash) WHERE NOT NULL` (partial), `Package(IdentityKey)` unique, `Package(Creator, PackageName, VersionSort)`, `Package(IsFavorite)`, `ContentItem(VarFileId)`, `ContentItem(Type)`, `Dependency(VarFileId)`, `Dependency(DependsOnRefKey)`, `Dependency(ResolvedPackageId)`, `SaveDependency(DependsOnRefKey)`, `UsageEvent(PackageId, Timestamp)`, `UsageStat(Class)`, `MigrationJob(VarFileId) WHERE live`, `ActivationLink(ProfileId)`, `ActivationLink(VarFileId)`, `PresetMember(PresetId)`, `VarAlias(MissingRefKey)`, plus one composite per `PackageListItem` sort order.
 

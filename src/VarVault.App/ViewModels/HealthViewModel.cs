@@ -9,6 +9,10 @@ namespace VarVault.App.ViewModels;
 public sealed partial class HealthViewModel(
     IHealthService health, Services.IDialogLauncher? launcher = null) : ObservableObject, ILoadableScreen
 {
+    public PagedListState<IntegrityIssue> IntegrityPager { get; } =
+        new((request, ct) => health.IntegrityPageAsync(request, ct));
+    public PagedListState<IntegrityIssue> MissingMetaPager { get; } =
+        new((request, ct) => health.MissingMetaPageAsync(request, ct));
     /// <summary>Sub-navigation tabs (GC-2).</summary>
     public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =
         [new("Encoding"), new("Integrity / corrupt"), new("Missing meta")];
@@ -46,10 +50,10 @@ public sealed partial class HealthViewModel(
 
     /// <summary>Explicit empty-state flag for the encoding groups. (GF-2)</summary>
     public bool IsEmpty => EncodingGroups.Count == 0;
-    public ObservableCollection<IntegrityIssue> Integrity { get; } = [];
+    public ObservableCollection<IntegrityIssue> Integrity => IntegrityPager.Items;
 
     /// <summary>Vars missing a parseable meta.json, for the Missing-meta tab. (24-checklist A4)</summary>
-    public ObservableCollection<IntegrityIssue> MissingMeta { get; } = [];
+    public ObservableCollection<IntegrityIssue> MissingMeta => MissingMetaPager.Items;
 
     [ObservableProperty] private string? _statusMessage;
 
@@ -63,12 +67,9 @@ public sealed partial class HealthViewModel(
         OnPropertyChanged(nameof(GbkCount));
         OnPropertyChanged(nameof(ShiftJisCount));
         OnPropertyChanged(nameof(OtherEncodingCount));
-        Integrity.Clear();
-        foreach (var i in await health.IntegrityAsync(cancellationToken).ConfigureAwait(true))
-            Integrity.Add(i);
-        MissingMeta.Clear();
-        foreach (var i in await health.MissingMetaAsync(cancellationToken).ConfigureAwait(true))
-            MissingMeta.Add(i);
+        await IntegrityPager.ResetAndReloadAsync(cancellationToken).ConfigureAwait(true);
+        await MissingMetaPager.ResetAndReloadAsync(cancellationToken).ConfigureAwait(true);
+        NotifyPaged();
     }
 
     [RelayCommand]
@@ -77,5 +78,74 @@ public sealed partial class HealthViewModel(
         var result = await health.FixAsync(varFileId, cancellationToken).ConfigureAwait(true);
         StatusMessage = result.IsSuccess ? "Fixed" : result.Error.Message;
         await LoadAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    [RelayCommand(CanExecute = nameof(CanIntegrityPreviousPage))]
+    private async Task IntegrityPreviousPageAsync(CancellationToken cancellationToken = default)
+    {
+        await IntegrityPager.PreviousPageAsync(cancellationToken).ConfigureAwait(true);
+        NotifyPaged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanIntegrityNextPage))]
+    private async Task IntegrityNextPageAsync(CancellationToken cancellationToken = default)
+    {
+        await IntegrityPager.NextPageAsync(cancellationToken).ConfigureAwait(true);
+        NotifyPaged();
+    }
+
+    [RelayCommand]
+    private async Task IntegrityGoToPageAsync(int pageNumber)
+    {
+        await IntegrityPager.LoadPageAsync(pageNumber, IntegrityPager.PageSize).ConfigureAwait(true);
+        NotifyPaged();
+    }
+
+    [RelayCommand]
+    private async Task IntegrityChangePageSizeAsync(int pageSize)
+    {
+        await IntegrityPager.LoadPageAsync(1, pageSize).ConfigureAwait(true);
+        NotifyPaged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanMissingMetaPreviousPage))]
+    private async Task MissingMetaPreviousPageAsync(CancellationToken cancellationToken = default)
+    {
+        await MissingMetaPager.PreviousPageAsync(cancellationToken).ConfigureAwait(true);
+        NotifyPaged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanMissingMetaNextPage))]
+    private async Task MissingMetaNextPageAsync(CancellationToken cancellationToken = default)
+    {
+        await MissingMetaPager.NextPageAsync(cancellationToken).ConfigureAwait(true);
+        NotifyPaged();
+    }
+
+    [RelayCommand]
+    private async Task MissingMetaGoToPageAsync(int pageNumber)
+    {
+        await MissingMetaPager.LoadPageAsync(pageNumber, MissingMetaPager.PageSize).ConfigureAwait(true);
+        NotifyPaged();
+    }
+
+    [RelayCommand]
+    private async Task MissingMetaChangePageSizeAsync(int pageSize)
+    {
+        await MissingMetaPager.LoadPageAsync(1, pageSize).ConfigureAwait(true);
+        NotifyPaged();
+    }
+
+    private bool CanIntegrityPreviousPage() => IntegrityPager.HasPreviousPage && !IntegrityPager.IsLoading;
+    private bool CanIntegrityNextPage() => IntegrityPager.HasNextPage && !IntegrityPager.IsLoading;
+    private bool CanMissingMetaPreviousPage() => MissingMetaPager.HasPreviousPage && !MissingMetaPager.IsLoading;
+    private bool CanMissingMetaNextPage() => MissingMetaPager.HasNextPage && !MissingMetaPager.IsLoading;
+
+    private void NotifyPaged()
+    {
+        IntegrityPreviousPageCommand.NotifyCanExecuteChanged();
+        IntegrityNextPageCommand.NotifyCanExecuteChanged();
+        MissingMetaPreviousPageCommand.NotifyCanExecuteChanged();
+        MissingMetaNextPageCommand.NotifyCanExecuteChanged();
     }
 }

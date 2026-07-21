@@ -79,8 +79,9 @@ public static class AppHost
         if (screens["repos"] is RepositoriesViewModel reposVm)
         {
             reposVm.ShowToast = shell.ShowToast;
-            reposVm.ReindexRepo = id => EnqueueIndexRepo(services, id);
-            reposVm.ReindexAll = () => EnqueueIndexAll(services);
+            // Manual re-index is an explicit "force full" — bypass the unchanged-repo fast-path. (A16.)
+            reposVm.ReindexRepo = id => EnqueueIndexRepo(services, id, forceFull: true);
+            reposVm.ReindexAll = () => EnqueueIndexAll(services, forceFull: true);
         }
 
         // GD-1/GD-2 · let the dashboard + library navigate the shell.
@@ -123,33 +124,59 @@ public static class AppHost
     }
 
     /// <summary>
-    /// GA-5 · Enqueue a full index run on the job queue (BE-N0 orchestrator). Called at startup and after a
-    /// repository is added, so the catalog actually populates — the runtime trigger the GUI was missing.
-    /// Returns null when indexing isn't composed (minimal test hosts). (18-gap GA-5.)
+    /// Enqueue a full index via the indexer worker (coalesced). The job queue entry mirrors worker
+    /// progress into the jobs panel. (A12; GA-5.)
     /// </summary>
-    public static Sdk.Threading.JobHandle? EnqueueIndexAll(IServiceProvider services)
+    public static Sdk.Threading.JobHandle? EnqueueIndexAll(IServiceProvider services, bool forceFull = false)
     {
         var queue = services.GetService<Sdk.Threading.IJobQueue>();
+        var indexer = IndexerClientOverride.Current ?? services.GetService<Sdk.Indexer.IIndexerClient>();
+        if (queue is null)
+            return null;
+
+        // Prefer worker client; fall back to in-proc orchestrator for minimal test hosts.
+        if (indexer is not null)
+        {
+            return queue.Enqueue(forceFull ? "Re-indexing library (full)" : "Indexing library", async ctx =>
+            {
+                var start = await indexer.StartIndexAllAsync(forceFull, CancellationToken.None).ConfigureAwait(false);
+                if (start.IsFailure)
+                    throw new InvalidOperationException(start.Error.Message);
+                await MirrorIndexerAsync(indexer, start.Value, ctx).ConfigureAwait(false);
+            });
+        }
+
         var orchestrator = services.GetService<Sdk.Indexing.IIndexOrchestrator>();
-        if (queue is null || orchestrator is null)
+        if (orchestrator is null)
             return null;
         return queue.Enqueue("Indexing library", async ctx =>
         {
-            // Pass the job's progress sink straight into the orchestrator so scan/index/resolve status ticks
-            // live in the jobs panel + log-dock — instead of one final update after the whole run. (GA-5.)
             var summary = await orchestrator.IndexAllAsync(ctx.Progress, ctx.Cancellation).ConfigureAwait(false);
             ctx.Progress.Report(new Common.ProgressReport(summary.Indexed, Math.Max(1, summary.Indexed),
                 $"Indexed {summary.Indexed} vars across {summary.Repositories} repos"));
         });
     }
 
-    /// <summary>Re-index (resume) one repository as a background job — idempotent: adds new vars, prunes gone ones,
-    /// leaves existing rows. Returns null when indexing isn't composed. </summary>
-    public static Sdk.Threading.JobHandle? EnqueueIndexRepo(IServiceProvider services, System.Guid repositoryId)
+    public static Sdk.Threading.JobHandle? EnqueueIndexRepo(IServiceProvider services, System.Guid repositoryId, bool forceFull = false)
     {
         var queue = services.GetService<Sdk.Threading.IJobQueue>();
+        var indexer = IndexerClientOverride.Current ?? services.GetService<Sdk.Indexer.IIndexerClient>();
+        if (queue is null)
+            return null;
+
+        if (indexer is not null)
+        {
+            return queue.Enqueue("Re-indexing repository", async ctx =>
+            {
+                var start = await indexer.StartIndexRepositoryAsync(repositoryId, forceFull, CancellationToken.None).ConfigureAwait(false);
+                if (start.IsFailure)
+                    throw new InvalidOperationException(start.Error.Message);
+                await MirrorIndexerAsync(indexer, start.Value, ctx).ConfigureAwait(false);
+            });
+        }
+
         var orchestrator = services.GetService<Sdk.Indexing.IIndexOrchestrator>();
-        if (queue is null || orchestrator is null)
+        if (orchestrator is null)
             return null;
         return queue.Enqueue("Re-indexing repository", async ctx =>
         {
@@ -157,6 +184,43 @@ public static class AppHost
             ctx.Progress.Report(new Common.ProgressReport(summary.Indexed, Math.Max(1, summary.Indexed),
                 $"Indexed {summary.Indexed} vars ({summary.Skipped} unchanged, {summary.Pruned} pruned)"));
         });
+    }
+
+    private static async System.Threading.Tasks.Task MirrorIndexerAsync(
+        Sdk.Indexer.IIndexerClient indexer, System.Guid jobId, Sdk.Threading.JobContext ctx)
+    {
+        try
+        {
+            while (!ctx.Cancellation.IsCancellationRequested)
+            {
+                var status = await indexer.GetStatusAsync(ctx.Cancellation).ConfigureAwait(false);
+                if (status.IsFailure)
+                    break;
+                var s = status.Value;
+                ctx.Progress.Report(new Common.ProgressReport(
+                    s.Done, Math.Max(1, s.Total),
+                    s.PhaseMessage ?? s.State.ToString()));
+                if (s.State is Sdk.Indexer.IndexerJobState.Completed
+                    or Sdk.Indexer.IndexerJobState.Failed
+                    or Sdk.Indexer.IndexerJobState.Cancelled
+                    or Sdk.Indexer.IndexerJobState.Idle)
+                {
+                    if (s.State == Sdk.Indexer.IndexerJobState.Failed && s.Error is not null)
+                        throw new InvalidOperationException(s.Error);
+                    break;
+                }
+                await System.Threading.Tasks.Task.Delay(400, ctx.Cancellation).ConfigureAwait(false);
+            }
+
+            ctx.Cancellation.ThrowIfCancellationRequested();
+        }
+        catch (System.OperationCanceledException)
+        {
+            // GUI job cancelled → cancel the worker job (in-proc or out-of-process).
+            try { await indexer.CancelAsync(jobId, CancellationToken.None).ConfigureAwait(false); }
+            catch { /* best-effort */ }
+            throw;
+        }
     }
 
     private const string OnboardingSeenKey = "onboarding.seen";
@@ -228,14 +292,11 @@ public static class AppHost
     /// <summary>Build the live-feeds source if all its read services are present (null in minimal test hosts).</summary>
     private static Services.IShellLiveFeeds? TryBuildFeeds(IServiceProvider services, Sdk.Threading.IJobQueue? jobQueue)
     {
-        // Presence check keeps minimal test hosts (without these read services) returning null; the feeds resolve
-        // their services per-poll from a fresh scope, so the poll never shares the shell's DbContext. (24-checklist B1.)
         var scopeFactory = services.GetService<IServiceScopeFactory>();
-        if (services.GetService<IProposalService>() is null || services.GetService<IHealthService>() is null
-            || services.GetService<IMissingDepsQuery>() is null || services.GetService<IDashboardService>() is null
-            || jobQueue is null || scopeFactory is null)
+        if (services.GetService<IDashboardService>() is null || scopeFactory is null)
             return null;
-        return new Services.ShellLiveFeeds(scopeFactory, jobQueue);
+        var indexer = IndexerClientOverride.Current ?? services.GetService<Sdk.Indexer.IIndexerClient>();
+        return new Services.ShellLiveFeeds(scopeFactory, indexer);
     }
 
     private static string DefaultDataDir => AppDataLocation.Resolve();
@@ -255,6 +316,10 @@ public static class AppHost
             Directory.CreateDirectory(dataDir);
             var host = Bootstrap.BuildApp(dataDir);
             var scope = host.Services.CreateScope(); // app-lifetime scope backing the shell's read services
+            IndexerClientOverride.Current = IndexerProcessHost.ResolveClient(host.Services, dataDir);
+            // Keep a worker reachable for the whole session (respawn/reconnect if it dies). (A12 liveness.)
+            IndexerClientOverride.Monitor = new IndexerHealthMonitor(host.Services, dataDir);
+            IndexerClientOverride.Monitor.Start();
             var shell = CreateShell(scope.ServiceProvider);
             // C1.1 · a zero-repository install (that hasn't dismissed the wizard) opens onboarding on load.
             shell.ShowOnboardingOnLoad = NeedsOnboardingAsync(host.Services).GetAwaiter().GetResult();

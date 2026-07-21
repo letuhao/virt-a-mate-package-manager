@@ -4,6 +4,7 @@ using VarVault.Domain.Dependencies;
 using VarVault.Domain.Entities;
 using VarVault.Domain.Identity;
 using VarVault.Infrastructure.Persistence;
+using VarVault.Sdk.Paging;
 using VarVault.Sdk.Presets;
 
 namespace VarVault.Infrastructure.Indexing;
@@ -80,6 +81,20 @@ public sealed class EfPresetService(VarVaultDbContext db, IClock clock, IDepende
             .OrderBy(m => m.SortOrder)
             .Select(m => m.PackageRefRaw)
             .ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<PageResult<string>> MembersPageAsync(long presetId, PageRequest request, CancellationToken cancellationToken = default)
+    {
+        var page = request.Normalize();
+        var query = db.PresetMembers.AsNoTracking().Where(m => m.PresetId == presetId);
+        var total = await query.CountAsync(cancellationToken).ConfigureAwait(false);
+        var items = await query
+            .OrderBy(m => m.SortOrder)
+            .Skip(page.Skip)
+            .Take(page.SafePageSize)
+            .Select(m => m.PackageRefRaw)
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        return new PageResult<string>(items, total, page.SafePageNumber, page.SafePageSize);
+    }
 
     public async Task<IReadOnlyList<PresetInfo>> ListAsync(CancellationToken cancellationToken = default) =>
         await db.LoadingPresets.AsNoTracking()

@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/VarVault.App/VarVault.App.csproj" />
     <Project Path="src/VarVault.Cli/VarVault.Cli.csproj" />
+    <Project Path="src/VarVault.Indexer/VarVault.Indexer.csproj" />
     <Project Path="src/VarVault.Common/VarVault.Common.csproj" />
     <Project Path="src/VarVault.Domain/VarVault.Domain.csproj" />
     <Project Path="src/VarVault.Host/VarVault.Host.csproj" />

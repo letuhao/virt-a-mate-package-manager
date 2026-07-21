@@ -163,3 +163,24 @@ public enum ContentType
     Plugin = 8,
     Asset = 9,
 }
+
+/// <summary>Durable per-VarFile ingest completeness for crash-resumable raw-first indexing. (A15.)</summary>
+public enum IngestState
+{
+    Discovered = 0,
+    Inspecting = 1,
+    RawStored = 2,
+    Failed = 3,
+}
+
+/// <summary>High-level scan run phase persisted on <see cref="ScanRun"/>.</summary>
+public enum ScanPhase
+{
+    Discovering = 0,
+    Ingesting = 1,
+    Resolving = 2,
+    Refreshing = 3,
+    Completed = 4,
+    Failed = 5,
+    Cancelled = 6,
+}

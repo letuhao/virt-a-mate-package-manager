@@ -11,28 +11,34 @@ namespace VarVault.App.Services;
 /// step is a delegate so the pipeline is testable without an image backend. (Checklist 1.35.)
 /// </summary>
 /// <typeparam name="TImage">The decoded image type (Avalonia <see cref="Bitmap"/> in production).</typeparam>
-public sealed class ThumbnailLoader<TImage>(IThumbnailStore store, Func<byte[], TImage> decode)
+public sealed class ThumbnailLoader<TImage>(IThumbnailStore store, Func<byte[], TImage> decode, int maxCached = 512)
     where TImage : class
 {
     private readonly ConcurrentDictionary<long, Task<TImage?>> _cache = new();
+    private readonly ConcurrentQueue<long> _order = new();
+    private readonly int _maxCached = Math.Max(32, maxCached);
 
-    /// <summary>
-    /// The decoded thumbnail for a package (or null when none is stored). Concurrent callers for the
-    /// same id share one decode; a completed decode is served from cache without touching disk again.
-    /// </summary>
     public Task<TImage?> LoadAsync(long packageId, CancellationToken cancellationToken = default) =>
-        _cache.GetOrAdd(packageId, id => LoadCoreAsync(id));
+        _cache.GetOrAdd(packageId, id =>
+        {
+            _order.Enqueue(id);
+            TrimIfNeeded();
+            return LoadCoreAsync(id);
+        });
 
-    /// <summary>Warm the cache for a run of ids (e.g. the rows just below the viewport). (1.35 prefetch.)</summary>
     public Task PrefetchAsync(IEnumerable<long> packageIds, CancellationToken cancellationToken = default) =>
         Task.WhenAll(packageIds.Select(id => LoadAsync(id, cancellationToken)));
+
+    private void TrimIfNeeded()
+    {
+        while (_cache.Count > _maxCached && _order.TryDequeue(out var old))
+            _cache.TryRemove(old, out _);
+    }
 
     private async Task<TImage?> LoadCoreAsync(long packageId)
     {
         try
         {
-            // Bytes come off the store's async I/O; decoding is CPU work pushed to a pool thread so the
-            // UI thread is never the one turning JPEG into pixels.
             var bytes = await store.GetAsync(packageId).ConfigureAwait(false);
             if (bytes is null)
                 return null;
@@ -40,7 +46,6 @@ public sealed class ThumbnailLoader<TImage>(IThumbnailStore store, Func<byte[], 
         }
         catch
         {
-            // Don't poison the cache with a faulted task — a later load may succeed (e.g. after re-index).
             _cache.TryRemove(packageId, out _);
             throw;
         }

@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VarVault.Sdk.Library;
+using VarVault.Sdk.Paging;
 
 namespace VarVault.App.ViewModels;
 
@@ -17,7 +18,19 @@ public sealed class SpaceRowViewModel(string group, long bytes, long max)
 /// <summary>Analytics screen: where space goes, by creator/type/tier, with bars. (Checklist 5.16 / GD-14.)</summary>
 public sealed partial class AnalyticsViewModel(IAnalyticsService analytics, ITieringService? tiering = null) : ObservableObject, ILoadableScreen
 {
-    public ObservableCollection<SpaceRowViewModel> ByCreator { get; } = [];
+    public PagedListState<SpaceRowViewModel> CreatorPager { get; } =
+        new(async (request, ct) =>
+        {
+            var page = await analytics.SpaceByCreatorPageAsync(request, ct).ConfigureAwait(false);
+            var max = page.Items.Count == 0 ? 0 : page.Items.Max(r => r.TotalBytes);
+            return new PageResult<SpaceRowViewModel>(
+                page.Items.Select(r => new SpaceRowViewModel(r.Group, r.TotalBytes, max)).ToList(),
+                page.TotalCount,
+                page.PageNumber,
+                page.PageSize);
+        });
+
+    public ObservableCollection<SpaceRowViewModel> ByCreator => CreatorPager.Items;
     public ObservableCollection<SpaceRowViewModel> ByType { get; } = [];
     public ObservableCollection<SpaceRowViewModel> ByTier { get; } = [];
 
@@ -36,7 +49,7 @@ public sealed partial class AnalyticsViewModel(IAnalyticsService analytics, ITie
     [RelayCommand]
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
-        await FillAsync(ByCreator, analytics.SpaceByCreatorAsync(cancellationToken)).ConfigureAwait(true);
+        await CreatorPager.ResetAndReloadAsync(cancellationToken).ConfigureAwait(true);
         await FillAsync(ByType, analytics.SpaceByTypeAsync(cancellationToken)).ConfigureAwait(true);
         await FillAsync(ByTier, analytics.SpaceByTierAsync(cancellationToken)).ConfigureAwait(true);
         SparkBars.Clear();
@@ -52,6 +65,25 @@ public sealed partial class AnalyticsViewModel(IAnalyticsService analytics, ITie
 
         OnPropertyChanged(nameof(IsEmpty));
     }
+
+    [RelayCommand(CanExecute = nameof(CanCreatorPreviousPage))]
+    private async Task CreatorPreviousPageAsync(CancellationToken cancellationToken = default) =>
+        await CreatorPager.PreviousPageAsync(cancellationToken).ConfigureAwait(true);
+
+    [RelayCommand(CanExecute = nameof(CanCreatorNextPage))]
+    private async Task CreatorNextPageAsync(CancellationToken cancellationToken = default) =>
+        await CreatorPager.NextPageAsync(cancellationToken).ConfigureAwait(true);
+
+    [RelayCommand]
+    private async Task CreatorGoToPageAsync(int pageNumber) =>
+        await CreatorPager.LoadPageAsync(pageNumber, CreatorPager.PageSize).ConfigureAwait(true);
+
+    [RelayCommand]
+    private async Task CreatorChangePageSizeAsync(int pageSize) =>
+        await CreatorPager.LoadPageAsync(1, pageSize).ConfigureAwait(true);
+
+    private bool CanCreatorPreviousPage() => CreatorPager.HasPreviousPage && !CreatorPager.IsLoading;
+    private bool CanCreatorNextPage() => CreatorPager.HasNextPage && !CreatorPager.IsLoading;
 
     private static async Task FillAsync(ObservableCollection<SpaceRowViewModel> target, Task<IReadOnlyList<SpaceByGroup>> source)
     {

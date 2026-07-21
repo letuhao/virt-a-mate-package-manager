@@ -1,4 +1,5 @@
 using VarVault.Common;
+using VarVault.Sdk.Paging;
 
 namespace VarVault.Sdk.Presets;
 
@@ -25,6 +26,12 @@ public interface IPresetService
     Task<Result<PresetInfo>> RemoveMemberAsync(long presetId, string memberRef, CancellationToken cancellationToken = default);
 
     /// <summary>The member refs of a preset, in order (edit-preset dialog member table). (BE-G3)</summary>
+    async Task<PageResult<string>> MembersPageAsync(long presetId, PageRequest request, CancellationToken cancellationToken = default)
+    {
+        var all = await MembersAsync(presetId, cancellationToken).ConfigureAwait(false);
+        var page = request.Normalize();
+        return new PageResult<string>(all.Skip(page.Skip).Take(page.SafePageSize).ToList(), all.Count, page.SafePageNumber, page.SafePageSize);
+    }
     Task<IReadOnlyList<string>> MembersAsync(long presetId, CancellationToken cancellationToken = default);
 
     /// <summary>Resolve members + pull the forward-dependency closure → "will pull in N" preview. (3.8)</summary>

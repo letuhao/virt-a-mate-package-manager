@@ -20,6 +20,8 @@ public static class Telemetry
     public static readonly Counter<long> WritesCompleted = Meter.CreateCounter<long>("varvault.writes.completed");
     public static readonly Counter<long> WritesFailed = Meter.CreateCounter<long>("varvault.writes.failed");
     public static readonly Histogram<double> WriteDurationMs = Meter.CreateHistogram<double>("varvault.write.duration", unit: "ms");
+    public static readonly Histogram<double> WriteLockWaitDurationMs = Meter.CreateHistogram<double>("varvault.write.lock_wait.duration", unit: "ms");
+    public static readonly Histogram<double> WriteLockHoldDurationMs = Meter.CreateHistogram<double>("varvault.write.lock_hold.duration", unit: "ms");
 
     // Indexing (scan → upsert pipeline)
     public static readonly Counter<long> IndexVarsIndexed = Meter.CreateCounter<long>("varvault.index.vars_indexed");
@@ -28,6 +30,14 @@ public static class Telemetry
     public static readonly Histogram<double> IndexWriteDurationMs = Meter.CreateHistogram<double>("varvault.index.write.duration", unit: "ms");
     public static readonly Histogram<double> IndexRefreshDurationMs = Meter.CreateHistogram<double>("varvault.index.refresh.duration", unit: "ms");
     public static readonly Histogram<double> IndexResolveDurationMs = Meter.CreateHistogram<double>("varvault.index.resolve.duration", unit: "ms");
+
+    // Stream ingestion pipeline (A12 raw-first worker path)
+    public static readonly Histogram<double> IndexDiscoveryDurationMs = Meter.CreateHistogram<double>("varvault.index.discovery.duration", unit: "ms");
+    public static readonly Histogram<double> IndexIngestDurationMs = Meter.CreateHistogram<double>("varvault.index.ingest.duration", unit: "ms");
+    public static readonly Counter<long> IndexVarsSkipped = Meter.CreateCounter<long>("varvault.index.vars_skipped");
+    public static readonly Counter<long> IndexVarsFailed = Meter.CreateCounter<long>("varvault.index.vars_failed");
+    public static readonly Histogram<int> IndexPersistBatchItems = Meter.CreateHistogram<int>("varvault.index.persist_batch.items", unit: "{var}");
+    public static readonly Histogram<long> IndexPersistBatchBytes = Meter.CreateHistogram<long>("varvault.index.persist_batch.bytes", unit: "By");
 
     // Pass-2 preview / gallery extraction
     public static readonly Counter<long> PreviewsExtracted = Meter.CreateCounter<long>("varvault.preview.extracted");

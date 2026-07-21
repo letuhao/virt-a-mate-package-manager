@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VarVault.Sdk.Import;
+using VarVault.Sdk.Paging;
 using VarVault.Sdk.Repositories;
 
 namespace VarVault.App.ViewModels;
@@ -84,13 +85,23 @@ public sealed partial class ImportItemViewModel(ImportItem item) : ObservableObj
 /// SCR · Import &amp; review screen (doc 30 §10). Pick source folders/archives + a target repo, scan (classify), review
 /// only the conflict/naming/corrupt lanes (table or gallery + resolver), then apply. (doc 31 Phase 6.)
 /// </summary>
-public sealed partial class ImportViewModel(IImportService import, IRepositoryService repos)
-    : ObservableObject, ILoadableScreen
+public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
 {
+    private readonly IImportService _import;
+    private readonly IRepositoryService _repos;
+
+    public ImportViewModel(IImportService import, IRepositoryService repos)
+    {
+        _import = import;
+        _repos = repos;
+        Pager = new PagedListState<ImportItemViewModel>(LoadPageAsync);
+    }
+
     public static bool IsReviewLane(ImportLane l) => l is ImportLane.Conflict or ImportLane.Naming or ImportLane.Corrupt;
 
     private readonly List<ImportItemViewModel> _all = [];
     private ImportSession? _session;
+    public PagedListState<ImportItemViewModel> Pager { get; }
 
     public ObservableCollection<RepositoryInfo> Repositories { get; } = [];
     [ObservableProperty] private RepositoryInfo? _targetRepo;
@@ -99,7 +110,7 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
     public ObservableCollection<ImportSource> Sources { get; } = [];
     public ObservableCollection<string> Warnings { get; } = [];   // D1 dedup-trust warnings (offline/unindexed repo).
     public bool HasWarnings => Warnings.Count > 0;
-    public ObservableCollection<ImportItemViewModel> Items { get; } = [];   // the filtered view
+    public ObservableCollection<ImportItemViewModel> Items => Pager.Items;   // the filtered view
     public ObservableCollection<ImportRun> History { get; } = [];
 
     [ObservableProperty] private string _laneFilter = "all";
@@ -161,7 +172,7 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         Repositories.Clear();
-        foreach (var r in await repos.ListAsync(cancellationToken).ConfigureAwait(true))
+        foreach (var r in await _repos.ListAsync(cancellationToken).ConfigureAwait(true))
             Repositories.Add(r);
         TargetRepo ??= Repositories.FirstOrDefault(r => r.Tier == Repositories.Min(x => x.Tier)) ?? Repositories.FirstOrDefault();
         await RefreshHistoryAsync(cancellationToken).ConfigureAwait(true);
@@ -209,7 +220,7 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
         NotifyGate();
         try
         {
-            _session = await import.ScanAsync(new ImportSpec([.. SourcePaths], TargetRepo.Id, ActivateAfter)).ConfigureAwait(true);
+            _session = await _import.ScanAsync(new ImportSpec([.. SourcePaths], TargetRepo.Id, ActivateAfter)).ConfigureAwait(true);
             _all.Clear();
             foreach (var it in _session.Items)
             {
@@ -225,7 +236,7 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
                 Warnings.Add(w);
             OnPropertyChanged(nameof(SourcesSummary));
             OnPropertyChanged(nameof(HasWarnings));
-            ApplyFilter();
+            await ApplyFilterAsync().ConfigureAwait(true);
             StatusMessage = $"Scanned {_all.Count} vars · {ReviewRemaining} need review";
         }
         catch (Exception ex)
@@ -273,7 +284,7 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
         NotifyGate();
         try
         {
-            var r = await import.ApplyAsync(_session).ConfigureAwait(true);
+            var r = await _import.ApplyAsync(_session).ConfigureAwait(true);
             StatusMessage = $"Done: copied {r.Copied} · fixed {r.Fixed} · renamed {r.Renamed} · skipped {r.Skipped} · discarded {r.Discarded}"
                             + (r.Failed > 0 ? $" · failed {r.Failed}" : "");
             _session = null;
@@ -345,7 +356,7 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
     }
 
     [RelayCommand] private void ToggleView() => GalleryView = !GalleryView;
-    [RelayCommand] private void Filter(string lane) { LaneFilter = lane; ApplyFilter(); }
+    [RelayCommand] private void Filter(string lane) { LaneFilter = lane; _ = ApplyFilterAsync(); }
     [RelayCommand] private async Task OpenHistory() { await RefreshHistoryAsync().ConfigureAwait(true); HistoryOpen = true; }
     [RelayCommand] private void CloseHistory() => HistoryOpen = false;
 
@@ -360,8 +371,8 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
     }
 
     partial void OnTargetRepoChanged(RepositoryInfo? value) => NotifyGate();
-    partial void OnLaneFilterChanged(string value) => ApplyFilter();
-    partial void OnSearchTextChanged(string value) => ApplyFilter();
+    partial void OnLaneFilterChanged(string value) => _ = ApplyFilterAsync();
+    partial void OnSearchTextChanged(string value) => _ = ApplyFilterAsync();
 
     private void OnItemChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
@@ -372,16 +383,19 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
         }
     }
 
-    private void ApplyFilter()
+    private IEnumerable<ImportItemViewModel> CurrentFiltered()
     {
         var q = SearchText?.Trim() ?? "";
-        Items.Clear();
-        foreach (var i in _all.Where(i =>
+        return _all.Where(i =>
             (LaneFilter == "all" || i.Lane.ToString().Equals(LaneFilter, StringComparison.OrdinalIgnoreCase))
             && (q.Length == 0
                 || i.FileName.Contains(q, StringComparison.OrdinalIgnoreCase)
-                || i.Creator.Contains(q, StringComparison.OrdinalIgnoreCase))))
-            Items.Add(i);
+                || i.Creator.Contains(q, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private async Task ApplyFilterAsync()
+    {
+        await Pager.LoadPageAsync(1, Pager.PageSize).ConfigureAwait(true);
         if (Selected is null || !Items.Contains(Selected))
             Selected = Items.FirstOrDefault();
     }
@@ -389,7 +403,7 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
     private async Task RefreshHistoryAsync(CancellationToken ct = default)
     {
         History.Clear();
-        foreach (var run in await import.HistoryAsync(20, ct).ConfigureAwait(true))
+        foreach (var run in await _import.HistoryAsync(20, ct).ConfigureAwait(true))
             History.Add(run);
     }
 
@@ -408,5 +422,52 @@ public sealed partial class ImportViewModel(IImportService import, IRepositorySe
         OnPropertyChanged(nameof(CanScan));
         ScanCommand.NotifyCanExecuteChanged();
         ApplyCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanPreviousPage))]
+    private async Task PreviousPageAsync(CancellationToken cancellationToken = default)
+    {
+        await Pager.PreviousPageAsync(cancellationToken).ConfigureAwait(true);
+        if (Selected is null || !Items.Contains(Selected))
+            Selected = Items.FirstOrDefault();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanNextPage))]
+    private async Task NextPageAsync(CancellationToken cancellationToken = default)
+    {
+        await Pager.NextPageAsync(cancellationToken).ConfigureAwait(true);
+        if (Selected is null || !Items.Contains(Selected))
+            Selected = Items.FirstOrDefault();
+    }
+
+    [RelayCommand]
+    private async Task GoToPageAsync(int pageNumber)
+    {
+        await Pager.LoadPageAsync(pageNumber, Pager.PageSize).ConfigureAwait(true);
+        if (Selected is null || !Items.Contains(Selected))
+            Selected = Items.FirstOrDefault();
+    }
+
+    [RelayCommand]
+    private async Task ChangePageSizeAsync(int pageSize)
+    {
+        await Pager.LoadPageAsync(1, pageSize).ConfigureAwait(true);
+        if (Selected is null || !Items.Contains(Selected))
+            Selected = Items.FirstOrDefault();
+    }
+
+    private bool CanPreviousPage() => Pager.HasPreviousPage && !Pager.IsLoading;
+    private bool CanNextPage() => Pager.HasNextPage && !Pager.IsLoading;
+
+    private Task<PageResult<ImportItemViewModel>> LoadPageAsync(PageRequest request, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var filtered = CurrentFiltered().ToList();
+        var page = request.Normalize();
+        return Task.FromResult(new PageResult<ImportItemViewModel>(
+            filtered.Skip(page.Skip).Take(page.SafePageSize).ToList(),
+            filtered.Count,
+            page.SafePageNumber,
+            page.SafePageSize));
     }
 }

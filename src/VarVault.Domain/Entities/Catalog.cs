@@ -94,6 +94,21 @@ public sealed class VarFile
     public QuarantineKind QuarantineKind { get; set; } = QuarantineKind.None;
     public DateTime IndexedAt { get; set; }
 
+    /// <summary>Durable ingest completeness for crash-resume (A15). Freshness skip only when RawStored+fresh.</summary>
+    public IngestState IngestState { get; set; } = IngestState.Discovered;
+
+    /// <summary>Scan generation that last saw this file during discovery.</summary>
+    public long SeenGeneration { get; set; }
+
+    /// <summary>Worker lease owner; null when unclaimed.</summary>
+    public Guid? LeaseOwner { get; set; }
+
+    /// <summary>UTC expiry of the current inspect lease.</summary>
+    public DateTime? LeaseExpiresAt { get; set; }
+
+    public int IngestAttempts { get; set; }
+    public string? IngestError { get; set; }
+
     public ICollection<ContentItem> ContentItems { get; } = new List<ContentItem>();
     public ICollection<Dependency> Dependencies { get; } = new List<Dependency>();
 }

@@ -11,8 +11,7 @@ public sealed class IndexingModule : IModule
 
     public void Register(IServiceCollection services, IModuleContext context)
     {
-        // The orchestrator binds only to Domain/SDK seams; Infrastructure provides the
-        // IRepositoryEnumerator/IVarInspector/ICatalogStore implementations via DI.
+        // Legacy IIndexingService kept for tests that call it directly; orchestrator uses IStreamIndexer.
         services.AddSingleton<IIndexingService, IndexingService>();
         services.AddSingleton<IIndexOrchestrator, IndexOrchestrator>();
         _ = context;

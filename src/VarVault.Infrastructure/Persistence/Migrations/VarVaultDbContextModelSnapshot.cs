@@ -226,6 +226,26 @@ namespace VarVault.Infrastructure.Persistence.Migrations
                     b.ToTable("Dependency", (string)null);
                 });
 
+            modelBuilder.Entity("VarVault.Domain.Entities.DirtyPackage", b =>
+                {
+                    b.Property<long>("PackageId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("MarkedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("PackageId");
+
+                    b.HasIndex("MarkedAt");
+
+                    b.ToTable("DirtyPackage", (string)null);
+                });
+
             modelBuilder.Entity("VarVault.Domain.Entities.ImportFailedSourceEntity", b =>
                 {
                     b.Property<long>("Id")
@@ -783,6 +803,72 @@ namespace VarVault.Infrastructure.Persistence.Migrations
                     b.ToTable("SaveDependency", (string)null);
                 });
 
+            modelBuilder.Entity("VarVault.Domain.Entities.ScanRun", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Discovered")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long>("Failed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Generation")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Ingested")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Phase")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Pruned")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<Guid>("PublicId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("RepositoryId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<long?>("SigFileCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("SigNewestMtimeTicks")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("SigPathsHash")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long?>("SigTotalBytes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("Skipped")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Phase");
+
+                    b.HasIndex("PublicId")
+                        .IsUnique();
+
+                    b.HasIndex("RepositoryId", "Generation");
+
+                    b.ToTable("ScanRun", (string)null);
+                });
+
             modelBuilder.Entity("VarVault.Domain.Entities.Setting", b =>
                 {
                     b.Property<string>("Key")
@@ -1029,8 +1115,23 @@ namespace VarVault.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("IndexedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("IngestAttempts")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("IngestError")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("IngestState")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("IntegrityStatus")
                         .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("LeaseExpiresAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("LeaseOwner")
+                        .HasColumnType("TEXT");
 
                     b.Property<long?>("PackageId")
                         .HasColumnType("INTEGER");
@@ -1050,6 +1151,9 @@ namespace VarVault.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("RepositoryId")
                         .HasColumnType("TEXT");
+
+                    b.Property<long>("SeenGeneration")
+                        .HasColumnType("INTEGER");
 
                     b.Property<long>("SizeBytes")
                         .HasColumnType("INTEGER");
@@ -1074,8 +1178,12 @@ namespace VarVault.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("SupersededByVarFileId");
 
+                    b.HasIndex("IngestState", "LeaseExpiresAt");
+
                     b.HasIndex("RepositoryId", "RelativePath")
                         .IsUnique();
+
+                    b.HasIndex("RepositoryId", "SeenGeneration");
 
                     b.ToTable("VarFile", (string)null);
                 });

@@ -57,9 +57,20 @@
       </DockPanel>
 
       <!-- Integrity / corrupt (tab 1) -->
-      <c:Card IsVisible="{Binding IsIntegrityTab}" Header="Integrity / corrupt vars">
-        <ScrollViewer>
-          <ItemsControl ItemsSource="{Binding Integrity}">
+      <DockPanel IsVisible="{Binding IsIntegrityTab}">
+        <c:PaginationBar DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                         PageNumber="{Binding IntegrityPager.PageNumber}"
+                         PageCount="{Binding IntegrityPager.PageCount}"
+                         PageSize="{Binding IntegrityPager.PageSize}"
+                         TotalCount="{Binding IntegrityPager.TotalCount}"
+                         SummaryLabel="{Binding IntegrityPager.SummaryLabel}"
+                         PreviousCommand="{Binding IntegrityPreviousPageCommand}"
+                         NextCommand="{Binding IntegrityNextPageCommand}"
+                         GoToPageCommand="{Binding IntegrityGoToPageCommand}"
+                         PageSizeChangedCommand="{Binding IntegrityChangePageSizeCommand}" />
+        <c:Card Header="Integrity / corrupt vars">
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding Integrity}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="lib:IntegrityIssue">
                 <Grid ColumnDefinitions="*,2*" Height="24">
@@ -68,14 +79,26 @@
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
-      </c:Card>
+            </ItemsControl>
+          </ScrollViewer>
+        </c:Card>
+      </DockPanel>
 
       <!-- Missing meta (tab 2) — 24-checklist A4 -->
-      <c:Card IsVisible="{Binding IsMissingMetaTab}" Header="Missing meta.json">
-        <ScrollViewer>
-          <ItemsControl ItemsSource="{Binding MissingMeta}">
+      <DockPanel IsVisible="{Binding IsMissingMetaTab}">
+        <c:PaginationBar DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                         PageNumber="{Binding MissingMetaPager.PageNumber}"
+                         PageCount="{Binding MissingMetaPager.PageCount}"
+                         PageSize="{Binding MissingMetaPager.PageSize}"
+                         TotalCount="{Binding MissingMetaPager.TotalCount}"
+                         SummaryLabel="{Binding MissingMetaPager.SummaryLabel}"
+                         PreviousCommand="{Binding MissingMetaPreviousPageCommand}"
+                         NextCommand="{Binding MissingMetaNextPageCommand}"
+                         GoToPageCommand="{Binding MissingMetaGoToPageCommand}"
+                         PageSizeChangedCommand="{Binding MissingMetaChangePageSizeCommand}" />
+        <c:Card Header="Missing meta.json">
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding MissingMeta}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="lib:IntegrityIssue">
                 <Grid ColumnDefinitions="*,2*" Height="24">
@@ -84,9 +107,10 @@
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
-      </c:Card>
+            </ItemsControl>
+          </ScrollViewer>
+        </c:Card>
+      </DockPanel>
     </Grid>
   </DockPanel>
 </UserControl>

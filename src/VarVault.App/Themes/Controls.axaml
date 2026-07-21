@@ -293,4 +293,62 @@
     </Setter>
   </ControlTheme>
 
+  <!-- SC-13 · PaginationBar -->
+  <ControlTheme x:Key="{x:Type c:PaginationBar}" TargetType="c:PaginationBar">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+          <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+            <TextBlock Text="Rows" VerticalAlignment="Center" Opacity="0.7" />
+            <ItemsControl ItemsSource="{TemplateBinding PageSizeOptions}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" Spacing="4" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Button Content="{Binding}"
+                          MinWidth="34"
+                          Padding="6,2"
+                          Command="{Binding PageSizeChangedCommand, RelativeSource={RelativeSource AncestorType=c:PaginationBar}}"
+                          CommandParameter="{Binding}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+
+          <TextBlock Grid.Column="1"
+                     Text="{TemplateBinding SummaryLabel}"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center"
+                     Opacity="0.75" />
+
+          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+            <Button Content="Previous"
+                    Command="{TemplateBinding PreviousCommand}" />
+            <ItemsControl ItemsSource="{Binding VisiblePages, RelativeSource={RelativeSource TemplatedParent}}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Orientation="Horizontal" Spacing="4" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Button Content="{Binding}"
+                          MinWidth="32"
+                          Padding="6,2"
+                          Command="{Binding GoToPageCommand, RelativeSource={RelativeSource AncestorType=c:PaginationBar}}"
+                          CommandParameter="{Binding}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Next"
+                    Command="{TemplateBinding NextCommand}" />
+          </StackPanel>
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+  </ControlTheme>
+
 </ResourceDictionary>

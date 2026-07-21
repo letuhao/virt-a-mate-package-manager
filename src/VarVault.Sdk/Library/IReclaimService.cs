@@ -1,3 +1,5 @@
+using VarVault.Sdk.Paging;
+
 namespace VarVault.Sdk.Library;
 
 /// <summary>One physical copy in a duplicate group.</summary>
@@ -23,9 +25,21 @@ public sealed record ReclaimResult(int Trashed, int Blocked);
 /// </summary>
 public interface IReclaimService
 {
+    async Task<PageResult<DuplicateGroup>> ExactGroupsPageAsync(PageRequest request, CancellationToken cancellationToken = default)
+    {
+        var all = await ExactGroupsAsync(cancellationToken).ConfigureAwait(false);
+        var page = request.Normalize();
+        return new PageResult<DuplicateGroup>(all.Skip(page.Skip).Take(page.SafePageSize).ToList(), all.Count, page.SafePageNumber, page.SafePageSize);
+    }
     Task<IReadOnlyList<DuplicateGroup>> ExactGroupsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Near-duplicate groups: same payload signature across ≥2 distinct identities. Read-only. (24-checklist A9.)</summary>
+    async Task<PageResult<NearDuplicateGroup>> NearDuplicateGroupsPageAsync(PageRequest request, CancellationToken cancellationToken = default)
+    {
+        var all = await NearDuplicateGroupsAsync(cancellationToken).ConfigureAwait(false);
+        var page = request.Normalize();
+        return new PageResult<NearDuplicateGroup>(all.Skip(page.Skip).Take(page.SafePageSize).ToList(), all.Count, page.SafePageNumber, page.SafePageSize);
+    }
     Task<IReadOnlyList<NearDuplicateGroup>> NearDuplicateGroupsAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Keep one copy; trash the listed redundant copies (each gated by the deletion predicate).</summary>

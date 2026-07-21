@@ -1,3 +1,5 @@
+using VarVault.Sdk.Paging;
+
 namespace VarVault.Sdk.Library;
 
 /// <summary>The kind of analyzer proposal (drives which runner Approve dispatches to).</summary>
@@ -23,6 +25,21 @@ public sealed record ProposalActionResult(bool Ok, string Message);
 /// </summary>
 public interface IProposalService
 {
+    async Task<PageResult<Proposal>> ListPageAsync(
+        ProposalKind? kind,
+        PageRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var all = await ListAsync(cancellationToken).ConfigureAwait(false);
+        var filtered = kind is null ? all : all.Where(x => x.Kind == kind.Value).ToList();
+        var page = request.Normalize();
+        return new PageResult<Proposal>(
+            filtered.Skip(page.Skip).Take(page.SafePageSize).ToList(),
+            filtered.Count,
+            page.SafePageNumber,
+            page.SafePageSize);
+    }
+
     Task<IReadOnlyList<Proposal>> ListAsync(CancellationToken cancellationToken = default);
     Task<ProposalActionResult> ApproveAsync(Proposal proposal, CancellationToken cancellationToken = default);
     Task<ProposalActionResult> RejectAsync(Proposal proposal, CancellationToken cancellationToken = default);

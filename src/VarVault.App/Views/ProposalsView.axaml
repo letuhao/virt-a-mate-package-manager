@@ -16,13 +16,25 @@
     <TextBlock DockPanel.Dock="Top" Foreground="{DynamicResource TextLoBrush}" Margin="0,0,0,12"
                Text="Nothing runs unattended. The analyzer proposes; you approve." />
     <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
+    <c:PaginationBar DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                     PageNumber="{Binding CurrentPager.PageNumber}"
+                     PageCount="{Binding CurrentPager.PageCount}"
+                     PageSize="{Binding CurrentPager.PageSize}"
+                     TotalCount="{Binding PendingCount}"
+                     SummaryLabel="{Binding CurrentPager.SummaryLabel}"
+                     PreviousCommand="{Binding PreviousPageCommand}"
+                     NextCommand="{Binding NextPageCommand}"
+                     GoToPageCommand="{Binding GoToPageCommand}"
+                     PageSizeChangedCommand="{Binding ChangePageSizeCommand}" />
     <ScrollViewer>
       <ItemsControl ItemsSource="{Binding VisibleProposals}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="vm:ProposalRowViewModel">
             <c:Card Margin="0,0,0,10">
               <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto" >
-                <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,8,0"
+                          Command="{Binding ((vm:ProposalsViewModel)DataContext).ToggleSelectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                          CommandParameter="{Binding}" />
                 <TextBlock Grid.Column="1" Text="{Binding Icon}" FontSize="18" VerticalAlignment="Center" Margin="0,0,10,0" />
                 <StackPanel Grid.Column="2">
                   <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />

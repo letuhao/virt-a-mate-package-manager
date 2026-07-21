@@ -3,6 +3,7 @@ using VarVault.App.Services;
 using VarVault.App.ViewModels;
 using VarVault.Common;
 using VarVault.Sdk.Library;
+using VarVault.Sdk.Paging;
 using VarVault.Sdk.Settings;
 
 namespace VarVault.App.Tests;
@@ -34,20 +35,28 @@ public sealed class StubTiering(
 {
     public Task<TierClassCounts> ClassCountsAsync(CancellationToken ct = default) =>
         Task.FromResult(counts ?? new TierClassCounts(0, 0, 0));
+    public Task<PageResult<MisplacedItem>> MisplacedPageAsync(PageRequest request, CancellationToken ct = default) =>
+        Task.FromResult(new PageResult<MisplacedItem>(misplaced ?? [], (misplaced ?? []).Count, request.SafePageNumber, request.SafePageSize));
     public Task<IReadOnlyList<MisplacedItem>> MisplacedAsync(CancellationToken ct = default) =>
         Task.FromResult(misplaced ?? []);
     public Task<TierMigrationPlan> BuildPlanAsync(CancellationToken ct = default) =>
         Task.FromResult(plan ?? new TierMigrationPlan([], 0));
     public Task<TierPolicy> PolicyAsync(CancellationToken ct = default) =>
         Task.FromResult(new TierPolicy([]));
+    public Task<PageResult<StaleVersion>> StaleVersionsPageAsync(PageRequest request, CancellationToken ct = default) =>
+        Task.FromResult(new PageResult<StaleVersion>([], 0, request.SafePageNumber, request.SafePageSize));
     public Task<IReadOnlyList<StaleVersion>> StaleVersionsAsync(CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<StaleVersion>>([]);
 }
 
 public sealed class StubReclaim(IReadOnlyList<DuplicateGroup>? groups = null) : IReclaimService
 {
+    public Task<PageResult<DuplicateGroup>> ExactGroupsPageAsync(PageRequest request, CancellationToken ct = default) =>
+        Task.FromResult(new PageResult<DuplicateGroup>(groups ?? [], (groups ?? []).Count, request.SafePageNumber, request.SafePageSize));
     public Task<IReadOnlyList<DuplicateGroup>> ExactGroupsAsync(CancellationToken ct = default) =>
         Task.FromResult(groups ?? []);
+    public Task<PageResult<NearDuplicateGroup>> NearDuplicateGroupsPageAsync(PageRequest request, CancellationToken ct = default) =>
+        Task.FromResult(new PageResult<NearDuplicateGroup>([], 0, request.SafePageNumber, request.SafePageSize));
     public Task<IReadOnlyList<NearDuplicateGroup>> NearDuplicateGroupsAsync(CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<NearDuplicateGroup>>([]);
     public Task<ReclaimResult> TrashRedundantAsync(long keep, IReadOnlyList<long> trash, CancellationToken ct = default) =>
@@ -58,8 +67,12 @@ public sealed class StubHealth(IReadOnlyList<EncodingGroup>? groups = null) : IH
 {
     public Task<IReadOnlyList<EncodingGroup>> EncodingGroupsAsync(CancellationToken ct = default) =>
         Task.FromResult(groups ?? []);
+    public Task<PageResult<IntegrityIssue>> IntegrityPageAsync(PageRequest request, CancellationToken ct = default) =>
+        Task.FromResult(new PageResult<IntegrityIssue>([], 0, request.SafePageNumber, request.SafePageSize));
     public Task<IReadOnlyList<IntegrityIssue>> IntegrityAsync(CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<IntegrityIssue>>([]);
+    public Task<PageResult<IntegrityIssue>> MissingMetaPageAsync(PageRequest request, CancellationToken ct = default) =>
+        Task.FromResult(new PageResult<IntegrityIssue>([], 0, request.SafePageNumber, request.SafePageSize));
     public Task<IReadOnlyList<IntegrityIssue>> MissingMetaAsync(CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<IntegrityIssue>>([]);
     public Task<Result<long>> FixAsync(long varFileId, CancellationToken ct = default) =>
@@ -70,6 +83,8 @@ public sealed class StubProposals(IReadOnlyList<Proposal>? pending = null) : IPr
 {
     public List<Proposal> Approved { get; } = [];
     public List<Proposal> Rejected { get; } = [];
+    public Task<PageResult<Proposal>> ListPageAsync(ProposalKind? kind, PageRequest request, CancellationToken ct = default) =>
+        Task.FromResult(new PageResult<Proposal>((pending ?? []).Where(p => kind is null || p.Kind == kind.Value).ToList(), (pending ?? []).Count, request.SafePageNumber, request.SafePageSize));
     public Task<IReadOnlyList<Proposal>> ListAsync(CancellationToken ct = default) =>
         Task.FromResult(pending ?? []);
     public Task<ProposalActionResult> ApproveAsync(Proposal p, CancellationToken ct = default)
@@ -85,6 +100,8 @@ public sealed class StubTrash(
     public List<string> Restored { get; } = [];
     public List<string> Purged { get; } = [];
     public bool BackedUp { get; private set; }
+    public Task<PageResult<TrashItemDto>> ListPageAsync(PageRequest request, string? searchText = null, CancellationToken ct = default) =>
+        Task.FromResult(new PageResult<TrashItemDto>(items ?? [], (items ?? []).Count, request.SafePageNumber, request.SafePageSize));
     public Task<IReadOnlyList<TrashItemDto>> ListAsync(CancellationToken ct = default) =>
         Task.FromResult(items ?? []);
     public Task<Result> RestoreAsync(string id, CancellationToken ct = default)
@@ -112,6 +129,8 @@ public sealed class StubReposEmpty : VarVault.Sdk.Repositories.IRepositoryServic
 
 public sealed class StubMissing(IReadOnlyList<MissingDependency>? items = null) : IMissingDepsQuery
 {
+    public Task<PageResult<MissingDependency>> GetPageAsync(PageRequest request, string? searchText = null, CancellationToken ct = default) =>
+        Task.FromResult(new PageResult<MissingDependency>(items ?? [], (items ?? []).Count, request.SafePageNumber, request.SafePageSize));
     public Task<IReadOnlyList<MissingDependency>> GetMissingAsync(CancellationToken ct = default) => Task.FromResult(items ?? []);
 }
 
@@ -135,6 +154,7 @@ public sealed class StubPresetsMin : VarVault.Sdk.Presets.IPresetService
     public Task<bool> DeleteAsync(long id, CancellationToken ct = default) => Task.FromResult(true);
     public Task<Result<VarVault.Sdk.Presets.PresetInfo>> AddMemberAsync(long id, string r, CancellationToken ct = default) => throw new NotSupportedException();
     public Task<Result<VarVault.Sdk.Presets.PresetInfo>> RemoveMemberAsync(long id, string r, CancellationToken ct = default) => throw new NotSupportedException();
+    public Task<PageResult<string>> MembersPageAsync(long id, PageRequest request, CancellationToken ct = default) => Task.FromResult(new PageResult<string>([], 0, request.SafePageNumber, request.SafePageSize));
     public Task<IReadOnlyList<string>> MembersAsync(long id, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>([]);
     public Task<VarVault.Sdk.Presets.ActivationPreview?> PreviewActivationAsync(long id, CancellationToken ct = default) => Task.FromResult<VarVault.Sdk.Presets.ActivationPreview?>(null);
 }
@@ -144,6 +164,8 @@ public sealed class StubAnalytics(
     IReadOnlyList<SpaceByGroup>? byType = null,
     IReadOnlyList<SpaceByGroup>? byTier = null) : IAnalyticsService
 {
+    public Task<PageResult<SpaceByGroup>> SpaceByCreatorPageAsync(PageRequest request, CancellationToken ct = default) =>
+        Task.FromResult(new PageResult<SpaceByGroup>(byCreator ?? [], (byCreator ?? []).Count, request.SafePageNumber, request.SafePageSize));
     public Task<IReadOnlyList<SpaceByGroup>> SpaceByCreatorAsync(CancellationToken ct = default) => Task.FromResult(byCreator ?? []);
     public Task<IReadOnlyList<SpaceByGroup>> SpaceByTypeAsync(CancellationToken ct = default) => Task.FromResult(byType ?? []);
     public Task<IReadOnlyList<SpaceByGroup>> SpaceByTierAsync(CancellationToken ct = default) => Task.FromResult(byTier ?? []);
@@ -153,6 +175,8 @@ public sealed class StubActivityLog(IReadOnlyList<VarVault.Sdk.Activation.Activi
     : VarVault.Sdk.Activation.IActivityLog
 {
     public Task RecordAsync(string kind, string desc, long? pkg = null, CancellationToken ct = default) => Task.CompletedTask;
+    public Task<PageResult<VarVault.Sdk.Activation.ActivityRecord>> GetRecentPageAsync(PageRequest request, CancellationToken ct = default) =>
+        Task.FromResult(new PageResult<VarVault.Sdk.Activation.ActivityRecord>(records ?? [], (records ?? []).Count, request.SafePageNumber, request.SafePageSize));
     public Task<IReadOnlyList<VarVault.Sdk.Activation.ActivityRecord>> GetRecentAsync(int limit = 100, CancellationToken ct = default) =>
         Task.FromResult(records ?? []);
 }

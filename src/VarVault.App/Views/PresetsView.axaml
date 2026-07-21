@@ -68,17 +68,29 @@
                      Text="{Binding Preview.MissingRefs.Count, StringFormat='{}{0} missing'}" />
           <!-- Member table (GD-8) -->
           <TextBlock Text="Members" FontSize="10" Opacity="0.6" Margin="0,6,0,0" />
-          <ItemsControl ItemsSource="{Binding Members}" MaxHeight="240">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:PresetMemberRow">
-                <Grid ColumnDefinitions="*,Auto" Margin="0,1">
-                  <TextBlock Grid.Column="0" Text="{Binding Ref}" FontFamily="{DynamicResource MonoFont}" FontSize="12" VerticalAlignment="Center" />
-                  <c:StatePill Grid.Column="1" State="Miss" Text="missing" IsVisible="{Binding IsMissing}" />
-                  <c:StatePill Grid.Column="1" State="Ok" Text="ok" IsVisible="{Binding !IsMissing}" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+          <DockPanel>
+            <c:PaginationBar DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                             PageNumber="{Binding MembersPager.PageNumber}"
+                             PageCount="{Binding MembersPager.PageCount}"
+                             PageSize="{Binding MembersPager.PageSize}"
+                             TotalCount="{Binding MembersPager.TotalCount}"
+                             SummaryLabel="{Binding MembersPager.SummaryLabel}"
+                             PreviousCommand="{Binding MembersPreviousPageCommand}"
+                             NextCommand="{Binding MembersNextPageCommand}"
+                             GoToPageCommand="{Binding MembersGoToPageCommand}"
+                             PageSizeChangedCommand="{Binding MembersChangePageSizeCommand}" />
+            <ItemsControl ItemsSource="{Binding Members}" MaxHeight="240">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:PresetMemberRow">
+                  <Grid ColumnDefinitions="*,Auto" Margin="0,1">
+                    <TextBlock Grid.Column="0" Text="{Binding Ref}" FontFamily="{DynamicResource MonoFont}" FontSize="12" VerticalAlignment="Center" />
+                    <c:StatePill Grid.Column="1" State="Miss" Text="missing" IsVisible="{Binding IsMissing}" />
+                    <c:StatePill Grid.Column="1" State="Ok" Text="ok" IsVisible="{Binding !IsMissing}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </DockPanel>
           <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
             <Button Content="Activate &amp; switch" Command="{Binding ActivateAndSwitchCommand}"
                     Background="{DynamicResource AccentBrush}" Foreground="White"

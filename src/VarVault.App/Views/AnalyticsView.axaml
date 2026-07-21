@@ -25,19 +25,31 @@
         </c:Card>
 
         <c:Card Header="Top space by creator" Width="320" Margin="0,0,14,14">
-          <ItemsControl ItemsSource="{Binding ByCreator}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:SpaceRowViewModel">
-                <StackPanel Margin="0,3">
-                  <Grid ColumnDefinitions="*,Auto">
-                    <TextBlock Grid.Column="0" Text="{Binding Group}" />
-                    <TextBlock Grid.Column="1" Text="{Binding SizeLabel}" Opacity="0.7" FontFamily="{DynamicResource MonoFont}" />
-                  </Grid>
-                  <c:MeterBar Height="5" Margin="0,3,0,0" Value="{Binding Fraction}" Fill="{DynamicResource AccentBrush}" />
-                </StackPanel>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
+          <DockPanel>
+            <c:PaginationBar DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                             PageNumber="{Binding CreatorPager.PageNumber}"
+                             PageCount="{Binding CreatorPager.PageCount}"
+                             PageSize="{Binding CreatorPager.PageSize}"
+                             TotalCount="{Binding CreatorPager.TotalCount}"
+                             SummaryLabel="{Binding CreatorPager.SummaryLabel}"
+                             PreviousCommand="{Binding CreatorPreviousPageCommand}"
+                             NextCommand="{Binding CreatorNextPageCommand}"
+                             GoToPageCommand="{Binding CreatorGoToPageCommand}"
+                             PageSizeChangedCommand="{Binding CreatorChangePageSizeCommand}" />
+            <ItemsControl ItemsSource="{Binding ByCreator}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:SpaceRowViewModel">
+                  <StackPanel Margin="0,3">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Grid.Column="0" Text="{Binding Group}" />
+                      <TextBlock Grid.Column="1" Text="{Binding SizeLabel}" Opacity="0.7" FontFamily="{DynamicResource MonoFont}" />
+                    </Grid>
+                    <c:MeterBar Height="5" Margin="0,3,0,0" Value="{Binding Fraction}" Fill="{DynamicResource AccentBrush}" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </DockPanel>
         </c:Card>
 
         <c:Card Header="⚠ Wasting fast storage" Width="320" Margin="0,0,14,14">
