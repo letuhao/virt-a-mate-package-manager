@@ -28,6 +28,9 @@ public sealed class PackageListItem
     public ContentClass Class { get; set; } = ContentClass.Cold;
     public bool IsActive { get; set; }
 
+    /// <summary>When the package was linked into the active loading profile (null when not installed).</summary>
+    public DateTime? InstalledAt { get; set; }
+
     /// <summary>Direct-only, materialized bit — never computed transitively per grid row.</summary>
     public bool HasMissingDeps { get; set; }
 

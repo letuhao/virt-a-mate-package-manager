@@ -20,4 +20,9 @@ public interface IDependencyResolver
     /// Returns the number of edges re-resolved. (Checklist 2.7.)
     /// </summary>
     Task<int> ResolveFamilyAsync(string creator, string packageName, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Re-resolve only edges with one exact folded requested-reference key after an alias changes.
+    /// </summary>
+    Task<int> ResolveReferenceAsync(string requestedRef, CancellationToken cancellationToken = default);
 }

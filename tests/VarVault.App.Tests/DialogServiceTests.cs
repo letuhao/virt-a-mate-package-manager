@@ -76,13 +76,22 @@ public class DialogServiceTests
         Assert.False(modal.IsOpen);
         Assert.Null(shell.Dialogs.Current);
 
-        // Esc on the host also closes.
+        // Esc on the host also closes through the service (not just the visual host).
         shell.Dialogs.Show(new RescueViewModel(new StubActivation()));
         Dispatcher.UIThread.RunJobs();
         modal.Focus();
         modal.RaiseEvent(new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Escape });
         Dispatcher.UIThread.RunJobs();
         Assert.False(modal.IsOpen);
+        Assert.False(shell.Dialogs.IsOpen);
+        Assert.Null(shell.Dialogs.Current);
+
+        // Reopen after Esc — must show again (regression for modal lifecycle divergence).
+        shell.Dialogs.Show(new RescueViewModel(new StubActivation()));
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(modal.IsOpen);
+        Assert.True(shell.Dialogs.IsOpen);
+        Assert.NotNull(shell.Dialogs.Current);
     }
 
     [AvaloniaFact]
@@ -97,5 +106,54 @@ public class DialogServiceTests
         svc.Close();
         Assert.False(svc.IsOpen);
         Assert.Null(svc.Current);
+    }
+
+    [Fact]
+    public void Push_and_back_restore_previous_dialog()
+    {
+        var svc = new DialogService();
+        var first = new object();
+        var second = new object();
+        svc.Show(first);
+        svc.Push(second);
+        Assert.Same(second, svc.Current);
+        Assert.True(svc.CanGoBack);
+        svc.Back();
+        Assert.Same(first, svc.Current);
+        Assert.False(svc.CanGoBack);
+    }
+
+    [AvaloniaFact]
+    public async Task Nested_Esc_backs_then_closes()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var scope = host.Host.Services.CreateScope();
+        var shell = AppHost.CreateShell(scope.ServiceProvider);
+        var window = new MainWindow { DataContext = shell };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var modal = window.GetVisualDescendants().OfType<ModalHost>().Single();
+
+        var parent = new RescueViewModel(new StubActivation());
+        var child = new object();
+        shell.Dialogs.Show(parent);
+        shell.Dialogs.Push(child);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(modal.IsOpen);
+        Assert.Same(child, shell.Dialogs.Current);
+        Assert.True(shell.Dialogs.CanGoBack);
+
+        // First Esc/close-request pops the nested dialog.
+        modal.RequestClose();
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(modal.IsOpen);
+        Assert.Same(parent, shell.Dialogs.Current);
+        Assert.False(shell.Dialogs.CanGoBack);
+
+        // Second Esc closes the stack.
+        modal.RequestClose();
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(modal.IsOpen);
+        Assert.Null(shell.Dialogs.Current);
     }
 }

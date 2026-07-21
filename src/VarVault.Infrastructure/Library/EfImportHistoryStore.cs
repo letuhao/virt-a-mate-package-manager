@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using VarVault.Domain.Entities;
 using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Import;
+using VarVault.Sdk.Paging;
 using VarVault.Sdk.Settings;
 using VarVault.Sdk.Threading;
 
@@ -58,6 +59,50 @@ public sealed class EfImportHistoryStore(VarVaultDbContext db, IWriteQueue write
         return rows.Select(Map).ToList();
     }
 
+    public async Task<PageResult<ImportOutcome>> OutcomesPageAsync(
+        Guid runId,
+        PageRequest request,
+        string filter = "all",
+        string? searchText = null,
+        CancellationToken cancellationToken = default)
+    {
+        var page = request.Normalize();
+        var query = db.ImportOutcomes.AsNoTracking().Where(o => o.RunId == runId);
+
+        query = filter.ToLowerInvariant() switch
+        {
+            "failed" => query.Where(o => o.Result == "failed"),
+            "copied" => query.Where(o => o.Result == "ok"
+                && o.Reason != "skipped" && o.Reason != "cancelled" && o.Reason != "discarded"),
+            "skipped" => query.Where(o => o.Result == "ok"
+                && (o.Reason == "skipped" || o.Reason == "cancelled")),
+            "discarded" => query.Where(o => o.Result == "ok" && o.Reason == "discarded"),
+            _ => query,
+        };
+
+        var search = searchText?.Trim();
+        if (!string.IsNullOrEmpty(search))
+        {
+            var pattern = $"%{search}%";
+            query = query.Where(o =>
+                EF.Functions.Like(o.FileName, pattern)
+                || EF.Functions.Like(o.IdentityKey, pattern)
+                || (o.Reason != null && EF.Functions.Like(o.Reason, pattern)));
+        }
+
+        var total = await query.CountAsync(cancellationToken).ConfigureAwait(false);
+        var rows = await query.OrderBy(o => o.Id)
+            .Skip(page.Skip)
+            .Take(page.SafePageSize)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        return new PageResult<ImportOutcome>(
+            rows.Select(MapOutcome).ToList(),
+            total,
+            page.SafePageNumber,
+            page.SafePageSize);
+    }
+
     private async Task<int> ResolveKeepAsync(CancellationToken ct)
     {
         var raw = await settings.GetAsync(KeepKey, ct).ConfigureAwait(false);
@@ -74,4 +119,12 @@ public sealed class EfImportHistoryStore(VarVaultDbContext db, IWriteQueue write
             Enum.TryParse<ImportLane>(o.Lane, out var lane) ? lane : ImportLane.New,
             Enum.TryParse<ImportDecision>(o.Decision, out var dec) ? dec : ImportDecision.None,
             o.Result == "ok", o.Reason)).ToList());
+
+    private static ImportOutcome MapOutcome(ImportOutcomeEntity o) => new(
+        o.FileName,
+        o.IdentityKey,
+        Enum.TryParse<ImportLane>(o.Lane, out var lane) ? lane : ImportLane.New,
+        Enum.TryParse<ImportDecision>(o.Decision, out var decision) ? decision : ImportDecision.None,
+        o.Result == "ok",
+        o.Reason);
 }

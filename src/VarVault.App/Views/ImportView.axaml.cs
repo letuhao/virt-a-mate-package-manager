@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using VarVault.App.ViewModels;
 
 namespace VarVault.App.Views;
@@ -18,36 +19,52 @@ public partial class ImportView : UserControl
         AvaloniaXamlLoader.Load(this);
         // Tunnel so the mapped keys win before the ListBox's type-ahead search / Del handling. (6.6)
         AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
-        DataContextChanged += OnDataContextChanged;
+        DataContextChanged += (_, _) => WirePickers();
+        AttachedToVisualTree += (_, _) => WirePickers();
+        // DataContext may already be set by a DataTemplate before our handler was subscribed.
+        WirePickers();
     }
 
     /// <summary>Wire the native OS folder/archive pickers (Avalonia StorageProvider — no extra library). (QoL)</summary>
-    private void OnDataContextChanged(object? sender, System.EventArgs e)
+    private void WirePickers()
     {
         if (DataContext is not ImportViewModel vm)
             return;
-        vm.FolderPicker ??= PickFoldersAsync;
-        vm.ArchivePicker ??= PickArchivesAsync;
+        // Always reassign: the view may be rebound to a fresh VM after navigation.
+        vm.FolderPicker = PickFoldersAsync;
+        vm.ArchivePicker = PickArchivesAsync;
     }
 
     private async Task<IReadOnlyList<string>> PickFoldersAsync()
     {
-        var top = TopLevel.GetTopLevel(this);
+        var top = await ResolveTopLevelAsync().ConfigureAwait(true);
         if (top is null)
+        {
+            if (DataContext is ImportViewModel vm)
+                vm.StatusMessage = "Can't open the folder picker — window not ready. Try again.";
             return [];
+        }
         var folders = await top.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
             Title = "Select folders containing .var files",
             AllowMultiple = true,
         }).ConfigureAwait(true);
-        return folders.Select(f => f.Path.LocalPath).ToList();
+        return folders
+            .Select(f => f.TryGetLocalPath() ?? f.Path.LocalPath)
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Cast<string>()
+            .ToList();
     }
 
     private async Task<IReadOnlyList<string>> PickArchivesAsync()
     {
-        var top = TopLevel.GetTopLevel(this);
+        var top = await ResolveTopLevelAsync().ConfigureAwait(true);
         if (top is null)
+        {
+            if (DataContext is ImportViewModel vm)
+                vm.StatusMessage = "Can't open the archive picker — window not ready. Try again.";
             return [];
+        }
         var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = "Select archives (zip / 7z / rar / tar)",
@@ -58,7 +75,24 @@ public partial class ImportView : UserControl
                 FilePickerFileTypes.All,
             ],
         }).ConfigureAwait(true);
-        return files.Select(f => f.Path.LocalPath).ToList();
+        return files
+            .Select(f => f.TryGetLocalPath() ?? f.Path.LocalPath)
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Cast<string>()
+            .ToList();
+    }
+
+    /// <summary>
+    /// TopLevel can be null briefly after DataContext is set but before the control is attached.
+    /// Wait one layout pass so the native picker has a host window.
+    /// </summary>
+    private async Task<TopLevel?> ResolveTopLevelAsync()
+    {
+        var top = TopLevel.GetTopLevel(this) ?? this.GetVisualRoot() as TopLevel;
+        if (top is not null)
+            return top;
+        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { }, Avalonia.Threading.DispatcherPriority.Loaded);
+        return TopLevel.GetTopLevel(this) ?? this.GetVisualRoot() as TopLevel;
     }
 
     /// <summary>

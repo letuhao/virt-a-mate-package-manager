@@ -103,3 +103,25 @@ internal sealed class VarAliasConfig : IEntityTypeConfiguration<VarAlias>
             .OnDelete(DeleteBehavior.Cascade);
     }
 }
+
+internal sealed class ProfilePackageLinkConfig : IEntityTypeConfiguration<ProfilePackageLink>
+{
+    public void Configure(EntityTypeBuilder<ProfilePackageLink> b)
+    {
+        b.ToTable("ProfilePackageLink");
+        b.HasKey(x => new { x.ProfileId, x.PackageId });
+
+        b.HasIndex(x => x.PackageId);
+        b.HasIndex(x => new { x.ProfileId, x.InstalledAt });
+
+        b.HasOne(x => x.Profile)
+            .WithMany(p => p.PackageLinks)
+            .HasForeignKey(x => x.ProfileId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        b.HasOne(x => x.Package)
+            .WithMany()
+            .HasForeignKey(x => x.PackageId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}

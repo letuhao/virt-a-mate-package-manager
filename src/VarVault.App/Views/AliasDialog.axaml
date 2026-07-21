@@ -15,9 +15,7 @@
                      FilterMode="None" MinimumPrefixLength="0" />
     <TextBlock Text="{Binding SelectedOwned.VarName, StringFormat='→ {0}'}" Opacity="0.7"
                IsVisible="{Binding CanSave}" Foreground="{DynamicResource GoodBrush}" />
-    <TextBlock Text="Save scope" Opacity="0.8" />
-    <ComboBox HorizontalAlignment="Stretch" ItemsSource="{Binding ScopeOptions}" SelectedItem="{Binding Scope}" />
-    <TextBlock Text="Saved aliases re-apply automatically on every load &amp; preset switch." Opacity="0.7" TextWrapping="Wrap" />
+    <TextBlock Text="Saved aliases apply globally and are re-resolved immediately." Opacity="0.7" TextWrapping="Wrap" />
     <StackPanel Orientation="Horizontal" Spacing="8">
       <Button Content="Save alias" Command="{Binding SaveCommand}" Background="{DynamicResource AccentBrush}" Foreground="White" />
       <TextBlock Text="{Binding StatusMessage}" Opacity="0.8" VerticalAlignment="Center" Foreground="{DynamicResource GoodBrush}" />

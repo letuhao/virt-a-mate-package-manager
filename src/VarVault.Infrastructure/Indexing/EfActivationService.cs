@@ -8,6 +8,7 @@ using VarVault.Domain.Dependencies;
 using VarVault.Domain.Entities;
 using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Activation;
+using VarVault.Sdk.Library;
 using VarVault.Sdk.Settings;
 using VarVault.Sdk.Threading;
 
@@ -29,6 +30,7 @@ public sealed class EfActivationService(
     IVamProfileService profiles,
     ISymlinkService symlinks,
     IWriteQueue writeQueue,
+    IProfilePackageLinkService profileLinks,
     ILogger<EfActivationService> logger) : IActivationService
 {
     // Serializes filesystem link operations so two concurrent activations can't race on a profile dir. (T7.3)
@@ -61,6 +63,8 @@ public sealed class EfActivationService(
             db.ActivationLinks.RemoveRange(owned);
             await SaveAsync(cancellationToken).ConfigureAwait(false);
         }
+        await profileLinks.SyncFromActivationLinksAsync(profileId, cancellationToken).ConfigureAwait(false);
+        await profileLinks.RefreshActiveProfileReadModelAsync(cancellationToken).ConfigureAwait(false);
         return owned.Count;
     }
 
@@ -303,6 +307,10 @@ public sealed class EfActivationService(
 
             profile.IsActive = string.Equals(profile.Name, profiles.ActiveProfile(vamRoot), StringComparison.OrdinalIgnoreCase);
             await SaveAsync(cancellationToken).ConfigureAwait(false);
+
+            await profileLinks.SyncFromActivationLinksAsync(profile.Id, cancellationToken).ConfigureAwait(false);
+            if (profile.IsActive)
+                await profileLinks.RefreshActiveProfileReadModelAsync(cancellationToken).ConfigureAwait(false);
 
             return new ActivationBuildResult(present, removed, missing);
         }

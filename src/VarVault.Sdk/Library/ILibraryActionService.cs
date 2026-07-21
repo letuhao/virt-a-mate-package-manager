@@ -30,4 +30,8 @@ public interface ILibraryActionService
     /// doubles need not implement it; the real service overrides it. (doc 26 · G-1.1)</summary>
     Task<bool> SetFavoriteAsync(long packageId, bool isFavorite, CancellationToken cancellationToken = default)
         => Task.FromResult(false);
+
+    /// <summary>Bulk favorite/unfavorite in one write-queue transaction.</summary>
+    Task<BulkActionResult> SetFavoritesAsync(IReadOnlyList<long> packageIds, bool isFavorite, CancellationToken cancellationToken = default)
+        => Task.FromResult(new BulkActionResult(0, packageIds.Count));
 }

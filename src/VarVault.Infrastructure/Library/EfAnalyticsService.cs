@@ -12,16 +12,18 @@ public sealed class EfAnalyticsService(VarVaultDbContext db) : IAnalyticsService
     public async Task<PageResult<SpaceByGroup>> SpaceByCreatorPageAsync(PageRequest request, CancellationToken cancellationToken = default)
     {
         var page = request.Normalize();
+        // Project to anonymous type first — EF cannot translate `new SpaceByGroup(...)` inside GroupBy.
         var query = db.PackageListItems.AsNoTracking()
             .GroupBy(x => x.Creator)
-            .Select(g => new SpaceByGroup(g.Key, g.Sum(x => x.TotalSize), g.Count()));
+            .Select(g => new { Group = g.Key, TotalBytes = g.Sum(x => x.TotalSize), Count = g.Count() });
         var total = await query.CountAsync(cancellationToken).ConfigureAwait(false);
-        var items = await query
+        var rows = await query
             .OrderByDescending(x => x.TotalBytes)
             .ThenBy(x => x.Group)
             .Skip(page.Skip)
             .Take(page.SafePageSize)
             .ToListAsync(cancellationToken).ConfigureAwait(false);
+        var items = rows.Select(x => new SpaceByGroup(x.Group, x.TotalBytes, x.Count)).ToList();
         return new PageResult<SpaceByGroup>(items, total, page.SafePageNumber, page.SafePageSize);
     }
 

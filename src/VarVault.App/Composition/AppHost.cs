@@ -1,9 +1,12 @@
 using System.IO;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using VarVault.App.Services;
 using VarVault.App.ViewModels;
 using VarVault.Host;
 using VarVault.Sdk.Activation;
 using VarVault.Sdk.Library;
+using VarVault.Sdk.Threading;
 
 namespace VarVault.App.Composition;
 
@@ -23,6 +26,12 @@ public static class AppHost
         var launcher = new Services.DialogLauncher(services, dialogs,
             afterRepoAdded: () => EnqueueIndexAll(services),
             toast: (msg, undo) => shellRef?.ShowToast(msg, undo));
+
+        var importJobs = services.GetService<ImportJobRunner>()
+            ?? new ImportJobRunner(
+                services.GetRequiredService<Sdk.Threading.IJobQueue>(),
+                services.GetRequiredService<IServiceScopeFactory>());
+        var uiDispatcher = services.GetRequiredService<IUiDispatcher>();
 
         var screens = new Dictionary<string, object>
         {
@@ -44,7 +53,11 @@ public static class AppHost
             ["presets"] = new PresetsViewModel(services.GetRequiredService<Sdk.Presets.IPresetService>(), services.GetService<IProfileService>(), launcher, services.GetService<Sdk.Activation.IActivationService>(), services.GetService<Sdk.Settings.ISettingsService>()),
             ["tiering"] = new TieringViewModel(services.GetRequiredService<ITieringService>(), launcher, services.GetService<Sdk.Repositories.IRepositoryService>()),
             ["dupes"] = new DupesViewModel(services.GetRequiredService<IReclaimService>(), launcher),
-            ["import"] = new ImportViewModel(services.GetRequiredService<Sdk.Import.IImportService>(), services.GetRequiredService<Sdk.Repositories.IRepositoryService>()),
+            ["import"] = new ImportViewModel(
+                services.GetRequiredService<Sdk.Import.IImportService>(),
+                services.GetRequiredService<Sdk.Repositories.IRepositoryService>(),
+                importJobs,
+                uiDispatcher),
             ["history"] = new ActivityViewModel(services.GetRequiredService<IActivityLog>()),
             ["missing"] = new MissingDepsViewModel(services.GetRequiredService<IMissingDepsQuery>(), launcher, services.GetService<Sdk.Library.IMissingLogResolver>()),
             ["proposals"] = new ProposalsViewModel(services.GetRequiredService<IProposalService>(), launcher),
@@ -93,15 +106,20 @@ public static class AppHost
             lib.ShowToast = shell.ShowToast;
 
             // GA-4/AC-7 · log-dock "selected N" tracks the library selection when it is the active screen.
+            lib.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(LibraryViewModel.SelectedCount) && ReferenceEquals(shell.ActiveScreen, lib))
+                    shell.SelectedCount = lib.SelectedCount;
+            };
             lib.SelectedItems.CollectionChanged += (_, _) =>
             {
                 if (ReferenceEquals(shell.ActiveScreen, lib))
-                    shell.SelectedCount = lib.SelectedItems.Count;
+                    shell.SelectedCount = lib.SelectedCount;
             };
             shell.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(ShellViewModel.ActiveScreen))
-                    shell.SelectedCount = ReferenceEquals(shell.ActiveScreen, lib) ? lib.SelectedItems.Count : 0;
+                    shell.SelectedCount = ReferenceEquals(shell.ActiveScreen, lib) ? lib.SelectedCount : 0;
             };
 
             // AC-8 · top-bar search Enter → apply the text as the library filter and navigate there.
@@ -314,7 +332,12 @@ public static class AppHost
         try
         {
             Directory.CreateDirectory(dataDir);
-            var host = Bootstrap.BuildApp(dataDir);
+            var host = Bootstrap.BuildApp(dataDir, services =>
+            {
+                services.RemoveAll<IUiDispatcher>();
+                services.AddSingleton<IUiDispatcher, AvaloniaUiDispatcher>();
+                services.AddSingleton<ImportJobRunner>();
+            });
             var scope = host.Services.CreateScope(); // app-lifetime scope backing the shell's read services
             IndexerClientOverride.Current = IndexerProcessHost.ResolveClient(host.Services, dataDir);
             // Keep a worker reachable for the whole session (respawn/reconnect if it dies). (A12 liveness.)

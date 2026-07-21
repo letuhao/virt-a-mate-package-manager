@@ -100,6 +100,14 @@ public sealed class ShardedThumbnailStore : IThumbnailStore
         return await cmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not null;
     }
 
+    public Task PutContentAsync(long contentItemId, byte[] jpeg, CancellationToken cancellationToken = default) =>
+        PutAsync(ContentKey(contentItemId), jpeg, cancellationToken);
+
+    public Task<byte[]?> GetContentAsync(long contentItemId, CancellationToken cancellationToken = default) =>
+        GetAsync(ContentKey(contentItemId), cancellationToken);
+
+    private static long ContentKey(long contentItemId) => checked(-contentItemId);
+
     /// <summary>
     /// One-time migration from a legacy single-file <c>thumbnails.db</c> into the shards, then delete the legacy
     /// file (+ its WAL/SHM). No-op if the legacy file is absent, so it's safe to call on every launch. Preserves

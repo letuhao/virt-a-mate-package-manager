@@ -8,7 +8,7 @@ namespace VarVault.Sdk.Indexer;
 /// <summary>Protocol version for the GUI ↔ Indexer named-pipe contract. (A12.)</summary>
 public static class IndexerProtocol
 {
-    public const int Version = 1;
+    public const int Version = 2;
     public const string PipeNamePrefix = "VarVault.Indexer.";
 
     public static string PipeNameFor(string dataDirectoryHash) =>
@@ -40,6 +40,8 @@ public enum IndexerCommandKind
     RegisterOwner = 6,
     /// <summary>Detach the caller as an owner (clean GUI shutdown); worker may self-exit once idle+orphaned.</summary>
     UnregisterOwner = 7,
+    /// <summary>Extract and cache one requested content-item preview on demand.</summary>
+    ExtractContentPreview = 8,
 }
 
 public enum IndexerJobState
@@ -62,7 +64,8 @@ public sealed record IndexerCommand(
     /// <summary>The caller process id, so the worker can watch owner liveness and self-exit when orphaned.</summary>
     int? OwnerProcessId = null,
     /// <summary>Bypass the unchanged-repository fast-path and re-scan every file. (A16 manual re-index.)</summary>
-    bool ForceFull = false);
+    bool ForceFull = false,
+    long? ContentItemId = null);
 
 public sealed record IndexerStatus(
     int ProtocolVersion,
@@ -94,6 +97,10 @@ public interface IIndexerClient
 
     /// <summary>Detach on clean shutdown so the worker may self-exit once idle. (A12 liveness.)</summary>
     Task<Result> UnregisterOwnerAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Ask the writer worker to extract one content-item preview into the packed cache.</summary>
+    Task<Result> ExtractContentPreviewAsync(long contentItemId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Result.Failure("indexer.preview", "Content preview extraction is unavailable."));
 }
 
 /// <summary>

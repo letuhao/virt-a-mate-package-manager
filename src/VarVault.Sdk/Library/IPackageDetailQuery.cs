@@ -2,8 +2,43 @@ using VarVault.Sdk.Paging;
 
 namespace VarVault.Sdk.Library;
 
+/// <summary>Resolution state for a dependency edge shown in detail UI.</summary>
+public enum DependencyResolutionState
+{
+    Resolved = 0,
+    Missing = 1,
+    Substituted = 2,
+    Alias = 3,
+}
+
+/// <summary>Compact resolved package card for dependency navigation.</summary>
+public sealed record ResolvedPackageCard(
+    long PackageId,
+    string VarName,
+    string PrimaryType,
+    string StorageClass);
+
+/// <summary>A direct dependency edge with raw ref, resolution state, and optional resolved card.</summary>
+public sealed record DependencyEdgeDto(
+    string RequestedRefRaw,
+    string RequestedRefKey,
+    DependencyResolutionState State,
+    bool IsVersionSubstituted,
+    ResolvedPackageCard? ResolvedPackage);
+
+/// <summary>A package that depends on the current one (reverse closure entry).</summary>
+public sealed record ReverseDependentDto(
+    long PackageId,
+    string VarName,
+    string PrimaryType);
+
 /// <summary>A content entry inside a var (for the previews/content-items tab).</summary>
-public sealed record ContentItemDto(string Type, string EntryPath, bool IsPreset);
+public sealed record ContentItemDto(
+    long ContentItemId,
+    string Type,
+    string EntryPath,
+    bool IsPreset,
+    bool HasPreview);
 
 /// <summary>A physical copy of a package (for the copies & lineage tab).</summary>
 public sealed record CopyDto(long VarFileId, int Tier, string Path, long SizeBytes, bool IsOnline, long? FixedFromVarFileId);
@@ -27,49 +62,26 @@ public sealed record PackageDetail(
     long TotalSize,
     string StorageClass,
     int DependedOnByCount,
-    IReadOnlyList<long> ForwardClosure,
-    IReadOnlyList<ContentItemDto> ContentItems,
     IReadOnlyList<CopyDto> Copies);
 
 /// <summary>
-/// BE-N9 · Per-package detail: identity, license, class, reverse-dependent count, forward dependency
-/// closure, content items, and copies/lineage. (16-checklist BE-N9.)
+/// BE-N9 · Per-package detail: identity, license, class, reverse-dependent count, dependency edges,
+/// content items, and copies/lineage. (16-checklist BE-N9.)
 /// </summary>
 public interface IPackageDetailQuery
 {
-    async Task<PackageDetailOverview?> GetOverviewAsync(long packageId, CancellationToken cancellationToken = default)
-    {
-        var full = await GetAsync(packageId, cancellationToken).ConfigureAwait(false);
-        return full is null ? null : new PackageDetailOverview(
-            full.PackageId, full.VarName, full.IdentityKey, full.License, full.TotalSize, full.StorageClass, full.DependedOnByCount);
-    }
+    Task<PackageDetailOverview?> GetOverviewAsync(long packageId, CancellationToken cancellationToken = default);
 
-    async Task<PageResult<long>> GetForwardClosurePageAsync(long packageId, PageRequest request, CancellationToken cancellationToken = default)
-    {
-        var full = await GetAsync(packageId, cancellationToken).ConfigureAwait(false);
-        if (full is null)
-            return PageResult<long>.Empty(request);
-        var page = request.Normalize();
-        return new PageResult<long>(full.ForwardClosure.Skip(page.Skip).Take(page.SafePageSize).ToList(), full.ForwardClosure.Count, page.SafePageNumber, page.SafePageSize);
-    }
+    Task<PageResult<DependencyEdgeDto>> GetDirectDependenciesPageAsync(long packageId, PageRequest request, CancellationToken cancellationToken = default);
 
-    async Task<PageResult<ContentItemDto>> GetContentItemsPageAsync(long packageId, PageRequest request, CancellationToken cancellationToken = default)
-    {
-        var full = await GetAsync(packageId, cancellationToken).ConfigureAwait(false);
-        if (full is null)
-            return PageResult<ContentItemDto>.Empty(request);
-        var page = request.Normalize();
-        return new PageResult<ContentItemDto>(full.ContentItems.Skip(page.Skip).Take(page.SafePageSize).ToList(), full.ContentItems.Count, page.SafePageNumber, page.SafePageSize);
-    }
+    Task<PageResult<ReverseDependentDto>> GetReverseDependentsPageAsync(long packageId, PageRequest request, CancellationToken cancellationToken = default);
 
-    async Task<PageResult<CopyDto>> GetCopiesPageAsync(long packageId, PageRequest request, CancellationToken cancellationToken = default)
-    {
-        var full = await GetAsync(packageId, cancellationToken).ConfigureAwait(false);
-        if (full is null)
-            return PageResult<CopyDto>.Empty(request);
-        var page = request.Normalize();
-        return new PageResult<CopyDto>(full.Copies.Skip(page.Skip).Take(page.SafePageSize).ToList(), full.Copies.Count, page.SafePageNumber, page.SafePageSize);
-    }
+    Task<PageResult<DependencyEdgeDto>> GetSaveDependentsPageAsync(long packageId, PageRequest request, CancellationToken cancellationToken = default);
+
+    Task<PageResult<ContentItemDto>> GetContentItemsPageAsync(
+        long packageId, long? varFileId, PageRequest request, CancellationToken cancellationToken = default);
+
+    Task<PageResult<CopyDto>> GetCopiesPageAsync(long packageId, PageRequest request, CancellationToken cancellationToken = default);
 
     Task<PackageDetail?> GetAsync(long packageId, CancellationToken cancellationToken = default);
 }

@@ -96,6 +96,97 @@ public class LibraryViewModelStateTests
     }
 
     [Fact]
+    public async Task Select_all_matching_covers_unordered_snapshot_beyond_loaded_page()
+    {
+        var vm = new LibraryViewModel(new StubLibrary(250));
+        await vm.RefreshAsync();
+        Assert.Equal(100, vm.Items.Count);
+
+        vm.SelectAllMatching();
+
+        Assert.Equal(250, vm.SelectedCount);
+        Assert.Equal(100, vm.SelectedItems.Count); // projection is loaded rows only
+        Assert.Equal(250, await vm.CountAllMatchingAsync());
+    }
+
+    [Fact]
+    public async Task Unchecking_one_loaded_row_after_select_all_drops_only_that_id()
+    {
+        var vm = new LibraryViewModel(new StubLibrary(150));
+        await vm.RefreshAsync();
+        vm.SelectAllMatching();
+        Assert.Equal(150, vm.SelectedCount);
+
+        vm.SetSelected(vm.Items[0].PackageId, false);
+
+        Assert.Equal(149, vm.SelectedCount);
+        Assert.False(vm.IsSelected(vm.Items[0]));
+    }
+
+    [Fact]
+    public async Task Table_gallery_focus_survives_view_mode_toggle()
+    {
+        var vm = new LibraryViewModel(new StubLibrary(5));
+        await vm.RefreshAsync();
+        vm.SelectEntry(vm.Items[2]);
+        Assert.Equal(2, vm.SelectedEntry!.PackageId);
+
+        await vm.ToggleViewModeAsync();
+        Assert.Equal(LibraryViewMode.Gallery, vm.ViewMode);
+        Assert.Equal(2, vm.SelectedEntry!.PackageId);
+        Assert.True(vm.GalleryItems.Single(c => c.PackageId == 2).IsSelected);
+    }
+
+    [Fact]
+    public async Task Empty_preferences_keep_added_descending_default()
+    {
+        var vm = new LibraryViewModel(new StubLibrary(0), new FakeSettings());
+        await vm.LoadPreferencesAsync();
+        Assert.Equal(LibrarySort.Added, vm.Sort);
+        Assert.True(vm.Descending);
+    }
+
+    [Fact]
+    public async Task Refresh_clears_stale_focus_and_detail_selection()
+    {
+        var vm = new LibraryViewModel(new StubLibrary(2));
+        await vm.RefreshAsync();
+        vm.SelectEntry(vm.Items[0]);
+        vm.SelectAllMatching();
+        Assert.NotNull(vm.SelectedEntry);
+        Assert.Equal(2, vm.SelectedCount);
+
+        await vm.RefreshAsync();
+
+        Assert.Null(vm.SelectedEntry);
+        Assert.Null(vm.SelectedDetail);
+        Assert.Equal(0, vm.SelectedCount);
+        Assert.Empty(vm.SelectedItems);
+    }
+
+    [Fact]
+    public async Task Column_layout_round_trips_as_a_versioned_setting()
+    {
+        var settings = new FakeSettings();
+        var vm = new LibraryViewModel(new StubLibrary(0), settings);
+        await vm.SaveColumnLayoutAsync("[{\"Id\":\"Name\"}]");
+        Assert.Equal("[{\"Id\":\"Name\"}]", await vm.LoadColumnLayoutAsync());
+    }
+
+    [Fact]
+    public async Task Ensure_index_loaded_appends_until_target_is_covered()
+    {
+        var vm = new LibraryViewModel(new StubLibrary(250));
+        await vm.RefreshAsync();
+        Assert.Equal(100, vm.Items.Count);
+
+        await vm.EnsureIndexLoadedAsync(150);
+
+        Assert.True(vm.Items.Count > 150);
+        Assert.Contains(vm.Items, i => i.PackageId == 150);
+    }
+
+    [Fact]
     public async Task Typing_flags_count_approximate_then_exact_after_settle()
     {
         // A gate delay holds the debounced refresh open so the interim (approximate) state is observed
@@ -168,11 +259,16 @@ public class LibraryViewModelStateTests
 
         public Task<IReadOnlyList<long>> GetOrderedIdsAsync(LibraryQuery query, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<long>>(Enumerable.Range(0, total).Select(i => (long)i).ToList());
+
+        public Task<IReadOnlyList<PackageListEntry>> GetByIdsAsync(IReadOnlyList<long> packageIds, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<PackageListEntry>>(
+                packageIds.Select(i => new PackageListEntry(i, $"C.P.{i}", "C", "P", "1", "Scene", 1024, 1, 1, true, false, "Cold", false, null)).ToList());
     }
 
     private sealed class CountingLibrary(int total) : ILibraryQueryService
     {
         public int PageCalls { get; private set; }
+        public int ByIdsCalls { get; private set; }
 
         public Task<LibraryPage> GetPageAsync(LibraryQuery query, CancellationToken cancellationToken = default)
         {
@@ -184,6 +280,11 @@ public class LibraryViewModelStateTests
             Task.FromResult<IReadOnlyList<string>>(["C"]);
         public Task<IReadOnlyList<long>> GetOrderedIdsAsync(LibraryQuery query, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<long>>([]);
+        public Task<IReadOnlyList<PackageListEntry>> GetByIdsAsync(IReadOnlyList<long> packageIds, CancellationToken cancellationToken = default)
+        {
+            ByIdsCalls++;
+            return Task.FromResult<IReadOnlyList<PackageListEntry>>([]);
+        }
     }
 
     private sealed class ThrowingLibrary : ILibraryQueryService
@@ -194,6 +295,8 @@ public class LibraryViewModelStateTests
             Task.FromResult<IReadOnlyList<string>>([]);
         public Task<IReadOnlyList<long>> GetOrderedIdsAsync(LibraryQuery query, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<long>>([]);
+        public Task<IReadOnlyList<PackageListEntry>> GetByIdsAsync(IReadOnlyList<long> packageIds, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<PackageListEntry>>([]);
     }
 
     private sealed class FakeSettings : ISettingsService

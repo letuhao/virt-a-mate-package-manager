@@ -46,8 +46,8 @@ public class LibraryScreenTests
         window.Show();
         Dispatcher.UIThread.RunJobs();
 
-        var list = view.GetVisualDescendants().OfType<ListBox>().First(l => ReferenceEquals(l.ItemsSource, vm.Items) && l.IsVisible);
-        Assert.Equal(5, list.ItemCount);
+        var grid = view.GetVisualDescendants().OfType<Avalonia.Controls.DataGrid>().First(g => ReferenceEquals(g.ItemsSource, vm.Items) && g.IsVisible);
+        Assert.Equal(5, grid.ItemsSource!.Cast<object>().Count());
 
         vm.SelectedEntry = vm.Items[0];
         Dispatcher.UIThread.RunJobs();

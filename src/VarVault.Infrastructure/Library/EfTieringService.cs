@@ -32,6 +32,7 @@ public sealed class EfTieringService(VarVaultDbContext db, IRepositoryService re
     public async Task<PageResult<MisplacedItem>> MisplacedPageAsync(PageRequest request, CancellationToken cancellationToken = default)
     {
         var page = request.Normalize();
+        // Desired tiers are 1-based (Hot→1, Warm→2, Cold→3) — must match PlacementPolicy / TierPolicy.
         var query = db.PackageListItems.AsNoTracking()
             .Where(x => x.ActualTierMin != null)
             .Select(x => new
@@ -40,27 +41,27 @@ public sealed class EfTieringService(VarVaultDbContext db, IRepositoryService re
                 x.VarName,
                 x.Class,
                 Actual = x.ActualTierMin!.Value,
-                Desired = x.Class == ContentClass.Hot ? 0 : x.Class == ContentClass.Warm ? 1 : 2,
+                Desired = x.Class == ContentClass.Hot ? 1 : x.Class == ContentClass.Warm ? 2 : 3,
                 x.TotalSize,
             })
             .Where(x => x.Actual != x.Desired);
 
         var total = await query.CountAsync(cancellationToken).ConfigureAwait(false);
-        var items = await query
+        var rows = await query
             .OrderByDescending(x => x.TotalSize)
             .ThenBy(x => x.VarName)
             .ThenBy(x => x.PackageId)
             .Skip(page.Skip)
             .Take(page.SafePageSize)
-            .Select(x => new MisplacedItem(
-                x.PackageId,
-                x.VarName,
-                x.Class.ToString(),
-                x.Actual,
-                x.Desired,
-                x.TotalSize,
-                x.Desired < x.Actual ? $"{x.Class} sitting on slower tier" : $"{x.Class} wasting faster tier"))
             .ToListAsync(cancellationToken).ConfigureAwait(false);
+        var items = rows.Select(x => new MisplacedItem(
+            x.PackageId,
+            x.VarName,
+            x.Class.ToString(),
+            x.Actual,
+            x.Desired,
+            x.TotalSize,
+            x.Desired < x.Actual ? $"{x.Class} sitting on slower tier" : $"{x.Class} wasting faster tier")).ToList();
 
         return new PageResult<MisplacedItem>(items, total, page.SafePageNumber, page.SafePageSize);
     }

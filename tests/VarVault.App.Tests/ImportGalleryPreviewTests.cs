@@ -27,7 +27,7 @@ public sealed class ImportGalleryPreviewTests
     [AvaloniaFact]
     public async Task Gallery_extracts_and_decodes_a_real_var_preview()
     {
-        await using var host = TestHost.Create(withPersistence: true);
+        await using var host = TestHost.Create(withPersistence: true, configure: ImportTestHelpers.RegisterImportJobs);
         using var targetDir = new TempDirectory();
         using var importDir = new TempDirectory();
 
@@ -45,9 +45,7 @@ public sealed class ImportGalleryPreviewTests
             await scope.ServiceProvider.GetRequiredService<IIndexOrchestrator>().IndexAllAsync();
 
         using var read = host.Host.Services.CreateScope();
-        var vm = new ImportViewModel(
-            read.ServiceProvider.GetRequiredService<IImportService>(),
-            read.ServiceProvider.GetRequiredService<IRepositoryService>());
+        var vm = ImportTestHelpers.CreateImportViewModel(read.ServiceProvider);
         await vm.LoadAsync();
         vm.TargetRepo = vm.Repositories.First(r => r.Id == targetId);
         vm.AddSourcePath(importDir.Path);

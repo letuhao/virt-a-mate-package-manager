@@ -51,7 +51,7 @@ public class LibraryDetailActionTests
         var lib = new LibraryViewModel(new StubLibraryQuery(), reveal: reveal)
         {
             SelectedDetail = new PackageDetail(
-                1, "A.B.1", "AB1", null, 100, "Cold", 0, [], [],
+                1, "A.B.1", "AB1", null, 100, "Cold", 0,
                 new[]
                 {
                     new CopyDto(9, 3, @"E:\cold\A.B.1.var", 100, false, null), // offline copy

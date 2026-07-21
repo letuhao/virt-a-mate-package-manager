@@ -61,7 +61,7 @@
     <views:JobsPanelView DataContext="{Binding}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,44,14,0" />
 
     <!-- Modal dialog host (GA-1) — hosts whatever the dialog service currently shows -->
-    <c:ModalHost Content="{Binding Dialogs.Current}" IsOpen="{Binding Dialogs.IsOpen}" />
+    <c:ModalHost x:Name="ModalHost" Content="{Binding Dialogs.Current}" IsOpen="{Binding Dialogs.IsOpen}" />
 
     <!-- Toast (bottom-center) -->
     <c:Toast Message="{Binding ToastMessage}" IsOpen="{Binding ToastVisible}" HasUndo="{Binding ToastHasUndo}"

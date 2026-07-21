@@ -9,4 +9,8 @@ public interface IThumbnailStore
     Task PutAsync(long packageId, byte[] jpeg, CancellationToken cancellationToken = default);
     Task<byte[]?> GetAsync(long packageId, CancellationToken cancellationToken = default);
     Task<bool> ExistsAsync(long packageId, CancellationToken cancellationToken = default);
+
+    /// <summary>Content-item previews keyed by <see cref="ContentItem"/> id (negative shard key).</summary>
+    Task PutContentAsync(long contentItemId, byte[] jpeg, CancellationToken cancellationToken = default);
+    Task<byte[]?> GetContentAsync(long contentItemId, CancellationToken cancellationToken = default);
 }

@@ -17,8 +17,9 @@ public sealed class FakeDialogLauncher : IDialogLauncher
     public void OpenRescue() => Opened.Add("rescue");
     public void OpenOnboarding() => Opened.Add("onboarding");
     public void OpenMigratePlan() => Opened.Add("migrate");
-    public void OpenVarDetail(long packageId) => Opened.Add($"var-detail:{packageId}");
-    public void OpenAlias(string missingRef) => Opened.Add($"alias:{missingRef}");
+    public void OpenVarDetail(long packageId) => OpenVarDetail(packageId, push: false);
+    public void OpenVarDetail(long packageId, bool push) => Opened.Add($"var-detail:{packageId}{(push ? ":push" : "")}");
+    public void OpenAlias(string missingRef, Action? onSaved = null) => Opened.Add($"alias:{missingRef}");
     public void OpenConfirmDelete(IReadOnlyList<ConfirmItem> items, int reverseDepCount = 0) => Opened.Add($"confirm:{items.Count}");
     public void OpenFix(long varFileId, string? codepage) => Opened.Add($"fix:{codepage}");
     public void OpenDupeReview(DuplicateGroup group) => Opened.Add($"dupe:{group.IdentityKey}");

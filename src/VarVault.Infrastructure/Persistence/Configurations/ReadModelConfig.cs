@@ -18,6 +18,8 @@ internal sealed class PackageListItemConfig : IEntityTypeConfiguration<PackageLi
         b.HasIndex(x => new { x.PrimaryType, x.VarName });
         b.HasIndex(x => x.IsFavorite);
         b.HasIndex(x => x.HasMissingDeps);
+        b.HasIndex(x => new { x.AddedAt, x.VarName, x.PackageId });
+        b.HasIndex(x => new { x.InstalledAt, x.VarName, x.PackageId });
 
         b.HasOne(x => x.Package)
             .WithOne()

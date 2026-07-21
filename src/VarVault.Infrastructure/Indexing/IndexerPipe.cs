@@ -97,6 +97,19 @@ public sealed class NamedPipeIndexerClient(string pipeName, int ownerProcessId =
         return status.IsSuccess ? Result.Success() : Result.Failure(status.Error);
     }
 
+    public async Task<Result> ExtractContentPreviewAsync(long contentItemId, CancellationToken cancellationToken = default)
+    {
+        var status = await SendAsync(
+            new IndexerCommand(IndexerCommandKind.ExtractContentPreview, ContentItemId: contentItemId),
+            DefaultConnectTimeout,
+            cancellationToken).ConfigureAwait(false);
+        if (status.IsFailure)
+            return Result.Failure(status.Error);
+        return status.Value.Error is null
+            ? Result.Success()
+            : Result.Failure("indexer.preview", status.Value.Error);
+    }
+
     private async Task<Result<IndexerStatus>> SendAsync(
         IndexerCommand command, TimeSpan connectTimeout, CancellationToken cancellationToken)
     {

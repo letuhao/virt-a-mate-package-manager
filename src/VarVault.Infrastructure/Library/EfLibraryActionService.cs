@@ -6,6 +6,7 @@ using VarVault.Domain.Safety;
 using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Library;
 using VarVault.Sdk.Presets;
+using VarVault.Sdk.Threading;
 
 namespace VarVault.Infrastructure.Library;
 
@@ -41,9 +42,15 @@ public sealed class EfLibraryActionService(
 
     public async Task<BulkActionResult> DeleteAsync(IReadOnlyList<long> varFileIds, CancellationToken cancellationToken = default)
     {
-        // Load candidates + their identity groups so the predicate can confirm a surviving verified copy.
+        // Load only the selected candidates' identity groups so the predicate can confirm a surviving verified copy.
+        var identities = await db.VarFiles.AsNoTracking()
+            .Where(v => varFileIds.Contains(v.Id) && v.PackageId != null)
+            .Select(v => v.Package!.IdentityKey)
+            .Distinct()
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
         var rows = await db.VarFiles
-            .Where(v => v.PackageId != null)
+            .AsNoTracking()
+            .Where(v => v.PackageId != null && identities.Contains(v.Package!.IdentityKey))
             .Select(v => new
             {
                 v.Id, v.Package!.IdentityKey, v.ContentHash, v.RelativePath,
@@ -79,56 +86,96 @@ public sealed class EfLibraryActionService(
         return sb.ToString();
     }
 
-    public async Task<BulkActionResult> MoveToSubfolderAsync(IReadOnlyList<long> varFileIds, string subfolder, CancellationToken cancellationToken = default)
+    public Task<BulkActionResult> MoveToSubfolderAsync(IReadOnlyList<long> varFileIds, string subfolder, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(subfolder))
-            return new BulkActionResult(0, varFileIds.Count);
+            return Task.FromResult(new BulkActionResult(0, varFileIds.Count));
 
-        var rows = await db.VarFiles
-            .Where(v => varFileIds.Contains(v.Id))
-            .Select(v => new { v.Id, v.RelativePath, Mount = v.Repository!.MountPath })
-            .ToListAsync(cancellationToken).ConfigureAwait(false);
-        var byId = rows.ToDictionary(r => r.Id);
-
-        int ok = 0, fail = 0;
-        foreach (var id in varFileIds)
+        return writeQueue.EnqueueAsync(async ct =>
         {
-            if (!byId.TryGetValue(id, out var row)) { fail++; continue; }
+            var rows = await db.VarFiles
+                .Where(v => varFileIds.Contains(v.Id))
+                .Select(v => new { Entity = v, Mount = v.Repository!.MountPath })
+                .ToListAsync(ct).ConfigureAwait(false);
+            var byId = rows.ToDictionary(r => r.Entity.Id);
+            var moved = new List<(string Source, string Destination)>();
+            int ok = 0, fail = 0;
+            foreach (var id in varFileIds)
+            {
+                if (!byId.TryGetValue(id, out var row)) { fail++; continue; }
+                try
+                {
+                    var oldRelativePath = row.Entity.RelativePath;
+                    var fileName = Path.GetFileName(oldRelativePath);
+                    var newRel = Path.Combine(subfolder, fileName);
+                    var src = Path.Combine(row.Mount, oldRelativePath);
+                    var dst = Path.Combine(row.Mount, newRel);
+                    if (!File.Exists(src)) { fail++; continue; }
+                    Directory.CreateDirectory(Path.GetDirectoryName(dst)!);
+                    File.Move(src, dst, overwrite: false);
+                    moved.Add((src, dst));
+                    row.Entity.RelativePath = newRel;
+                    ok++;
+                }
+                catch (IOException) { fail++; }
+                catch (UnauthorizedAccessException) { fail++; }
+            }
+            if (ok == 0)
+                return new BulkActionResult(0, fail);
             try
             {
-                var fileName = Path.GetFileName(row.RelativePath);
-                var newRel = Path.Combine(subfolder, fileName);
-                var src = Path.Combine(row.Mount, row.RelativePath);
-                var dst = Path.Combine(row.Mount, newRel);
-                if (!File.Exists(src)) { fail++; continue; }
-                Directory.CreateDirectory(Path.GetDirectoryName(dst)!);
-                File.Move(src, dst, overwrite: false); // same-volume move within the repo → atomic rename
-                var entity = await db.VarFiles.FirstAsync(v => v.Id == id, cancellationToken).ConfigureAwait(false);
-                entity.RelativePath = newRel;
-                ok++;
+                await db.SaveChangesAsync(ct).ConfigureAwait(false);
+                return new BulkActionResult(ok, fail);
             }
-            catch (IOException) { fail++; }
-            catch (UnauthorizedAccessException) { fail++; }
-        }
-        // Single-writer discipline (CLAUDE.md): route the catalog write through the write queue. (AC-31)
-        await writeQueue.EnqueueAsync(ct => db.SaveChangesAsync(ct), cancellationToken: cancellationToken).ConfigureAwait(false);
-        return new BulkActionResult(ok, fail);
+            catch (DbUpdateException)
+            {
+                foreach (var move in moved.AsEnumerable().Reverse())
+                {
+                    try
+                    {
+                        if (File.Exists(move.Destination) && !File.Exists(move.Source))
+                            File.Move(move.Destination, move.Source);
+                    }
+                    catch (IOException)
+                    {
+                        // The catalog write failed; leave the filesystem failure visible for a later rescan.
+                    }
+                }
+                db.ChangeTracker.Clear();
+                return new BulkActionResult(0, fail + ok);
+            }
+        }, WritePriority.Interactive, cancellationToken);
     }
 
-    public async Task<bool> SetFavoriteAsync(long packageId, bool isFavorite, CancellationToken cancellationToken = default)
-    {
-        var pkg = await db.Packages.FirstOrDefaultAsync(p => p.Id == packageId, cancellationToken).ConfigureAwait(false);
-        if (pkg is null)
-            return false;
-        pkg.IsFavorite = isFavorite;
-        // Keep the materialized read model in sync so the grid/detail reflect it immediately (no re-index).
-        var item = await db.PackageListItems.FirstOrDefaultAsync(i => i.PackageId == packageId, cancellationToken).ConfigureAwait(false);
-        if (item is not null)
-            item.IsFavorite = isFavorite;
-        // Single-writer discipline (CLAUDE.md): route the catalog write through the write queue.
-        await writeQueue.EnqueueAsync(ct => db.SaveChangesAsync(ct), cancellationToken: cancellationToken).ConfigureAwait(false);
-        return true;
-    }
+    public Task<bool> SetFavoriteAsync(long packageId, bool isFavorite, CancellationToken cancellationToken = default) =>
+        writeQueue.EnqueueAsync(async ct =>
+        {
+            var pkg = await db.Packages.FirstOrDefaultAsync(p => p.Id == packageId, ct).ConfigureAwait(false);
+            if (pkg is null)
+                return false;
+            pkg.IsFavorite = isFavorite;
+            var item = await db.PackageListItems.FirstOrDefaultAsync(i => i.PackageId == packageId, ct).ConfigureAwait(false);
+            if (item is not null)
+                item.IsFavorite = isFavorite;
+            await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return true;
+        }, WritePriority.Interactive, cancellationToken);
+
+    public Task<BulkActionResult> SetFavoritesAsync(IReadOnlyList<long> packageIds, bool isFavorite, CancellationToken cancellationToken = default) =>
+        writeQueue.EnqueueAsync(async ct =>
+        {
+            if (packageIds.Count == 0)
+                return new BulkActionResult(0, 0);
+            var ids = packageIds.Distinct().ToList();
+            var packages = await db.Packages.Where(p => ids.Contains(p.Id)).ToListAsync(ct).ConfigureAwait(false);
+            var items = await db.PackageListItems.Where(i => ids.Contains(i.PackageId)).ToListAsync(ct).ConfigureAwait(false);
+            foreach (var pkg in packages)
+                pkg.IsFavorite = isFavorite;
+            foreach (var item in items)
+                item.IsFavorite = isFavorite;
+            await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return new BulkActionResult(packages.Count, ids.Count - packages.Count);
+        }, cancellationToken: cancellationToken);
 
     public async Task<TxtResolveResult> ResolveTxtAsync(string txt, CancellationToken cancellationToken = default)
     {

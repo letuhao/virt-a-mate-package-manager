@@ -18,7 +18,8 @@ public interface IDialogLauncher
     void OpenOnboarding();
     void OpenMigratePlan();
     void OpenVarDetail(long packageId);
-    void OpenAlias(string missingRef);
+    void OpenVarDetail(long packageId, bool push);
+    void OpenAlias(string missingRef, Action? onSaved = null);
     void OpenConfirmDelete(IReadOnlyList<ConfirmItem> items, int reverseDepCount = 0);
     void OpenFix(long varFileId, string? codepage);
     void OpenDupeReview(VarVault.Sdk.Library.DuplicateGroup group);
@@ -59,20 +60,34 @@ public sealed class DialogLauncher(
         dialogs.Show(vm);
     }
 
-    public void OpenVarDetail(long packageId)
+    public void OpenVarDetail(long packageId) => OpenVarDetail(packageId, push: false);
+
+    public void OpenVarDetail(long packageId, bool push)
     {
-        var vm = new VarDetailViewModel(services.GetRequiredService<Sdk.Library.IPackageDetailQuery>());
+        var vm = new VarDetailViewModel(
+            services.GetRequiredService<Sdk.Library.IPackageDetailQuery>(),
+            this,
+            services.GetService<IClipboard>() ?? new AvaloniaClipboard(),
+            services.GetService<VarVault.Domain.Indexing.IThumbnailStore>(),
+            VarVault.App.Composition.IndexerClientOverride.Current ?? services.GetService<Sdk.Indexer.IIndexerClient>());
         _ = vm.LoadAsync(packageId);
-        dialogs.Show(vm);
+        if (push)
+            dialogs.Push(vm);
+        else
+            dialogs.Show(vm);
     }
 
-    public void OpenAlias(string missingRef)
+    public void OpenAlias(string missingRef, Action? onSaved = null)
     {
         var vm = new AliasViewModel(
             services.GetRequiredService<Sdk.Library.IAliasService>(),
-            services.GetService<Sdk.Library.ILibraryQueryService>());
+            services.GetService<Sdk.Library.ILibraryQueryService>(),
+            close: () => dialogs.Back())
+        {
+            OnSaved = onSaved,
+        };
         vm.MissingRef = missingRef;
-        dialogs.Show(vm);
+        dialogs.Push(vm);
     }
 
     public void OpenConfirmDelete(IReadOnlyList<ConfirmItem> items, int reverseDepCount = 0)

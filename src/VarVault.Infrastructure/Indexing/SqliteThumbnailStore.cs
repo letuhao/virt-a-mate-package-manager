@@ -54,6 +54,12 @@ public sealed class SqliteThumbnailStore : IThumbnailStore
         return await cmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) is not null;
     }
 
+    public Task PutContentAsync(long contentItemId, byte[] jpeg, CancellationToken cancellationToken = default) =>
+        PutAsync(checked(-contentItemId), jpeg, cancellationToken);
+
+    public Task<byte[]?> GetContentAsync(long contentItemId, CancellationToken cancellationToken = default) =>
+        GetAsync(checked(-contentItemId), cancellationToken);
+
     private void EnsureSchema()
     {
         using var connection = new SqliteConnection(_connectionString);

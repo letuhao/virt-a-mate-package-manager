@@ -46,4 +46,14 @@ public sealed class InProcessIndexerClient(IIndexerWorker worker) : IIndexerClie
     // In-process: worker lifetime is tied to this process, so ownership is a no-op.
     public Task<Result> RegisterOwnerAsync(CancellationToken cancellationToken = default) => Task.FromResult(Result.Success());
     public Task<Result> UnregisterOwnerAsync(CancellationToken cancellationToken = default) => Task.FromResult(Result.Success());
+
+    public async Task<Result> ExtractContentPreviewAsync(long contentItemId, CancellationToken cancellationToken = default)
+    {
+        var status = await worker.HandleAsync(
+            new IndexerCommand(IndexerCommandKind.ExtractContentPreview, ContentItemId: contentItemId),
+            cancellationToken).ConfigureAwait(false);
+        return status.Error is null
+            ? Result.Success()
+            : Result.Failure("indexer.preview", status.Error);
+    }
 }

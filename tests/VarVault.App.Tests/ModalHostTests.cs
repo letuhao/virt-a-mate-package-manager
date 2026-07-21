@@ -10,7 +10,7 @@ using VarVault.TestKit;
 
 namespace VarVault.App.Tests;
 
-/// <summary>SC-9 · ModalHost: open shows; Esc, ×, and backdrop-click close; content/footer render. (16-checklist SC-9.)</summary>
+/// <summary>SC-9 · ModalHost: open shows; Esc, ×, and backdrop-click request close. (16-checklist SC-9.)</summary>
 [Trait("Category", TestCategories.Unit)]
 public class ModalHostTests
 {
@@ -23,6 +23,7 @@ public class ModalHostTests
             Footer = new Button { Content = "Cancel" },
             IsOpen = open,
         };
+        host.CloseRequested += (_, _) => host.IsOpen = false;
         var window = new Window { Width = 800, Height = 600, Content = host };
         window.Show();
         Dispatcher.UIThread.RunJobs();
@@ -71,7 +72,6 @@ public class ModalHostTests
     public void Backdrop_click_closes()
     {
         var (window, host) = Show(open: true);
-        // Click the top-left corner — the backdrop, not the centered dialog.
         window.MouseDown(new Point(5, 5), MouseButton.Left);
         window.MouseUp(new Point(5, 5), MouseButton.Left);
         Dispatcher.UIThread.RunJobs();

@@ -13,6 +13,9 @@ namespace VarVault.App.ViewModels;
 public sealed partial class GalleryCardViewModel(PackageListEntry entry, ThumbnailLoader<Bitmap>? loader)
     : ObservableObject
 {
+    private bool _loaded;
+    private bool _loading;
+
     public PackageListEntry Entry => entry;
     public long PackageId => entry.PackageId;
     public string PackageName => entry.PackageName;
@@ -29,22 +32,29 @@ public sealed partial class GalleryCardViewModel(PackageListEntry entry, Thumbna
     public string SizeText => Common.Formatting.ByteSize.Humanize(entry.TotalSize);
 
     [ObservableProperty] private Bitmap? _thumbnail;
+    [ObservableProperty] private bool _isSelected;
 
     public bool HasThumbnail => Thumbnail is not null;
 
     /// <summary>Load (and decode) the extracted preview thumbnail for this package, if one was indexed.</summary>
     public async Task LoadAsync()
     {
-        if (loader is null)
+        if (loader is null || _loaded || _loading)
             return;
+        _loading = true;
         try
         {
             Thumbnail = await loader.LoadAsync(PackageId).ConfigureAwait(true);
+            _loaded = true;
         }
         catch
         {
             Thumbnail = null; // decode failure → placeholder
         }
-        OnPropertyChanged(nameof(HasThumbnail));
+        finally
+        {
+            _loading = false;
+            OnPropertyChanged(nameof(HasThumbnail));
+        }
     }
 }

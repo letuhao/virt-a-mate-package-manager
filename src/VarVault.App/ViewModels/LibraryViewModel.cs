@@ -84,12 +84,12 @@ public sealed partial class LibraryViewModel(
     [RelayCommand]
     public async Task InstallSelectedAsync(CancellationToken cancellationToken = default)
     {
-        if (activation is null || presets is null || SelectedItems.Count == 0)
+        if (activation is null || presets is null || SelectedCount == 0)
             return;
         var presetId = await EnsureLibraryPresetAsync(cancellationToken).ConfigureAwait(true);
         if (presetId is null) { LastActionMessage = "Could not prepare the library preset."; return; }
-        var count = SelectedItems.Count;
-        foreach (var entry in SelectedItems.ToList())
+        var count = SelectedCount;
+        foreach (var entry in await ResolveSelectedEntriesAsync(cancellationToken).ConfigureAwait(true))
             await presets.AddMemberAsync(presetId.Value, entry.VarName, cancellationToken).ConfigureAwait(true);
         var r = await activation.BuildProfileLinksAsync(presetId.Value, cancellationToken).ConfigureAwait(true);
         LastActionMessage = r.PrivilegeFailures > 0
@@ -102,13 +102,13 @@ public sealed partial class LibraryViewModel(
     [RelayCommand]
     public async Task UninstallSelectedAsync(CancellationToken cancellationToken = default)
     {
-        if (activation is null || presets is null || SelectedItems.Count == 0)
+        if (activation is null || presets is null || SelectedCount == 0)
             return;
         var presetId = await EnsureLibraryPresetAsync(cancellationToken).ConfigureAwait(true);
         if (presetId is null)
             return;
-        var count = SelectedItems.Count;
-        foreach (var entry in SelectedItems.ToList())
+        var count = SelectedCount;
+        foreach (var entry in await ResolveSelectedEntriesAsync(cancellationToken).ConfigureAwait(true))
             await presets.RemoveMemberAsync(presetId.Value, entry.VarName, cancellationToken).ConfigureAwait(true);
         var r = await activation.BuildProfileLinksAsync(presetId.Value, cancellationToken).ConfigureAwait(true);
         LastActionMessage = $"Uninstalled {count} selected → {r.LinksRemoved} links removed";
@@ -117,6 +117,7 @@ public sealed partial class LibraryViewModel(
 
     /// <summary>Presets available as add-to-preset targets (drives the ops-bar "Add to preset…" flyout). (AC-2)</summary>
     public ObservableCollection<Sdk.Presets.PresetInfo> Presets { get; } = [];
+    [ObservableProperty] private Sdk.Presets.PresetInfo? _selectedPreset;
 
     private async Task LoadPresetsAsync(CancellationToken cancellationToken)
     {
@@ -134,22 +135,55 @@ public sealed partial class LibraryViewModel(
         var items = new List<ConfirmItem>();
         if (detail is null)
             return items;
-        foreach (var pkg in SelectedItems.ToList())
+        foreach (var pkg in await ResolveSelectedEntriesAsync(cancellationToken).ConfigureAwait(true))
         {
-            var d = await detail.GetAsync(pkg.PackageId, cancellationToken).ConfigureAwait(true);
-            if (d is null)
-                continue;
-            foreach (var copy in d.Copies)
+            foreach (var copy in await GetAllCopiesAsync(pkg.PackageId, cancellationToken).ConfigureAwait(true))
                 items.Add(new ConfirmItem(copy.VarFileId, pkg.VarName, pkg.IsSingleCopy));
         }
         return items;
+    }
+
+    /// <summary>Materialize selected package IDs in bounded batches (supports select-all-matching beyond the loaded page).</summary>
+    private async Task<IReadOnlyList<PackageListEntry>> ResolveSelectedEntriesAsync(CancellationToken cancellationToken)
+    {
+        if (_selectedPackageIds.Count == 0)
+            return [];
+        var loaded = Items.Where(i => _selectedPackageIds.Contains(i.PackageId)).ToDictionary(i => i.PackageId);
+        if (loaded.Count == _selectedPackageIds.Count)
+            return _selectedPackageIds.Select(id => loaded[id]).ToList();
+
+        var result = new List<PackageListEntry>(_selectedPackageIds.Count);
+        foreach (var batch in _selectedPackageIds.Chunk(1_000))
+        {
+            var rows = await library.GetByIdsAsync(batch.ToList(), cancellationToken).ConfigureAwait(true);
+            result.AddRange(rows);
+        }
+        return result;
+    }
+
+    private async Task<IReadOnlyList<CopyDto>> GetAllCopiesAsync(long packageId, CancellationToken cancellationToken)
+    {
+        if (detail is null)
+            return [];
+        var result = new List<CopyDto>();
+        const int pageSize = 100;
+        for (var pageNumber = 1; ; pageNumber++)
+        {
+            var page = await detail.GetCopiesPageAsync(
+                packageId,
+                new Sdk.Paging.PageRequest(pageNumber, pageSize),
+                cancellationToken).ConfigureAwait(true);
+            result.AddRange(page.Items);
+            if (result.Count >= page.TotalCount || page.Items.Count == 0)
+                return result;
+        }
     }
 
     /// <summary>Ops-bar "Delete": open the predicate-gated confirm dialog for the selection. (AC-1/AC-4)</summary>
     [RelayCommand]
     public async Task DeleteSelectedAsync(CancellationToken cancellationToken = default)
     {
-        if (launcher is null || SelectedItems.Count == 0)
+        if (launcher is null || SelectedCount == 0)
         {
             LastActionMessage = "Nothing selected";
             return;
@@ -157,8 +191,8 @@ public sealed partial class LibraryViewModel(
         var items = await SelectedConfirmItemsAsync(cancellationToken).ConfigureAwait(true);
         var reverseDeps = 0;
         if (detail is not null)
-            foreach (var pkg in SelectedItems.ToList())
-                reverseDeps += (await detail.GetAsync(pkg.PackageId, cancellationToken).ConfigureAwait(true))?.DependedOnByCount ?? 0;
+            foreach (var pkg in await ResolveSelectedEntriesAsync(cancellationToken).ConfigureAwait(true))
+                reverseDeps += (await detail.GetOverviewAsync(pkg.PackageId, cancellationToken).ConfigureAwait(true))?.DependedOnByCount ?? 0;
         launcher.OpenConfirmDelete(items, reverseDeps);
     }
 
@@ -166,7 +200,7 @@ public sealed partial class LibraryViewModel(
     [RelayCommand]
     public async Task FixEncodingSelectedAsync(CancellationToken cancellationToken = default)
     {
-        if (actions is null || SelectedItems.Count == 0)
+        if (actions is null || SelectedCount == 0)
         {
             LastActionMessage = "Nothing selected";
             return;
@@ -189,7 +223,7 @@ public sealed partial class LibraryViewModel(
     [RelayCommand]
     public async Task MoveToSubfolderAsync(CancellationToken cancellationToken = default)
     {
-        if (actions is null || SelectedItems.Count == 0 || string.IsNullOrWhiteSpace(SubfolderName))
+        if (actions is null || SelectedCount == 0 || string.IsNullOrWhiteSpace(SubfolderName))
         {
             LastActionMessage = "Select rows and enter a sub-folder";
             return;
@@ -200,9 +234,23 @@ public sealed partial class LibraryViewModel(
         ShowToast?.Invoke($"Moved {result.Succeeded} files to {SubfolderName}", null);
     }
 
-    /// <summary>Ops-bar "select all N matching": select every currently-loaded row. (AC-9)</summary>
+    /// <summary>Ops-bar "Select all matching": select every package id in the current OrderedSnapshot. (1.49)</summary>
     [RelayCommand]
-    public void SelectAllMatching() => SelectVisible();
+    public void SelectAllMatching()
+    {
+        _selectedPackageIds.Clear();
+        if (_orderedIds.Count > 0)
+        {
+            foreach (var id in _orderedIds)
+                _selectedPackageIds.Add(id);
+        }
+        else
+        {
+            foreach (var item in Items)
+                _selectedPackageIds.Add(item.PackageId);
+        }
+        SyncSelectedItemsProjection();
+    }
 
     /// <summary>Row checkbox: toggle a single row's membership in the ops selection. (AC-11)</summary>
     [RelayCommand]
@@ -210,14 +258,11 @@ public sealed partial class LibraryViewModel(
     {
         if (entry is null)
             return;
-        if (SelectedItems.Contains(entry))
-            SelectedItems.Remove(entry);
-        else
-            SelectedItems.Add(entry);
+        SetSelected(entry.PackageId, !_selectedPackageIds.Contains(entry.PackageId));
     }
 
     /// <summary>Whether a row is in the ops selection (drives the row checkbox state). (AC-11)</summary>
-    public bool IsSelected(PackageListEntry entry) => SelectedItems.Contains(entry);
+    public bool IsSelected(PackageListEntry entry) => entry is not null && _selectedPackageIds.Contains(entry.PackageId);
 
     /// <summary>Per-row "Fix Var" (rebuild): fix encoding on that package's var files. (AC-11)</summary>
     [RelayCommand]
@@ -225,10 +270,10 @@ public sealed partial class LibraryViewModel(
     {
         if (actions is null || entry is null || detail is null)
             return;
-        var d = await detail.GetAsync(entry.PackageId, cancellationToken).ConfigureAwait(true);
-        if (d is null)
+        var copies = await GetAllCopiesAsync(entry.PackageId, cancellationToken).ConfigureAwait(true);
+        if (copies.Count == 0)
             return;
-        var result = await actions.FixEncodingAsync(d.Copies.Select(c => c.VarFileId).ToList(), cancellationToken).ConfigureAwait(true);
+        var result = await actions.FixEncodingAsync(copies.Select(c => c.VarFileId).ToList(), cancellationToken).ConfigureAwait(true);
         LastActionMessage = $"Fixed {result.Succeeded} ({result.Failed} skipped)";
         ShowToast?.Invoke($"Fixed {entry.VarName}", null);
     }
@@ -237,16 +282,22 @@ public sealed partial class LibraryViewModel(
     [RelayCommand]
     public async Task AddToPresetAsync(long presetId, CancellationToken cancellationToken = default)
     {
-        if (actions is null || SelectedItems.Count == 0)
+        if (actions is null || SelectedCount == 0)
         {
             LastActionMessage = "Nothing selected";
             return;
         }
-        var ids = SelectedItems.Select(s => s.PackageId).ToList();
+        var ids = _selectedPackageIds.ToList();
         var result = await actions.AddToPresetAsync(presetId, ids, cancellationToken).ConfigureAwait(true);
         LastActionMessage = $"Added {result.Succeeded} to preset";
         ShowToast?.Invoke($"Added {result.Succeeded} packages to preset", null);
     }
+
+    [RelayCommand]
+    private Task AddToSelectedPresetAsync(CancellationToken cancellationToken = default) =>
+        SelectedPreset is null
+            ? Task.CompletedTask
+            : AddToPresetAsync(SelectedPreset.Id, cancellationToken);
     private const int PageSize = 100;
 
     /// <summary>How long typing must settle before the exact faceted count is recomputed. (1.41)</summary>
@@ -257,12 +308,66 @@ public sealed partial class LibraryViewModel(
     private const string PrefDescending = "library.descending";
     private const string PrefViewMode = "library.view_mode";
     private const string PrefCreator = "library.creator";
+    private const string PrefTagId = "library.tag_id";
+    private const string PrefDetailWidth = "library.detail_width";
+    private const string PrefColumns = "library.columns.v1";
+    private const string PrefFavoritesOnly = "library.favorites_only";
+    private const string PrefMissingDepsOnly = "library.missing_deps_only";
+    private const string PrefInstalledOnly = "library.installed_only";
+    private const string PrefSingleCopyOnly = "library.single_copy_only";
 
     public ObservableCollection<PackageListEntry> Items { get; } = [];
     public ObservableCollection<string> Creators { get; } = [];
     /// <summary>Creators with owned-package counts for the searchable creator combo. (AC-10)</summary>
     public ObservableCollection<Controls.ComboOption> CreatorOptions { get; } = [];
-    public ObservableCollection<PackageListEntry> SelectedItems { get; } = [];
+    /// <summary>Canonical bulk selection by package id (covers unloaded OrderedSnapshot members).</summary>
+    private readonly HashSet<long> _selectedPackageIds = [];
+    private bool _projectingSelection;
+    private ObservableCollection<PackageListEntry>? _selectedItems;
+    /// <summary>Loaded-row projection of the ID selection for DataGrid checkbox sync.</summary>
+    public ObservableCollection<PackageListEntry> SelectedItems
+    {
+        get
+        {
+            if (_selectedItems is null)
+            {
+                _selectedItems = [];
+                _selectedItems.CollectionChanged += OnSelectedItemsMutated;
+            }
+            return _selectedItems;
+        }
+    }
+    /// <summary>Total bulk-selected packages, including ones not yet loaded into <see cref="Items"/>.</summary>
+    public int SelectedCount => _selectedPackageIds.Count;
+
+    private void OnSelectedItemsMutated(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        if (_projectingSelection)
+            return;
+        switch (e.Action)
+        {
+            case System.Collections.Specialized.NotifyCollectionChangedAction.Add when e.NewItems is not null:
+                foreach (PackageListEntry item in e.NewItems)
+                    _selectedPackageIds.Add(item.PackageId);
+                break;
+            case System.Collections.Specialized.NotifyCollectionChangedAction.Remove when e.OldItems is not null:
+                foreach (PackageListEntry item in e.OldItems)
+                    _selectedPackageIds.Remove(item.PackageId);
+                break;
+            case System.Collections.Specialized.NotifyCollectionChangedAction.Reset:
+                _selectedPackageIds.Clear();
+                foreach (var item in SelectedItems)
+                    _selectedPackageIds.Add(item.PackageId);
+                break;
+            case System.Collections.Specialized.NotifyCollectionChangedAction.Replace when e.NewItems is not null && e.OldItems is not null:
+                foreach (PackageListEntry item in e.OldItems)
+                    _selectedPackageIds.Remove(item.PackageId);
+                foreach (PackageListEntry item in e.NewItems)
+                    _selectedPackageIds.Add(item.PackageId);
+                break;
+        }
+        OnPropertyChanged(nameof(SelectedCount));
+    }
 
     /// <summary>Facet "Installed" filter — active profile members only (prototype checkbox). (AC-10)</summary>
     [ObservableProperty] private bool _installedOnly;
@@ -275,8 +380,8 @@ public sealed partial class LibraryViewModel(
     [ObservableProperty] private string? _searchText;
     [ObservableProperty] private bool _favoritesOnly;
     [ObservableProperty] private bool _missingDepsOnly;
-    [ObservableProperty] private LibrarySort _sort = LibrarySort.Name;
-    [ObservableProperty] private bool _descending;
+    [ObservableProperty] private LibrarySort _sort = LibrarySort.Added;
+    [ObservableProperty] private bool _descending = true;
     [ObservableProperty] private LibraryViewMode _viewMode = LibraryViewMode.Table;
     [ObservableProperty] private int _totalCount;
     [ObservableProperty] private LibraryState _state = LibraryState.Loading;
@@ -289,20 +394,28 @@ public sealed partial class LibraryViewModel(
     [ObservableProperty] private Avalonia.Media.Imaging.Bitmap? _selectedThumbnail;
     public bool HasSelectedThumbnail => SelectedThumbnail is not null;
     partial void OnSelectedThumbnailChanged(Avalonia.Media.Imaging.Bitmap? value) => OnPropertyChanged(nameof(HasSelectedThumbnail));
+    private int _detailGeneration;
 
-    partial void OnSelectedEntryChanged(PackageListEntry? value) => _ = LoadSelectedDetailAsync(value);
-
-    private async Task LoadSelectedDetailAsync(PackageListEntry? entry)
+    private async Task LoadSelectedDetailAsync(PackageListEntry? entry, int generation)
     {
         if (detail is null || entry is null)
         {
-            SelectedDetail = null;
-            SelectedThumbnail = null;
+            if (generation == _detailGeneration)
+            {
+                SelectedDetail = null;
+                SelectedThumbnail = null;
+            }
             return;
         }
-        SelectedDetail = await detail.GetAsync(entry.PackageId).ConfigureAwait(true);
-        // G-2.4 · load the extracted preview for the detail hero (per-package thumbnail store).
-        SelectedThumbnail = _thumbLoader is null ? null : await _thumbLoader.LoadAsync(entry.PackageId).ConfigureAwait(true);
+        var detailTask = detail.GetAsync(entry.PackageId);
+        var thumbnailTask = _thumbLoader is null
+            ? Task.FromResult<Avalonia.Media.Imaging.Bitmap?>(null)
+            : _thumbLoader.LoadAsync(entry.PackageId);
+        await Task.WhenAll(detailTask, thumbnailTask).ConfigureAwait(true);
+        if (generation != _detailGeneration || SelectedEntry?.PackageId != entry.PackageId)
+            return;
+        SelectedDetail = await detailTask.ConfigureAwait(true);
+        SelectedThumbnail = await thumbnailTask.ConfigureAwait(true);
     }
 
     /// <summary>Detail-panel "resolve via alias →": open the alias dialog for the selected package. (AC-13)</summary>
@@ -363,50 +476,69 @@ public sealed partial class LibraryViewModel(
     public string CreatorHeader => "Creator" + Caret(LibrarySort.Creator);
     public string SizeHeader => "Size" + Caret(LibrarySort.Size);
     public string ClassHeader => "Class" + Caret(LibrarySort.Class);
+    public string AddedHeader => "Added" + Caret(LibrarySort.Added);
+    public string InstalledHeader => "Installed" + Caret(LibrarySort.Installed);
     private void NotifySortHeaders()
     {
         OnPropertyChanged(nameof(NameHeader));
         OnPropertyChanged(nameof(CreatorHeader));
         OnPropertyChanged(nameof(SizeHeader));
         OnPropertyChanged(nameof(ClassHeader));
+        OnPropertyChanged(nameof(AddedHeader));
+        OnPropertyChanged(nameof(InstalledHeader));
     }
 
     private int _loaded;
+    private int _refreshGeneration;
+    private IReadOnlyList<long> _orderedIds = [];
+    [ObservableProperty] private bool _isLoadingMore;
+    [ObservableProperty] private long? _selectedTagId;
+    [ObservableProperty] private double _detailPanelWidth = 360;
 
     /// <summary>Whether more rows remain beyond what's loaded (drives incremental scroll load).</summary>
     public bool HasMore => _loaded < TotalCount;
 
     /// <summary>ILoadableScreen: the shell loads the library by refreshing it. (G-0)</summary>
-    Task ILoadableScreen.LoadAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
+    async Task ILoadableScreen.LoadAsync(CancellationToken cancellationToken)
+    {
+        await LoadPreferencesAsync(cancellationToken).ConfigureAwait(true);
+        await RefreshAsync(cancellationToken).ConfigureAwait(true);
+    }
 
     [RelayCommand]
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {
+        var generation = ++_refreshGeneration;
         State = LibraryState.Loading;
         NotifyStateFlags();
         try
         {
             Items.Clear();
             GalleryItems.Clear();
+            _selectedPackageIds.Clear();
             SelectedItems.Clear();
+            OnPropertyChanged(nameof(SelectedCount));
+            SelectedEntry = null;
+            SelectedDetail = null;
+            SelectedThumbnail = null;
             _loaded = 0;
+            _orderedIds = [];
 
-            if (Creators.Count == 0)
-            {
-                foreach (var creator in await library.GetCreatorsAsync(cancellationToken).ConfigureAwait(true))
-                    Creators.Add(creator);
-                var counts = await library.GetCreatorCountsAsync(cancellationToken).ConfigureAwait(true);
-                foreach (var c in counts)
-                    CreatorOptions.Add(new Controls.ComboOption(c.Creator, c.Count));
-            }
+            Creators.Clear();
+            CreatorOptions.Clear();
+            foreach (var creator in await library.GetCreatorsAsync(cancellationToken).ConfigureAwait(true))
+                Creators.Add(creator);
+            var counts = await library.GetCreatorCountsAsync(cancellationToken).ConfigureAwait(true);
+            foreach (var c in counts)
+                CreatorOptions.Add(new Controls.ComboOption(c.Creator, c.Count));
 
-            if (Presets.Count == 0)
-                await LoadPresetsAsync(cancellationToken).ConfigureAwait(true);
+            await LoadPresetsAsync(cancellationToken).ConfigureAwait(true);
+            await LoadTagsAsync(cancellationToken).ConfigureAwait(true);
 
-            if (Tags.Count == 0)
-                await LoadTagsAsync(cancellationToken).ConfigureAwait(true);
-
+            _orderedIds = await library.GetOrderedIdsAsync(CurrentQuery(0, 1), cancellationToken).ConfigureAwait(true);
             await LoadPageAsync(cancellationToken).ConfigureAwait(true);
+            if (generation != _refreshGeneration)
+                return;
             State = Items.Count == 0 ? LibraryState.Empty : LibraryState.Loaded;
             IsCountApproximate = false; // the count now reflects the settled query exactly
         }
@@ -421,7 +553,105 @@ public sealed partial class LibraryViewModel(
     }
 
     [RelayCommand(CanExecute = nameof(HasMore))]
-    public Task LoadMoreAsync(CancellationToken cancellationToken = default) => LoadPageAsync(cancellationToken);
+    public async Task LoadMoreAsync(CancellationToken cancellationToken = default)
+    {
+        if (IsLoadingMore)
+            return;
+        IsLoadingMore = true;
+        var generation = _refreshGeneration;
+        var skip = _loaded;
+        try
+        {
+            var page = await LoadSnapshotSliceAsync(skip, PageSize, cancellationToken).ConfigureAwait(true);
+            if (generation != _refreshGeneration)
+                return; // superseded by a filter/sort refresh — discard
+            foreach (var item in page.Items)
+            {
+                Items.Add(item);
+                var card = new GalleryCardViewModel(item, _thumbLoader);
+                GalleryItems.Add(card);
+            }
+            _loaded = skip + page.Items.Count;
+            TotalCount = _orderedIds.Count > 0 ? _orderedIds.Count : page.TotalCount;
+            SyncSelectedItemsProjection();
+            OnPropertyChanged(nameof(HasMore));
+            OnPropertyChanged(nameof(PositionLabel));
+            LoadMoreCommand.NotifyCanExecuteChanged();
+        }
+        finally
+        {
+            IsLoadingMore = false;
+        }
+    }
+
+    /// <summary>Bulk favorite the checked selection.</summary>
+    [RelayCommand]
+    public async Task FavoriteSelectedAsync(CancellationToken cancellationToken = default)
+    {
+        if (actions is null || SelectedCount == 0)
+            return;
+        var ids = _selectedPackageIds.ToList();
+        var loadedFav = SelectedItems.Where(s => ids.Contains(s.PackageId)).ToList();
+        var allFav = loadedFav.Count > 0 && loadedFav.All(s => s.IsFavorite);
+        var result = await actions.SetFavoritesAsync(ids, !allFav, cancellationToken).ConfigureAwait(true);
+        await RefreshAsync(cancellationToken).ConfigureAwait(true);
+        LastActionMessage = allFav
+            ? $"Unfavorited {result.Succeeded} packages"
+            : $"Favorited {result.Succeeded} packages";
+        ShowToast?.Invoke(LastActionMessage, null);
+    }
+
+    [RelayCommand]
+    private Task FavoriteCheckedAsync(CancellationToken cancellationToken = default) =>
+        SetSelectedFavoritesAsync(true, cancellationToken);
+
+    [RelayCommand]
+    private Task UnfavoriteCheckedAsync(CancellationToken cancellationToken = default) =>
+        SetSelectedFavoritesAsync(false, cancellationToken);
+
+    private async Task SetSelectedFavoritesAsync(bool favorite, CancellationToken cancellationToken)
+    {
+        if (actions is null || SelectedCount == 0)
+            return;
+        var ids = _selectedPackageIds.ToList();
+        var result = await actions.SetFavoritesAsync(ids, favorite, cancellationToken).ConfigureAwait(true);
+        LastActionMessage = favorite
+            ? $"Favorited {result.Succeeded} packages"
+            : $"Unfavorited {result.Succeeded} packages";
+        await RefreshAsync(cancellationToken).ConfigureAwait(true);
+        ShowToast?.Invoke(LastActionMessage, null);
+    }
+
+    /// <summary>Gallery/table row click: set focused detail row without wiping bulk selection.</summary>
+    [RelayCommand]
+    public void SelectEntry(PackageListEntry? entry)
+    {
+        if (entry is null)
+            return;
+        SelectedEntry = Items.FirstOrDefault(i => i.PackageId == entry.PackageId) ?? entry;
+    }
+
+    /// <summary>Filter by tag from the rail.</summary>
+    [RelayCommand]
+    public async Task FilterByTagAsync(long tagId, CancellationToken cancellationToken = default)
+    {
+        SelectedTagId = SelectedTagId == tagId ? null : tagId;
+        await SavePreferencesAsync(cancellationToken).ConfigureAwait(true);
+        await RefreshAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    partial void OnSelectedEntryChanged(PackageListEntry? value)
+    {
+        SyncGallerySelection(value?.PackageId);
+        var generation = ++_detailGeneration;
+        _ = LoadSelectedDetailAsync(value, generation);
+    }
+
+    private void SyncGallerySelection(long? packageId)
+    {
+        foreach (var card in GalleryItems)
+            card.IsSelected = packageId is not null && card.PackageId == packageId;
+    }
 
     /// <summary>Click a column header: toggle direction if already sorting by it, else sort by it ascending. (1.44)</summary>
     [RelayCommand]
@@ -446,16 +676,45 @@ public sealed partial class LibraryViewModel(
         await SavePreferencesAsync(cancellationToken).ConfigureAwait(true);
     }
 
-    /// <summary>Select the currently-loaded (visible) rows. (1.49)</summary>
+    /// <summary>Select the currently-loaded (visible) rows only. (1.49)</summary>
     [RelayCommand]
     public void SelectVisible()
     {
-        SelectedItems.Clear();
+        _selectedPackageIds.Clear();
         foreach (var item in Items)
-            SelectedItems.Add(item);
+            _selectedPackageIds.Add(item.PackageId);
+        SyncSelectedItemsProjection();
     }
 
-    public void ClearSelection() => SelectedItems.Clear();
+    public void ClearSelection()
+    {
+        _selectedPackageIds.Clear();
+        SyncSelectedItemsProjection();
+    }
+
+    public bool SetSelected(long packageId, bool selected)
+    {
+        var changed = selected ? _selectedPackageIds.Add(packageId) : _selectedPackageIds.Remove(packageId);
+        if (changed)
+            SyncSelectedItemsProjection();
+        return true;
+    }
+
+    private void SyncSelectedItemsProjection()
+    {
+        _projectingSelection = true;
+        try
+        {
+            SelectedItems.Clear();
+            foreach (var item in Items.Where(i => _selectedPackageIds.Contains(i.PackageId)))
+                SelectedItems.Add(item);
+        }
+        finally
+        {
+            _projectingSelection = false;
+        }
+        OnPropertyChanged(nameof(SelectedCount));
+    }
 
     /// <summary>Last ops-bar action result message (shown transiently). (SCR-2e)</summary>
     [ObservableProperty] private string? _lastActionMessage;
@@ -464,12 +723,12 @@ public sealed partial class LibraryViewModel(
     [RelayCommand]
     public async Task ExportSelectedAsync(CancellationToken cancellationToken = default)
     {
-        if (actions is null || SelectedItems.Count == 0)
+        if (actions is null || SelectedCount == 0)
         {
             LastActionMessage = "Nothing selected";
             return;
         }
-        var ids = SelectedItems.Select(s => s.PackageId).ToList();
+        var ids = _selectedPackageIds.ToList();
         var txt = await actions.ExportTxtAsync(ids, cancellationToken).ConfigureAwait(true);
         LastExportText = txt;
         LastActionMessage = $"Exported {ids.Count} packages";
@@ -482,8 +741,14 @@ public sealed partial class LibraryViewModel(
     [RelayCommand]
     public async Task ShowFavoritesAsync(CancellationToken cancellationToken = default)
     {
+        _suppressAutoRefresh = true;
         FavoritesOnly = true;
         MissingDepsOnly = false;
+        InstalledOnly = false;
+        SingleCopyOnly = false;
+        SelectedTagId = null;
+        _suppressAutoRefresh = false;
+        await SavePreferencesAsync(cancellationToken).ConfigureAwait(true);
         await RefreshAsync(cancellationToken).ConfigureAwait(true);
     }
 
@@ -491,8 +756,14 @@ public sealed partial class LibraryViewModel(
     [RelayCommand]
     public async Task ShowAllAsync(CancellationToken cancellationToken = default)
     {
+        _suppressAutoRefresh = true;
         FavoritesOnly = false;
         MissingDepsOnly = false;
+        InstalledOnly = false;
+        SingleCopyOnly = false;
+        SelectedTagId = null;
+        _suppressAutoRefresh = false;
+        await SavePreferencesAsync(cancellationToken).ConfigureAwait(true);
         await RefreshAsync(cancellationToken).ConfigureAwait(true);
     }
 
@@ -500,8 +771,14 @@ public sealed partial class LibraryViewModel(
     [RelayCommand]
     public async Task ShowMissingDepsAsync(CancellationToken cancellationToken = default)
     {
+        _suppressAutoRefresh = true;
         FavoritesOnly = false;
         MissingDepsOnly = true;
+        InstalledOnly = false;
+        SingleCopyOnly = false;
+        SelectedTagId = null;
+        _suppressAutoRefresh = false;
+        await SavePreferencesAsync(cancellationToken).ConfigureAwait(true);
         await RefreshAsync(cancellationToken).ConfigureAwait(true);
     }
 
@@ -515,6 +792,7 @@ public sealed partial class LibraryViewModel(
         _suppressAutoRefresh = true;
         FavoritesOnly = false; MissingDepsOnly = false; SingleCopyOnly = false; InstalledOnly = true;
         _suppressAutoRefresh = false;
+        await SavePreferencesAsync(cancellationToken).ConfigureAwait(true);
         await RefreshAsync(cancellationToken).ConfigureAwait(true);
     }
 
@@ -525,6 +803,7 @@ public sealed partial class LibraryViewModel(
         _suppressAutoRefresh = true;
         FavoritesOnly = false; MissingDepsOnly = false; InstalledOnly = false; SingleCopyOnly = true;
         _suppressAutoRefresh = false;
+        await SavePreferencesAsync(cancellationToken).ConfigureAwait(true);
         await RefreshAsync(cancellationToken).ConfigureAwait(true);
     }
 
@@ -542,6 +821,7 @@ public sealed partial class LibraryViewModel(
         Tags.Clear();
         foreach (var t in list)
             Tags.Add(t);
+        OnPropertyChanged(nameof(ActiveTagLabel));
     }
 
     /// <summary>Rail "+ new tag": create a tag via the tag service and refresh the section. (AC-12)</summary>
@@ -567,12 +847,14 @@ public sealed partial class LibraryViewModel(
         MissingDepsOnly = false;
         InstalledOnly = false;
         SingleCopyOnly = false;
+        SelectedTagId = null;
         _suppressAutoRefresh = false;
+        await SavePreferencesAsync(cancellationToken).ConfigureAwait(true);
         await RefreshAsync(cancellationToken).ConfigureAwait(true);
     }
 
     /// <summary>Sort options for the facet-bar dropdown (prototype: Recently used / Size↓ / Hot→Cold / Most depended-on). (GD-3)</summary>
-    public IReadOnlyList<string> SortOptions { get; } = ["Name", "Creator", "Size", "Class"];
+    public IReadOnlyList<string> SortOptions { get; } = ["Name", "Creator", "Size", "Class", "Added", "Installed"];
 
     /// <summary>Two-way selected sort label → drives <see cref="Sort"/>. (GD-3)</summary>
     public string SelectedSortLabel
@@ -591,8 +873,21 @@ public sealed partial class LibraryViewModel(
     /// </summary>
     public async Task<int> CountAllMatchingAsync(CancellationToken cancellationToken = default)
     {
+        if (_orderedIds.Count > 0)
+            return _orderedIds.Count;
         var ids = await library.GetOrderedIdsAsync(CurrentQuery(0, 1), cancellationToken).ConfigureAwait(true);
         return ids.Count;
+    }
+
+    /// <summary>
+    /// Ensure the OrderedSnapshot index is covered by the loaded window by appending slices (A9 windowing).
+    /// </summary>
+    public async Task EnsureIndexLoadedAsync(int index, CancellationToken cancellationToken = default)
+    {
+        if (index < 0 || index >= TotalCount)
+            return;
+        while (_loaded <= index && HasMore && !cancellationToken.IsCancellationRequested)
+            await LoadMoreAsync(cancellationToken).ConfigureAwait(true);
     }
 
     /// <summary>Restore the remembered view (sort/direction/view-mode/creator) from settings. (1.52)</summary>
@@ -604,13 +899,40 @@ public sealed partial class LibraryViewModel(
         var sort = await settings.GetAsync(PrefSort, cancellationToken).ConfigureAwait(true);
         if (Enum.TryParse<LibrarySort>(sort, out var parsedSort))
             Sort = parsedSort;
-        Descending = await settings.GetBoolAsync(PrefDescending, false, cancellationToken).ConfigureAwait(true);
+        Descending = await settings.GetBoolAsync(PrefDescending, true, cancellationToken).ConfigureAwait(true);
         var view = await settings.GetAsync(PrefViewMode, cancellationToken).ConfigureAwait(true);
         if (Enum.TryParse<LibraryViewMode>(view, out var parsedView))
             ViewMode = parsedView;
         CreatorFilter = await settings.GetAsync(PrefCreator, cancellationToken).ConfigureAwait(true);
+        var tag = await settings.GetAsync(PrefTagId, cancellationToken).ConfigureAwait(true);
+        if (long.TryParse(tag, out var tagId))
+            SelectedTagId = tagId;
+        var width = await settings.GetAsync(PrefDetailWidth, cancellationToken).ConfigureAwait(true);
+        if (double.TryParse(width, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var w))
+            DetailPanelWidth = Math.Clamp(w, 220, 600);
+        FavoritesOnly = await settings.GetBoolAsync(PrefFavoritesOnly, false, cancellationToken).ConfigureAwait(true);
+        MissingDepsOnly = await settings.GetBoolAsync(PrefMissingDepsOnly, false, cancellationToken).ConfigureAwait(true);
+        InstalledOnly = await settings.GetBoolAsync(PrefInstalledOnly, false, cancellationToken).ConfigureAwait(true);
+        SingleCopyOnly = await settings.GetBoolAsync(PrefSingleCopyOnly, false, cancellationToken).ConfigureAwait(true);
         _suppressAutoRefresh = false;
     }
+
+    public async Task SaveDetailWidthAsync(CancellationToken cancellationToken = default)
+    {
+        if (settings is null)
+            return;
+        await settings.SetAsync(PrefDetailWidth, DetailPanelWidth.ToString(System.Globalization.CultureInfo.InvariantCulture), cancellationToken).ConfigureAwait(true);
+    }
+
+    public Task<string?> LoadColumnLayoutAsync(CancellationToken cancellationToken = default) =>
+        settings is null
+            ? Task.FromResult<string?>(null)
+            : settings.GetAsync(PrefColumns, cancellationToken);
+
+    public Task SaveColumnLayoutAsync(string layout, CancellationToken cancellationToken = default) =>
+        settings is null
+            ? Task.CompletedTask
+            : settings.SetAsync(PrefColumns, layout, cancellationToken);
 
     private async Task SavePreferencesAsync(CancellationToken cancellationToken)
     {
@@ -620,6 +942,11 @@ public sealed partial class LibraryViewModel(
         await settings.SetBoolAsync(PrefDescending, Descending, cancellationToken).ConfigureAwait(true);
         await settings.SetAsync(PrefViewMode, ViewMode.ToString(), cancellationToken).ConfigureAwait(true);
         await settings.SetAsync(PrefCreator, CreatorFilter ?? string.Empty, cancellationToken).ConfigureAwait(true);
+        await settings.SetAsync(PrefTagId, SelectedTagId?.ToString() ?? string.Empty, cancellationToken).ConfigureAwait(true);
+        await settings.SetBoolAsync(PrefFavoritesOnly, FavoritesOnly, cancellationToken).ConfigureAwait(true);
+        await settings.SetBoolAsync(PrefMissingDepsOnly, MissingDepsOnly, cancellationToken).ConfigureAwait(true);
+        await settings.SetBoolAsync(PrefInstalledOnly, InstalledOnly, cancellationToken).ConfigureAwait(true);
+        await settings.SetBoolAsync(PrefSingleCopyOnly, SingleCopyOnly, cancellationToken).ConfigureAwait(true);
     }
 
     private LibraryQuery CurrentQuery(int skip, int take) => new(
@@ -633,24 +960,39 @@ public sealed partial class LibraryViewModel(
         Descending: Descending,
         PackageName: string.IsNullOrWhiteSpace(PackageNameFilter) ? null : PackageNameFilter,
         InstalledOnly: InstalledOnly,
-        SingleCopyOnly: SingleCopyOnly);
+        SingleCopyOnly: SingleCopyOnly,
+        TagId: SelectedTagId);
 
     private async Task LoadPageAsync(CancellationToken cancellationToken)
     {
-        var page = await library.GetPageAsync(CurrentQuery(_loaded, PageSize), cancellationToken).ConfigureAwait(true);
+        var page = await LoadSnapshotSliceAsync(_loaded, PageSize, cancellationToken).ConfigureAwait(true);
         foreach (var item in page.Items)
         {
             Items.Add(item);
             var card = new GalleryCardViewModel(item, _thumbLoader);
             GalleryItems.Add(card);
-            _ = card.LoadAsync(); // extract/decode the preview off the UI thread; placeholder until it lands
         }
 
         _loaded += page.Items.Count;
-        TotalCount = page.TotalCount;
+        TotalCount = _orderedIds.Count > 0 ? _orderedIds.Count : page.TotalCount;
+        SyncSelectedItemsProjection();
         OnPropertyChanged(nameof(HasMore));
         OnPropertyChanged(nameof(PositionLabel));
         LoadMoreCommand.NotifyCanExecuteChanged();
+    }
+
+    private async Task<LibraryPage> LoadSnapshotSliceAsync(
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        if (_orderedIds.Count == 0)
+            return await library.GetPageAsync(CurrentQuery(skip, take), cancellationToken).ConfigureAwait(true);
+        var ids = _orderedIds.Skip(skip).Take(take).ToList();
+        var rows = await library.GetByIdsAsync(ids, cancellationToken).ConfigureAwait(true);
+        if (rows.Count == 0 && ids.Count > 0)
+            return await library.GetPageAsync(CurrentQuery(skip, take), cancellationToken).ConfigureAwait(true);
+        return new LibraryPage(rows, _orderedIds.Count);
     }
 
     private void NotifyStateFlags()
@@ -695,7 +1037,38 @@ public sealed partial class LibraryViewModel(
 
     partial void OnCreatorFilterChanged(string? value)
     {
-        if (!_suppressAutoRefresh) _ = RefreshAsync();
+        if (!_suppressAutoRefresh)
+        {
+            _ = SavePreferencesAsync(CancellationToken.None);
+            _ = RefreshAsync();
+        }
+    }
+
+    partial void OnPackageNameFilterChanged(string? value)
+    {
+        if (_suppressAutoRefresh)
+            return;
+        IsCountApproximate = true;
+        PendingRefresh = DebouncedRefreshAsync();
+    }
+
+    partial void OnSelectedTagIdChanged(long? value)
+    {
+        OnPropertyChanged(nameof(IsTagActive));
+        OnPropertyChanged(nameof(ActiveTagLabel));
+        OnPropertyChanged(nameof(HasActiveTag));
+    }
+
+    public bool IsTagActive(long tagId) => SelectedTagId == tagId;
+    public bool HasActiveTag => SelectedTagId is not null;
+    public string ActiveTagLabel => Tags.FirstOrDefault(t => t.Id == SelectedTagId)?.Name ?? "Tag";
+
+    [RelayCommand]
+    private async Task ClearTagAsync(CancellationToken cancellationToken = default)
+    {
+        SelectedTagId = null;
+        await SavePreferencesAsync(cancellationToken).ConfigureAwait(true);
+        await RefreshAsync(cancellationToken).ConfigureAwait(true);
     }
 
     partial void OnSortChanged(LibrarySort value) => NotifySortHeaders();

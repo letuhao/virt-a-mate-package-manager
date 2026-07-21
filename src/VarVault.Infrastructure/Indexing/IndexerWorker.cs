@@ -96,8 +96,70 @@ public sealed class IndexerWorker(
                     return Snapshot with { Error = "repositoryId required" };
                 return Start(rid, command.ForceFull);
 
+            case IndexerCommandKind.ExtractContentPreview:
+                if (command.ContentItemId is not long contentItemId || contentItemId <= 0)
+                    return Snapshot with { Error = "contentItemId required" };
+                return await ExtractContentPreviewAsync(contentItemId, cancellationToken).ConfigureAwait(false);
+
             default:
                 return Snapshot with { Error = "unknown command" };
+        }
+    }
+
+    private async Task<IndexerStatus> ExtractContentPreviewAsync(long contentItemId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+            var thumbnails = scope.ServiceProvider.GetRequiredService<IThumbnailStore>();
+            if (await thumbnails.GetContentAsync(contentItemId, cancellationToken).ConfigureAwait(false) is not null)
+                return Snapshot with { Error = null };
+
+            var item = await (
+                from content in db.ContentItems.AsNoTracking()
+                join varFile in db.VarFiles.AsNoTracking() on content.VarFileId equals varFile.Id
+                join repository in db.Repositories.AsNoTracking() on varFile.RepositoryId equals repository.Id
+                where content.Id == contentItemId
+                select new
+                {
+                    content.EntryPath,
+                    content.Type,
+                    varFile.RelativePath,
+                    repository.MountPath,
+                    repository.IsOnline,
+                })
+                .FirstOrDefaultAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (item is null)
+                return Snapshot with { Error = "content item not found" };
+            if (!item.IsOnline)
+                return Snapshot with { Error = "content copy is offline" };
+            if (!VarVault.Domain.Content.PreviewRules.HasPreview(item.Type))
+                return Snapshot with { Error = "content type has no preview" };
+
+            var extractor = scope.ServiceProvider.GetRequiredService<PreviewExtractor>();
+            var bytes = await extractor.ExtractAsync(
+                Path.Combine(item.MountPath, item.RelativePath),
+                item.EntryPath,
+                cancellationToken).ConfigureAwait(false);
+            if (bytes is null)
+                return Snapshot with { Error = "preview is missing or corrupt" };
+
+            await thumbnails.PutContentAsync(contentItemId, bytes, cancellationToken).ConfigureAwait(false);
+            await writeQueue.EnqueueAsync(
+                ct => db.ContentItems.Where(c => c.Id == contentItemId)
+                    .ExecuteUpdateAsync(
+                        setters => setters.SetProperty(c => c.PreviewThumbRef, $"content-thumb:{contentItemId}"),
+                        ct),
+                WritePriority.Interactive,
+                cancellationToken).ConfigureAwait(false);
+            return Snapshot with { Error = null };
+        }
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogWarning(ex, "Content preview extraction failed for {ContentItemId}", contentItemId);
+            return Snapshot with { Error = ex.Message };
         }
     }
 

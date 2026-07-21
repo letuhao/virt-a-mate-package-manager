@@ -37,7 +37,7 @@ public class LibraryOpsMoveE2ETests
         UiE2E.Pump();
 
         // "select all N matching" selects the loaded row.
-        var selectAll = UiE2E.Button(window, "select all");
+        var selectAll = UiE2E.Button(window, "Select loaded");
         Assert.NotNull(selectAll);
         await UiE2E.ClickAsync(selectAll!);
         Assert.Equal(1, lib.SelectedItems.Count);

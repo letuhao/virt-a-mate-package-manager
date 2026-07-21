@@ -17,6 +17,7 @@ using VarVault.Sdk.Activation;
 using VarVault.Sdk.Events;
 using VarVault.Sdk.Import;
 using VarVault.Sdk.Indexer;
+using VarVault.Sdk.Paging;
 using VarVault.Sdk.Presets;
 using VarVault.Sdk.Settings;
 
@@ -58,9 +59,9 @@ public sealed class EfImportService(
         {
             return await ScanCoreAsync(spec, workspace, progress, cancellationToken).ConfigureAwait(false);
         }
-        catch (OperationCanceledException)
+        catch
         {
-            await workspace.DisposeAsync().ConfigureAwait(false); // clean temp on cancel (§11)
+            await workspace.DisposeAsync().ConfigureAwait(false); // clean temp on cancel or any failure (§11)
             throw;
         }
     }
@@ -68,12 +69,18 @@ public sealed class EfImportService(
     private async Task<ImportSession> ScanCoreAsync(ImportSpec spec, ITempWorkspace workspace,
         IProgressSink? progress, CancellationToken cancellationToken)
     {
+        progress?.Report(new ProgressReport(0, 1, "Preparing sources…"));
+
         // ── Resolve sources: folders (loose vars + nested archives) and top-level archives. (§6) ────────
         var sources = new List<ImportSource>();
         var varRefs = new List<(string Label, string SourcePath, string VarPath)>();
-        foreach (var path in spec.Paths ?? [])
+        var paths = spec.Paths ?? [];
+        var pathIndex = 0;
+        foreach (var path in paths)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report(new ProgressReport(pathIndex, Math.Max(1, paths.Count),
+                $"Preparing {Path.GetFileName(path)}…"));
             if (Directory.Exists(path))
             {
                 var label = new DirectoryInfo(path).Name;
@@ -83,13 +90,23 @@ public sealed class EfImportService(
                 sources.Add(new ImportSource(path, ImportSourceKind.Folder, ImportSourceStatus.Ok, loose.Count, null));
 
                 foreach (var archive in Directory.EnumerateFiles(path, "*.*", SearchOption.AllDirectories).Where(IsArchive))
+                {
+                    progress?.Report(new ProgressReport(pathIndex, Math.Max(1, paths.Count),
+                        $"Extracting {Path.GetFileName(archive)}…"));
                     sources.Add(await ExtractArchiveAsync(archive, workspace, varRefs, cancellationToken).ConfigureAwait(false));
+                }
             }
             else if (File.Exists(path) && IsArchive(path))
             {
+                progress?.Report(new ProgressReport(pathIndex, Math.Max(1, paths.Count),
+                    $"Extracting {Path.GetFileName(path)}…"));
                 sources.Add(await ExtractArchiveAsync(path, workspace, varRefs, cancellationToken).ConfigureAwait(false));
             }
+
+            pathIndex++;
         }
+
+        progress?.Report(new ProgressReport(0, 1, "Loading catalog…"));
 
         // ── Load the whole library's dedup facts once (D1: dedup across all repos). ─────────────────────
         var catalog = (await db.VarFiles
@@ -118,6 +135,8 @@ public sealed class EfImportService(
         // Gallery previews (6.3) are extracted per-file into the session temp — cleaned with the workspace.
         var thumbsDir = workspace.NewDir("thumbs");
 
+        progress?.Report(new ProgressReport(0, Math.Max(1, varRefs.Count), "Classifying…"));
+
         // ── Classify each incoming var (with intra-batch dedup, 4.2). ───────────────────────────────────
         var items = new List<ImportItem>(varRefs.Count);
         var batchSigs = new HashSet<string>(StringComparer.Ordinal);
@@ -126,8 +145,11 @@ public sealed class EfImportService(
         {
             cancellationToken.ThrowIfCancellationRequested();
             items.Add(BuildItem(label, spath, vpath, thumbsDir, catalog, catalogFacts, batchSigs, cancellationToken));
-            progress?.Report(new ProgressReport(++done, varRefs.Count, $"Scanning {Path.GetFileName(vpath)}"));
+            progress?.Report(new ProgressReport(++done, Math.Max(1, varRefs.Count),
+                $"Classifying {Path.GetFileName(vpath)} ({done}/{varRefs.Count})"));
         }
+
+        progress?.Report(new ProgressReport(Math.Max(1, varRefs.Count), Math.Max(1, varRefs.Count), "Scan complete"));
 
         // §9 telemetry: how many vars were scanned + the extracted temp footprint on disk.
         Telemetry.ImportScanned.Add(items.Count);
@@ -497,9 +519,11 @@ public sealed class EfImportService(
 
     // ── Apply (doc 30 §7; doc 31 Phase 5). Durable copy + fix + rename into the target repo, then index,
     //    record history, and clean the temp workspace. ────────────────────────────────────────────────────
-    public async Task<ApplyResult> ApplyAsync(ImportSession session, CancellationToken cancellationToken = default)
+    public async Task<ApplyResult> ApplyAsync(ImportSession session, IProgressSink? progress = null, CancellationToken cancellationToken = default)
     {
         Guard.NotNull(session);
+
+        progress?.Report(new ProgressReport(0, 1, "Preflight…"));
 
         // §11 · block Apply with a clear message when the target repo is offline/missing or too full to hold the
         //       import — never start copying into a repo that can't take it. (reuses the online/capacity signals.)
@@ -521,10 +545,12 @@ public sealed class EfImportService(
         var cancelled = false;   // E5: a graceful cancel mid-apply still records a partial run (remainder skipped).
         var importedRefs = new List<string>();   // identities of vars that landed, for activate-after (5.9)
         var outcomes = new List<ImportOutcome>(session.Items.Count);   // per-item results, persisted (§8 · G3)
+        var total = Math.Max(1, session.Items.Count);
         try
         {
           try
           {
+            var done = 0;
             foreach (var item in session.Items)
             {
                 if (cancellationToken.IsCancellationRequested) { cancelled = true; break; }
@@ -566,6 +592,9 @@ public sealed class EfImportService(
                     default: skipped++; reason = "skipped"; break; // Skip / KeepExisting / None
                 }
                 outcomes.Add(new ImportOutcome(item.FileName, item.IdentityKey, item.Lane, item.Decision, ok, reason));
+                done++;
+                progress?.Report(new ProgressReport(done, total,
+                    $"Applying {item.FileName} ({done}/{session.Items.Count})"));
             }
           }
           catch (OperationCanceledException)
@@ -588,11 +617,17 @@ public sealed class EfImportService(
             if (!cancelled)
             {
                 if (didImport)
-                    await WaitForIndexAsync(session.TargetRepositoryId, cancellationToken).ConfigureAwait(false);
+                {
+                    progress?.Report(new ProgressReport(0, 1, "Indexing target repository…"));
+                    await WaitForIndexAsync(session.TargetRepositoryId, cancellationToken, progress).ConfigureAwait(false);
+                }
 
                 // Optional activate-after (D2/5.9): link the just-imported vars into VaM via the existing preset flow.
                 if (session.ActivateAfter && importedRefs.Count > 0)
+                {
+                    progress?.Report(new ProgressReport(0, 1, "Activating imported vars…"));
                     activated = await ActivateImportedAsync(importedRefs, cancellationToken).ConfigureAwait(false);
+                }
             }
 
             var failedSources = session.Sources.Where(s => s.Status != ImportSourceStatus.Ok)
@@ -600,6 +635,7 @@ public sealed class EfImportService(
             var run = new ImportRun(Guid.NewGuid(), DateTime.UtcNow, session.TargetRepositoryId,
                 SummarizeSources(session.Sources), copied, fixedCount, renamed, skipped, discarded, failed, failedSources, outcomes);
             // History is written even for a cancelled run (§11) — and always before temp cleanup in `finally`.
+            progress?.Report(new ProgressReport(0, 1, "Recording history…"));
             var runId = await history.RecordAsync(run, CancellationToken.None).ConfigureAwait(false);
 
             // Metrics + event (5.7/§9) — after the run is persisted so subscribers see a consistent state.
@@ -620,6 +656,7 @@ public sealed class EfImportService(
         }
         finally
         {
+            progress?.Report(new ProgressReport(1, 1, "Cleaning up…"));
             try { if (Directory.Exists(session.TempRoot)) Directory.Delete(session.TempRoot, recursive: true); }
             catch { /* startup sweep catches leftovers */ }
         }
@@ -687,6 +724,14 @@ public sealed class EfImportService(
     public Task<IReadOnlyList<ImportRun>> HistoryAsync(int take, CancellationToken cancellationToken = default) =>
         history.RecentAsync(take, cancellationToken);
 
+    public Task<PageResult<ImportOutcome>> HistoryOutcomesPageAsync(
+        Guid runId,
+        PageRequest request,
+        string filter = "all",
+        string? searchText = null,
+        CancellationToken cancellationToken = default) =>
+        history.OutcomesPageAsync(runId, request, filter, searchText, cancellationToken);
+
     /// <summary>
     /// Startup sweep (§6/E5): remove import temp-session dirs a crash left behind. Temp bases depend on the
     /// <c>import.temp_dir</c> setting + each repo's drive (§6/D4), so sweep every candidate base.
@@ -707,7 +752,7 @@ public sealed class EfImportService(
             Import.TempWorkspace.SweepOrphans(b);
     }
 
-    private async Task WaitForIndexAsync(Guid repositoryId, CancellationToken cancellationToken)
+    private async Task WaitForIndexAsync(Guid repositoryId, CancellationToken cancellationToken, IProgressSink? progress = null)
     {
         var start = await indexer.StartIndexRepositoryAsync(repositoryId, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (start.IsFailure)
@@ -719,6 +764,9 @@ public sealed class EfImportService(
             if (status.IsFailure)
                 throw new InvalidOperationException(status.Error.Message);
             var s = status.Value;
+            progress?.Report(new ProgressReport(
+                s.Done, Math.Max(1, s.Total),
+                s.PhaseMessage ?? $"Indexing… ({s.State})"));
             if (s.State is IndexerJobState.Completed or IndexerJobState.Failed
                 or IndexerJobState.Cancelled or IndexerJobState.Idle)
             {

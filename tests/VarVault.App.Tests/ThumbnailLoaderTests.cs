@@ -78,5 +78,8 @@ public class ThumbnailLoaderTests
             Task.CompletedTask;
         public Task<bool> ExistsAsync(long packageId, CancellationToken cancellationToken = default) =>
             Task.FromResult(bytesFor(packageId) is not null);
+        public Task PutContentAsync(long contentItemId, byte[] jpeg, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<byte[]?> GetContentAsync(long contentItemId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<byte[]?>(null);
     }
 }

@@ -10,7 +10,20 @@ public partial class MainWindow : Window
 {
     private DispatcherTimer? _pollTimer;
 
-    public MainWindow() => InitializeComponent();
+    public MainWindow()
+    {
+        InitializeComponent();
+        ModalHost.CloseRequested += (_, _) =>
+        {
+            if (DataContext is ShellViewModel shell)
+            {
+                if (shell.Dialogs.CanGoBack)
+                    shell.Dialogs.Back();
+                else
+                    shell.Dialogs.Close();
+            }
+        };
+    }
 
     /// <summary>
     /// Start a light poll timer once shown: pulls live jobs/badges/log-dock from the shell's injected

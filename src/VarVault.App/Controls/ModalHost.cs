@@ -15,13 +15,16 @@ namespace VarVault.App.Controls;
 public class ModalHost : ContentControl
 {
     public static readonly StyledProperty<bool> IsOpenProperty =
-        AvaloniaProperty.Register<ModalHost, bool>(nameof(IsOpen), defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
+        AvaloniaProperty.Register<ModalHost, bool>(nameof(IsOpen), defaultBindingMode: Avalonia.Data.BindingMode.OneWay);
 
     public static readonly StyledProperty<string?> TitleProperty =
         AvaloniaProperty.Register<ModalHost, string?>(nameof(Title));
 
     public static readonly StyledProperty<object?> FooterProperty =
         AvaloniaProperty.Register<ModalHost, object?>(nameof(Footer));
+
+    /// <summary>Raised when the user dismisses via Esc, backdrop, or the close button.</summary>
+    public event EventHandler? CloseRequested;
 
     public bool IsOpen { get => GetValue(IsOpenProperty); set => SetValue(IsOpenProperty, value); }
     public string? Title { get => GetValue(TitleProperty); set => SetValue(TitleProperty, value); }
@@ -31,28 +34,30 @@ public class ModalHost : ContentControl
     {
         base.OnApplyTemplate(e);
         if (e.NameScope.Find<Border>("PART_Backdrop") is { } backdrop)
-            backdrop.PointerPressed += (_, args) =>
-            {
-                // Only a click on the backdrop itself (not the dialog) dismisses.
-                if (ReferenceEquals(args.Source, backdrop))
-                    Close();
-            };
+            backdrop.PointerPressed += OnBackdropPressed;
         if (e.NameScope.Find<Button>("PART_Close") is { } close)
-            close.Click += (_, _) => Close();
+            close.Click += OnCloseClicked;
         if (IsOpen)
             FocusDialog(e.NameScope);
     }
 
+    private void OnBackdropPressed(object? sender, PointerPressedEventArgs args)
+    {
+        if (sender is Border backdrop && ReferenceEquals(args.Source, backdrop))
+            RequestClose();
+    }
+
+    private void OnCloseClicked(object? sender, RoutedEventArgs args) => RequestClose();
+
     private Border? _dialog;
 
-    public void Close() => IsOpen = false;
-    public void Open() => IsOpen = true;
+    public void RequestClose() => CloseRequested?.Invoke(this, EventArgs.Empty);
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
         if (IsOpen && e.Key == Key.Escape)
         {
-            Close();
+            RequestClose();
             e.Handled = true;
         }
         base.OnKeyDown(e);

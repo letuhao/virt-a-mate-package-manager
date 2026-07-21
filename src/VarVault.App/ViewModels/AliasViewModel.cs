@@ -8,12 +8,13 @@ namespace VarVault.App.ViewModels;
 /// <summary>DLG-5 · Resolve missing dependency: search the owned library and map a missing ref to a chosen
 /// owned package. The search input drives <see cref="OwnedPackageId"/> so Save persists a real target.
 /// (16-checklist DLG-5 / AC-6.)</summary>
-public sealed partial class AliasViewModel(IAliasService aliases, ILibraryQueryService? library = null)
+public sealed partial class AliasViewModel(IAliasService aliases, ILibraryQueryService? library = null, Action? close = null)
     : ObservableObject
 {
+    /// <summary>Invoked after a successful save (e.g. reload parent detail).</summary>
+    public Action? OnSaved { get; init; }
     [ObservableProperty] private string? _missingRef;
     [ObservableProperty] private long _ownedPackageId;
-    [ObservableProperty] private string _scope = "Global — apply everywhere, always";
     [ObservableProperty] private string? _statusMessage;
 
     /// <summary>Owned-package search text (typed into the "map to owned" box). (AC-6)</summary>
@@ -27,9 +28,6 @@ public sealed partial class AliasViewModel(IAliasService aliases, ILibraryQueryS
 
     /// <summary>True once a real owned package is chosen — gates Save so it never persists id 0. (AC-6)</summary>
     public bool CanSave => OwnedPackageId != 0 && !string.IsNullOrWhiteSpace(MissingRef);
-
-    /// <summary>Alias save-scope options (prototype dropdown). (GE-5)</summary>
-    public IReadOnlyList<string> ScopeOptions { get; } = ["Global — apply everywhere, always", "Only this preset"];
 
     partial void OnOwnedQueryChanged(string? value) => SearchTask = SearchOwnedAsync(value);
 
@@ -72,5 +70,10 @@ public sealed partial class AliasViewModel(IAliasService aliases, ILibraryQueryS
         }
         var result = await aliases.SetAsync(MissingRef!, OwnedPackageId, cancellationToken).ConfigureAwait(true);
         StatusMessage = result.IsSuccess ? "Alias saved" : result.Error.Message;
+        if (result.IsSuccess)
+        {
+            OnSaved?.Invoke();
+            close?.Invoke();
+        }
     }
 }

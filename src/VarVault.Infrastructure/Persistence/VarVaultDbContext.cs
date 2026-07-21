@@ -35,6 +35,7 @@ public class VarVaultDbContext(DbContextOptions<VarVaultDbContext> options) : Db
     public DbSet<LoadingPreset> LoadingPresets => Set<LoadingPreset>();
     public DbSet<PresetMember> PresetMembers => Set<PresetMember>();
     public DbSet<VarAlias> VarAliases => Set<VarAlias>();
+    public DbSet<ProfilePackageLink> ProfilePackageLinks => Set<ProfilePackageLink>();
 
     // Discovery
     public DbSet<Tag> Tags => Set<Tag>();

@@ -5,6 +5,7 @@ using VarVault.Common.Diagnostics;
 using VarVault.Sdk.Events;
 using VarVault.Sdk.Import;
 using VarVault.Sdk.Indexing;
+using VarVault.Sdk.Paging;
 using VarVault.Sdk.Presets;
 using VarVault.Sdk.Repositories;
 using VarVault.Sdk.Settings;
@@ -138,6 +139,19 @@ public sealed class ImportApplyEffectsTests
             var broken = run.Outcomes.Single(o => o.FileName == "broken.var");
             Assert.Equal(ImportLane.Corrupt, broken.Lane);
             Assert.Equal(ImportDecision.Discard, broken.Decision);
+
+            // History detail is paged at the database, not materialized and sliced in the UI.
+            var firstPage = await svc.HistoryOutcomesPageAsync(run.Id, new PageRequest(1, 1));
+            var secondPage = await svc.HistoryOutcomesPageAsync(run.Id, new PageRequest(2, 1));
+            Assert.Equal(2, firstPage.TotalCount);
+            Assert.Single(firstPage.Items);
+            Assert.Single(secondPage.Items);
+            Assert.NotEqual(firstPage.Items[0].FileName, secondPage.Items[0].FileName);
+
+            var discarded = await svc.HistoryOutcomesPageAsync(
+                run.Id, new PageRequest(1, 25), filter: "discarded");
+            Assert.Single(discarded.Items);
+            Assert.Equal("broken.var", discarded.Items[0].FileName);
         }
     }
 

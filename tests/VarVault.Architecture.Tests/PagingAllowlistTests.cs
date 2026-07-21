@@ -35,6 +35,7 @@ public sealed class PagingAllowlistTests
 
         // Library A9 ordered-snapshot exception (virtualized, not a secondary pager)
         "ILibraryQueryService.GetOrderedIdsAsync",
+        "ILibraryQueryService.GetByIdsAsync",
 
         // Import history is capped by `take`
         "IImportService.HistoryAsync",

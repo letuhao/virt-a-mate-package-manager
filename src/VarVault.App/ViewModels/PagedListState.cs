@@ -47,6 +47,19 @@ public sealed partial class PagedListState<T> : ObservableObject
         await LoadPageAsync(1, PageSize, cancellationToken).ConfigureAwait(true);
     }
 
+    /// <summary>Clear items and totals without loading (used when switching the owning entity).</summary>
+    public void Reset()
+    {
+        _activeLoad?.Cancel();
+        _version++;
+        Items.Clear();
+        PageNumber = 1;
+        TotalCount = 0;
+        ErrorMessage = null;
+        IsLoading = false;
+        NotifyComputed();
+    }
+
     public async Task LoadPageAsync(int pageNumber, int pageSize, CancellationToken cancellationToken = default)
     {
         pageNumber = Math.Max(1, pageNumber);

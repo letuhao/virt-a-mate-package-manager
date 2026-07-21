@@ -59,9 +59,9 @@ public sealed class AliasServiceFlowTests
             Assert.True((await alias.SetAsync("Gone.Missing.1", 2)).IsSuccess);
             Assert.Contains(await alias.ListAsync(), a => a.MissingRef == "Gone.Missing.1" && a.ResolvedPackageId == 2);
 
-            await scope.ServiceProvider.GetRequiredService<IDependencyResolver>().ResolveAllAsync();
             var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
             Assert.False((await db.PackageListItems.FirstAsync(x => x.PackageId == 1)).HasMissingDeps);
+            Assert.Equal(2, (await db.Dependencies.SingleAsync()).ResolvedPackageId);
         }
     }
 

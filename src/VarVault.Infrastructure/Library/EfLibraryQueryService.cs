@@ -21,14 +21,38 @@ public sealed class EfLibraryQueryService(VarVaultDbContext db) : ILibraryQueryS
 
         q = ApplySort(q, query.Sort, query.Descending);
 
-        var page = await q
+        var rows = await ProjectAsync(q
             .Skip(Math.Max(0, query.Skip))
-            .Take(Math.Clamp(query.Take, 1, 1000))
+            .Take(Math.Clamp(query.Take, 1, 1000)), cancellationToken).ConfigureAwait(false);
+
+        return new LibraryPage(rows, total);
+    }
+
+    public async Task<IReadOnlyList<PackageListEntry>> GetByIdsAsync(
+        IReadOnlyList<long> packageIds,
+        CancellationToken cancellationToken = default)
+    {
+        Guard.NotNull(packageIds);
+        if (packageIds.Count == 0)
+            return [];
+        var ids = packageIds.Distinct().Take(1000).ToList();
+        var rows = await ProjectAsync(
+            db.PackageListItems.AsNoTracking().Where(x => ids.Contains(x.PackageId)),
+            cancellationToken).ConfigureAwait(false);
+        var byId = rows.ToDictionary(x => x.PackageId);
+        return ids.Where(byId.ContainsKey).Select(id => byId[id]).ToList();
+    }
+
+    private async Task<IReadOnlyList<PackageListEntry>> ProjectAsync(
+        IQueryable<PackageListItem> query,
+        CancellationToken cancellationToken)
+    {
+        var page = await query
             .Select(x => new
             {
                 x.PackageId, x.VarName, x.Creator, x.PackageName, x.VersionToken,
                 x.PrimaryType, x.TotalSize, x.OnlineInstanceCount, x.TotalInstanceCount,
-                x.IsSingleCopy, x.IsFavorite, x.Class, x.HasMissingDeps, x.LastUsedAt, x.ActualTierMin, x.AddedAt, x.IsActive,
+                x.IsSingleCopy, x.IsFavorite, x.Class, x.HasMissingDeps, x.LastUsedAt, x.ActualTierMin, x.AddedAt, x.InstalledAt, x.IsActive,
             })
             .ToListAsync(cancellationToken).ConfigureAwait(false);
 
@@ -60,9 +84,9 @@ public sealed class EfLibraryQueryService(VarVaultDbContext db) : ILibraryQueryS
                 x.PrimaryType.ToString(), x.TotalSize, x.OnlineInstanceCount, x.TotalInstanceCount,
                 x.IsSingleCopy, x.IsFavorite, x.Class.ToString(), x.HasMissingDeps, x.LastUsedAt, x.ActualTierMin,
                 countsByPkg.GetValueOrDefault(x.PackageId),
-                x.AddedAt, depCountByPkg.GetValueOrDefault(x.PackageId), x.IsActive)).ToList();
+                x.AddedAt, x.InstalledAt, depCountByPkg.GetValueOrDefault(x.PackageId), x.IsActive)).ToList();
 
-        return new LibraryPage(rows, total);
+        return rows;
     }
 
     public async Task<IReadOnlyList<long>> GetOrderedIdsAsync(LibraryQuery query, CancellationToken cancellationToken = default)
@@ -100,6 +124,8 @@ public sealed class EfLibraryQueryService(VarVaultDbContext db) : ILibraryQueryS
         }
         if (query.Tiers is { Count: > 0 })
             q = q.Where(x => x.ActualTierMin != null && query.Tiers.Contains(x.ActualTierMin.Value));
+        if (query.TagId is { } tagId)
+            q = q.Where(x => db.PackageTags.Any(t => t.TagId == tagId && t.PackageId == x.PackageId));
         if (!string.IsNullOrWhiteSpace(query.SearchText))
         {
             var text = query.SearchText.Trim();
@@ -155,6 +181,12 @@ public sealed class EfLibraryQueryService(VarVaultDbContext db) : ILibraryQueryS
         LibrarySort.Class => desc
             ? q.OrderByDescending(x => x.Class).ThenByDescending(x => x.LastUsedAt).ThenBy(x => x.PackageId)
             : q.OrderBy(x => x.Class).ThenBy(x => x.LastUsedAt).ThenBy(x => x.PackageId),
+        LibrarySort.Added => desc
+            ? q.OrderByDescending(x => x.AddedAt).ThenBy(x => x.VarName).ThenBy(x => x.PackageId)
+            : q.OrderBy(x => x.AddedAt).ThenBy(x => x.VarName).ThenBy(x => x.PackageId),
+        LibrarySort.Installed => desc
+            ? q.OrderBy(x => x.InstalledAt == null).ThenByDescending(x => x.InstalledAt).ThenBy(x => x.VarName).ThenBy(x => x.PackageId)
+            : q.OrderBy(x => x.InstalledAt == null).ThenBy(x => x.InstalledAt).ThenBy(x => x.VarName).ThenBy(x => x.PackageId),
         _ => desc
             ? q.OrderByDescending(x => x.VarName).ThenBy(x => x.PackageId)
             : q.OrderBy(x => x.VarName).ThenBy(x => x.PackageId),

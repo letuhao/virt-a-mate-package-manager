@@ -86,7 +86,7 @@ public sealed class ImportGuardrailsE2ETests
             using var cts = new CancellationTokenSource();
             cts.Cancel(); // graceful cancel before any item is applied
 
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => svc.ApplyAsync(session, cts.Token));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => svc.ApplyAsync(session, cancellationToken: cts.Token));
         }
 
         using (var scope = host.Host.Services.CreateScope())

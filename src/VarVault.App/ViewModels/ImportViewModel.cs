@@ -1,9 +1,13 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VarVault.App.Services;
+using VarVault.Common;
 using VarVault.Sdk.Import;
 using VarVault.Sdk.Paging;
 using VarVault.Sdk.Repositories;
+using VarVault.Sdk.Threading;
 
 namespace VarVault.App.ViewModels;
 
@@ -81,6 +85,24 @@ public sealed partial class ImportItemViewModel(ImportItem item) : ObservableObj
     };
 }
 
+/// <summary>One immutable row in an import-history detail report.</summary>
+public sealed class ImportOutcomeRow(ImportOutcome outcome)
+{
+    public ImportOutcome Model { get; } = outcome;
+    public string FileName => Model.FileName;
+    public string IdentityKey => Model.IdentityKey;
+    public string Lane => Model.Lane.ToString();
+    public string Decision => Model.Decision.ToString();
+    public string Reason => string.IsNullOrWhiteSpace(Model.Reason) ? "Completed" : Model.Reason!;
+    public bool IsFailed => !Model.Ok;
+    public string Status => IsFailed ? "Failed" : Model.Reason switch
+    {
+        "skipped" or "cancelled" => "Skipped",
+        "discarded" => "Discarded",
+        _ => "Completed",
+    };
+}
+
 /// <summary>
 /// SCR · Import &amp; review screen (doc 30 §10). Pick source folders/archives + a target repo, scan (classify), review
 /// only the conflict/naming/corrupt lanes (table or gallery + resolver), then apply. (doc 31 Phase 6.)
@@ -89,12 +111,24 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
 {
     private readonly IImportService _import;
     private readonly IRepositoryService _repos;
+    private readonly ImportJobRunner _jobs;
+    private readonly IUiDispatcher _ui;
 
-    public ImportViewModel(IImportService import, IRepositoryService repos)
+    private JobHandle? _activeJob;
+    private CancellationTokenSource? _progressPollCts;
+
+    public ImportViewModel(
+        IImportService import,
+        IRepositoryService repos,
+        ImportJobRunner jobs,
+        IUiDispatcher ui)
     {
         _import = import;
         _repos = repos;
+        _jobs = jobs;
+        _ui = ui;
         Pager = new PagedListState<ImportItemViewModel>(LoadPageAsync);
+        HistoryOutcomesPager = new PagedListState<ImportOutcomeRow>(LoadHistoryOutcomePageAsync, defaultPageSize: 25);
     }
 
     public static bool IsReviewLane(ImportLane l) => l is ImportLane.Conflict or ImportLane.Naming or ImportLane.Corrupt;
@@ -110,8 +144,26 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
     public ObservableCollection<ImportSource> Sources { get; } = [];
     public ObservableCollection<string> Warnings { get; } = [];   // D1 dedup-trust warnings (offline/unindexed repo).
     public bool HasWarnings => Warnings.Count > 0;
+    /// <summary>True when the user has picked sources that have not been scanned yet (chips strip).</summary>
+    public bool HasPendingSources => SourcePaths.Count > 0 && !HasSession;
+    public bool HasScannedSources => Sources.Count > 0;
     public ObservableCollection<ImportItemViewModel> Items => Pager.Items;   // the filtered view
     public ObservableCollection<ImportRun> History { get; } = [];
+    [ObservableProperty] private ImportRun? _selectedHistoryRun;
+    [ObservableProperty] private string _historyOutcomeFilter = "all";
+    [ObservableProperty] private string _historyOutcomeSearch = "";
+    public PagedListState<ImportOutcomeRow> HistoryOutcomesPager { get; }
+
+    /// <summary>True when the history overlay is showing a run's detail report.</summary>
+    public bool HasHistoryDetail => SelectedHistoryRun is not null;
+
+    public bool SelectedHasFailedSources => (SelectedHistoryRun?.FailedSources.Count ?? 0) > 0;
+    public string SelectedHistoryTitle => SelectedHistoryRun is { } r
+        ? $"Run {r.StartedUtc:g} — {r.SourceSummary}"
+        : "Select a run";
+    public string SelectedHistoryCounts => SelectedHistoryRun is { } r
+        ? $"✓ {r.Copied} copied · ✏ {r.Fixed} fixed · 🏷 {r.Renamed} renamed · ↷ {r.Skipped} skipped · 🗑 {r.Discarded} discarded · ✗ {r.Failed} failed"
+        : "";
 
     [ObservableProperty] private string _laneFilter = "all";
     [ObservableProperty] private string _searchText = "";
@@ -122,6 +174,13 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
     [ObservableProperty] private bool _isApplying;
     [ObservableProperty] private bool _historyOpen;
     [ObservableProperty] private string? _statusMessage;
+    [ObservableProperty] private double _operationProgress;
+    [ObservableProperty] private string? _operationMessage;
+
+    public bool IsOperationRunning => IsScanning || IsApplying;
+    public bool CanCancelOperation => _activeJob is { State: JobState.Queued or JobState.Running };
+    public bool CanEditSources => !IsApplying;
+    public bool CanEditReview => !IsApplying;
 
     /// <summary>Folder picker hook set by the view (real Avalonia StorageProvider). Returns chosen folder paths.</summary>
     public Func<Task<IReadOnlyList<string>>>? FolderPicker { get; set; }
@@ -143,16 +202,47 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
     public double ReviewProgress => ReviewTotal == 0 ? 1 : (double)ReviewResolved / ReviewTotal;
     public bool HasSession => _session is not null;
 
-    /// <summary>Sources strip summary line: "N folder(s) · M archive(s) extracted · K failed/password". </summary>
+    /// <summary>Sources strip summary: pending picks before scan, extracted counts after.</summary>
     public string SourcesSummary
     {
         get
         {
+            if (!HasSession)
+            {
+                if (SourcePaths.Count == 0)
+                    return "No sources yet — add a folder or archive, then Scan.";
+                return $"{SourcePaths.Count} source(s) ready — click Scan to classify.";
+            }
             var folders = Sources.Count(s => s.Kind == ImportSourceKind.Folder);
             var archives = Sources.Count(s => s.Kind == ImportSourceKind.Archive && s.Status == ImportSourceStatus.Ok);
             var failed = Sources.Count(s => s.Status != ImportSourceStatus.Ok);
             var s = $"{folders} folder(s) · {archives} archive(s) extracted";
             return failed > 0 ? s + $" · 🔒 {failed} failed/password (logged to History)" : s;
+        }
+    }
+
+    /// <summary>Why Scan/Apply are gated — shown so buttons don't look "dead".</summary>
+    public string GateHint
+    {
+        get
+        {
+            if (IsScanning)
+                return OperationMessage ?? "Scanning…";
+            if (IsApplying)
+                return OperationMessage ?? "Applying…";
+            if (Repositories.Count == 0)
+                return "Add a repository first (Repositories screen), then pick an Import into target.";
+            if (TargetRepo is null)
+                return "Choose a target repository (Import into).";
+            if (SourcePaths.Count == 0)
+                return "Add at least one folder or archive with + Folder… / + Archive….";
+            if (_session is not null && ReviewRemaining > 0)
+                return $"{ReviewRemaining} item(s) still need a decision before Apply.";
+            if (_session is not null && CanApply)
+                return "Ready to Apply.";
+            if (CanScan)
+                return "Ready to Scan.";
+            return "";
         }
     }
 
@@ -183,32 +273,100 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
     [RelayCommand]
     private async Task AddFolderAsync()
     {
-        if (FolderPicker is not null)
-            AddPaths(await FolderPicker().ConfigureAwait(true));
+        if (FolderPicker is null)
+        {
+            StatusMessage = "Folder picker is not available in this host.";
+            return;
+        }
+        var paths = await FolderPicker().ConfigureAwait(true);
+        AddPaths(paths, "folder");
     }
 
     /// <summary>"+ Archive…" — pick one or more archive files (zip/7z/rar/tar) via the native OS dialog. (QoL)</summary>
     [RelayCommand]
     private async Task AddArchiveAsync()
     {
-        if (ArchivePicker is not null)
-            AddPaths(await ArchivePicker().ConfigureAwait(true));
+        if (ArchivePicker is null)
+        {
+            StatusMessage = "Archive picker is not available in this host.";
+            return;
+        }
+        var paths = await ArchivePicker().ConfigureAwait(true);
+        AddPaths(paths, "archive");
     }
 
-    private void AddPaths(IReadOnlyList<string> paths)
+    private void AddPaths(IReadOnlyList<string> paths, string kindLabel)
     {
+        if (IsApplying)
+            return;
+        var added = 0;
         foreach (var p in paths)
-            if (!string.IsNullOrWhiteSpace(p) && !SourcePaths.Contains(p))
-                SourcePaths.Add(p);
+        {
+            if (string.IsNullOrWhiteSpace(p) || SourcePaths.Contains(p))
+                continue;
+            SourcePaths.Add(p);
+            added++;
+        }
+        // A new pick invalidates any prior unapplied session — user must re-scan.
+        if (added > 0 && _session is not null)
+            ClearSessionKeepSources();
+        StatusMessage = added > 0
+            ? $"Added {added} {kindLabel}(s) · {SourcePaths.Count} source(s) total"
+            : paths.Count == 0
+                ? "No path selected."
+                : "Those sources were already on the list.";
+        NotifyPendingSources();
         NotifyGate();
     }
 
     /// <summary>Add a source path directly (test seam / drag-drop).</summary>
     public void AddSourcePath(string path)
     {
-        if (!string.IsNullOrWhiteSpace(path) && !SourcePaths.Contains(path))
-            SourcePaths.Add(path);
+        if (IsApplying)
+            return;
+        if (string.IsNullOrWhiteSpace(path) || SourcePaths.Contains(path))
+            return;
+        SourcePaths.Add(path);
+        if (_session is not null)
+            ClearSessionKeepSources();
+        NotifyPendingSources();
         NotifyGate();
+    }
+
+    /// <summary>Remove a pending source chip before Scan.</summary>
+    [RelayCommand]
+    private void RemoveSource(string? path)
+    {
+        if (IsApplying)
+            return;
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+        if (!SourcePaths.Remove(path))
+            return;
+        if (_session is not null)
+            ClearSessionKeepSources();
+        StatusMessage = SourcePaths.Count == 0
+            ? "All sources removed."
+            : $"Removed · {SourcePaths.Count} source(s) remaining";
+        NotifyPendingSources();
+        NotifyGate();
+    }
+
+    /// <summary>Drop scanned session/items when the source set changes; keep SourcePaths.</summary>
+    private void ClearSessionKeepSources()
+    {
+        DiscardTemp(_session?.TempRoot);
+        _session = null;
+        foreach (var i in _all)
+            i.PropertyChanged -= OnItemChanged;
+        _all.Clear();
+        Items.Clear();
+        Sources.Clear();
+        Warnings.Clear();
+        Selected = null;
+        OnPropertyChanged(nameof(HasWarnings));
+        NotifyCounts();
+        NotifyPendingSources();
     }
 
     [RelayCommand(CanExecute = nameof(CanScan))]
@@ -216,28 +374,36 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
     {
         if (TargetRepo is null || SourcePaths.Count == 0)
             return;
+
+        var spec = new ImportSpec([.. SourcePaths], TargetRepo.Id, ActivateAfter);
+        var token = CaptureScanToken();
+
         IsScanning = true;
-        NotifyGate();
+        OperationProgress = 0;
+        OperationMessage = "Queued…";
+        NotifyOperationState();
         try
         {
-            _session = await _import.ScanAsync(new ImportSpec([.. SourcePaths], TargetRepo.Id, ActivateAfter)).ConfigureAwait(true);
-            _all.Clear();
-            foreach (var it in _session.Items)
+            var job = _jobs.StartScan(spec);
+            _activeJob = job.Handle;
+            NotifyOperationState(); // Cancel becomes enabled once a handle exists
+            StartProgressMirror(job.Handle);
+
+            var session = await job.Result.ConfigureAwait(true);
+            if (!IsScanStillValid(token))
             {
-                var vm = new ImportItemViewModel(it);
-                vm.PropertyChanged += OnItemChanged;
-                _all.Add(vm);
+                // Rejected result still owns a temp workspace — must not orphan it.
+                DiscardTemp(session.TempRoot);
+                StatusMessage = "Scan finished but inputs changed — run Scan again.";
+                return;
             }
-            Sources.Clear();
-            foreach (var s in _session.Sources)
-                Sources.Add(s);
-            Warnings.Clear();
-            foreach (var w in _session.Warnings)
-                Warnings.Add(w);
-            OnPropertyChanged(nameof(SourcesSummary));
-            OnPropertyChanged(nameof(HasWarnings));
-            await ApplyFilterAsync().ConfigureAwait(true);
+
+            await InstallSessionAsync(session).ConfigureAwait(true);
             StatusMessage = $"Scanned {_all.Count} vars · {ReviewRemaining} need review";
+        }
+        catch (OperationCanceledException)
+        {
+            StatusMessage = "Scan cancelled.";
         }
         catch (Exception ex)
         {
@@ -246,15 +412,21 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
         }
         finally
         {
+            StopProgressMirror();
+            _activeJob = null;
             IsScanning = false;
+            OperationProgress = 0;
+            OperationMessage = null;
             NotifyCounts();
-            NotifyGate();
+            NotifyOperationState();
         }
     }
 
     [RelayCommand]
     private void AcceptAll()
     {
+        if (IsApplying)
+            return;
         foreach (var i in _all.Where(x => x.NeedsReview && !x.IsResolved))
             i.Decision = i.Recommendation;
         NotifyCounts();
@@ -265,6 +437,8 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
     [RelayCommand]
     private void SetDecision(string param)
     {
+        if (IsApplying)
+            return;
         var parts = param.Split('|');
         if (parts.Length != 2 || !Guid.TryParse(parts[0], out var id) || !Enum.TryParse<ImportDecision>(parts[1], out var dec))
             return;
@@ -280,23 +454,32 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
     {
         if (_session is null)
             return;
+
+        var snapshot = ImportJobRunner.FreezeSession(
+            _session,
+            _all.Select(i => (i.Model.Id, i.Decision)));
+
         IsApplying = true;
-        NotifyGate();
+        OperationProgress = 0;
+        OperationMessage = "Queued…";
+        NotifyOperationState();
         try
         {
-            var r = await _import.ApplyAsync(_session).ConfigureAwait(true);
+            var job = _jobs.StartApply(snapshot);
+            _activeJob = job.Handle;
+            NotifyOperationState();
+            StartProgressMirror(job.Handle);
+
+            var r = await job.Result.ConfigureAwait(true);
             StatusMessage = $"Done: copied {r.Copied} · fixed {r.Fixed} · renamed {r.Renamed} · skipped {r.Skipped} · discarded {r.Discarded}"
                             + (r.Failed > 0 ? $" · failed {r.Failed}" : "");
-            _session = null;
-            _all.Clear();
-            Items.Clear();
-            Sources.Clear();
-            Warnings.Clear();
-            OnPropertyChanged(nameof(HasWarnings));
+            ResetAfterApply();
             await RefreshHistoryAsync().ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
+            // Apply always cleans temp in its finally — session paths are gone.
+            ResetAfterApply();
             StatusMessage = "Import cancelled — copied items are kept, the rest skipped (logged to History).";
             await RefreshHistoryAsync().ConfigureAwait(true);
         }
@@ -304,14 +487,150 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
         {
             // §11: target offline/full and other apply failures surface as a clear message, not a crash.
             StatusMessage = $"Can't import: {ex.Message}";
+            // Mid-apply failures also delete TempRoot; a session pointing at deleted files is unusable.
+            if (_session is not null && !string.IsNullOrEmpty(_session.TempRoot) && !Directory.Exists(_session.TempRoot))
+            {
+                ClearSessionKeepSources();
+                StatusMessage += " · re-scan sources to try again.";
+            }
         }
         finally
         {
+            StopProgressMirror();
+            _activeJob = null;
             IsApplying = false;
+            OperationProgress = 0;
+            OperationMessage = null;
             NotifyCounts();
-            NotifyGate();
+            NotifyOperationState();
         }
     }
+
+    [RelayCommand(CanExecute = nameof(CanCancelOperation))]
+    private void CancelOperation()
+    {
+        try { _activeJob?.Cancel(); }
+        catch (ObjectDisposedException) { /* job already finished */ }
+    }
+
+    private sealed record ScanRequestToken(Guid TargetId, bool ActivateAfter, IReadOnlyList<string> Paths);
+
+    private ScanRequestToken CaptureScanToken() =>
+        new(TargetRepo!.Id, ActivateAfter, SourcePaths.ToList());
+
+    private bool IsScanStillValid(ScanRequestToken token) =>
+        TargetRepo?.Id == token.TargetId
+        && ActivateAfter == token.ActivateAfter
+        && SourcePaths.Count == token.Paths.Count
+        && SourcePaths.OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .SequenceEqual(token.Paths.OrderBy(p => p, StringComparer.OrdinalIgnoreCase));
+
+    private async Task InstallSessionAsync(ImportSession session)
+    {
+        // Replacing a prior unapplied session must not leave its temp dir behind.
+        if (_session is not null && !string.Equals(_session.TempRoot, session.TempRoot, StringComparison.OrdinalIgnoreCase))
+            DiscardTemp(_session.TempRoot);
+
+        _session = session;
+        foreach (var i in _all)
+            i.PropertyChanged -= OnItemChanged;
+        _all.Clear();
+        foreach (var it in session.Items)
+        {
+            var vm = new ImportItemViewModel(it);
+            vm.PropertyChanged += OnItemChanged;
+            _all.Add(vm);
+        }
+        Sources.Clear();
+        foreach (var s in session.Sources)
+            Sources.Add(s);
+        Warnings.Clear();
+        foreach (var w in session.Warnings)
+            Warnings.Add(w);
+        OnPropertyChanged(nameof(SourcesSummary));
+        OnPropertyChanged(nameof(HasWarnings));
+        NotifyPendingSources();
+        await ApplyFilterAsync().ConfigureAwait(true);
+    }
+
+    private void ResetAfterApply()
+    {
+        // TempRoot already deleted by ApplyAsync — don't double-delete.
+        _session = null;
+        foreach (var i in _all)
+            i.PropertyChanged -= OnItemChanged;
+        _all.Clear();
+        Items.Clear();
+        Sources.Clear();
+        SourcePaths.Clear();
+        Warnings.Clear();
+        Selected = null;
+        OnPropertyChanged(nameof(HasWarnings));
+        NotifyPendingSources();
+    }
+
+    private static void DiscardTemp(string? root)
+    {
+        if (string.IsNullOrEmpty(root))
+            return;
+        try
+        {
+            if (Directory.Exists(root))
+                Directory.Delete(root, recursive: true);
+        }
+        catch { /* startup sweep catches leftovers */ }
+    }
+
+    private void StartProgressMirror(JobHandle handle)
+    {
+        StopProgressMirror();
+        _progressPollCts = new CancellationTokenSource();
+        var ct = _progressPollCts.Token;
+        _ = Task.Run(async () =>
+        {
+            while (!ct.IsCancellationRequested
+                   && handle.State is JobState.Queued or JobState.Running)
+            {
+                var p = handle.Progress;
+                try
+                {
+                    await _ui.InvokeAsync(() =>
+                    {
+                        OperationProgress = p.Total > 0 ? (double)p.Done / p.Total : 0;
+                        if (!string.IsNullOrEmpty(p.Message))
+                            OperationMessage = p.Message;
+                        return Task.CompletedTask;
+                    }).ConfigureAwait(false);
+                }
+                catch (ObjectDisposedException) { break; }
+                catch (TaskCanceledException) { break; }
+                try { await Task.Delay(200, ct).ConfigureAwait(false); }
+                catch (OperationCanceledException) { break; }
+            }
+        }, ct);
+    }
+
+    private void StopProgressMirror()
+    {
+        if (_progressPollCts is null)
+            return;
+        try { _progressPollCts.Cancel(); }
+        catch { /* best-effort */ }
+        _progressPollCts.Dispose();
+        _progressPollCts = null;
+    }
+
+    private void NotifyOperationState()
+    {
+        OnPropertyChanged(nameof(IsOperationRunning));
+        OnPropertyChanged(nameof(CanCancelOperation));
+        OnPropertyChanged(nameof(CanEditSources));
+        OnPropertyChanged(nameof(CanEditReview));
+        NotifyGate();
+        CancelOperationCommand.NotifyCanExecuteChanged();
+    }
+
+    partial void OnOperationMessageChanged(string? value) => OnPropertyChanged(nameof(GateHint));
 
     // ── Keyboard (doc 31 Phase 6.6 · 29-draft): J/K navigate, ] [ \ decide, Del discard. Called from the
     //    view's KeyDown. Navigation walks the visible list; decisions apply to the selected review item. ──────
@@ -349,6 +668,8 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
 
     private void Decide(Func<ImportItemViewModel, ImportDecision?> pick)
     {
+        if (IsApplying)
+            return;
         if (Selected is not { NeedsReview: true } sel)
             return;
         if (pick(sel) is { } d)
@@ -357,8 +678,28 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
 
     [RelayCommand] private void ToggleView() => GalleryView = !GalleryView;
     [RelayCommand] private void Filter(string lane) { LaneFilter = lane; _ = ApplyFilterAsync(); }
-    [RelayCommand] private async Task OpenHistory() { await RefreshHistoryAsync().ConfigureAwait(true); HistoryOpen = true; }
-    [RelayCommand] private void CloseHistory() => HistoryOpen = false;
+    [RelayCommand]
+    private async Task OpenHistory()
+    {
+        await RefreshHistoryAsync().ConfigureAwait(true);
+        HistoryOpen = true;
+        await SelectHistoryRunAsync(History.FirstOrDefault()).ConfigureAwait(true);
+    }
+
+    [RelayCommand]
+    private void CloseHistory()
+    {
+        HistoryOpen = false;
+        SelectedHistoryRun = null;
+        NotifyHistoryDetail();
+    }
+
+    /// <summary>Open the detail report for one history run (failed items + failed sources).</summary>
+    [RelayCommand]
+    private async Task OpenHistoryDetailAsync(ImportRun? run)
+    {
+        await SelectHistoryRunAsync(run).ConfigureAwait(true);
+    }
 
     /// <summary>History "Retry…" on a failed source: re-add it as a source + close history so the user re-scans
     /// (e.g. after removing the password or replacing the corrupt archive). (draft §10.)</summary>
@@ -367,12 +708,54 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
     {
         if (!string.IsNullOrWhiteSpace(path))
             AddSourcePath(path!);
-        HistoryOpen = false;
+        CloseHistory();
     }
+
+    private void NotifyHistoryDetail()
+    {
+        OnPropertyChanged(nameof(HasHistoryDetail));
+        OnPropertyChanged(nameof(SelectedHasFailedSources));
+        OnPropertyChanged(nameof(SelectedHistoryTitle));
+        OnPropertyChanged(nameof(SelectedHistoryCounts));
+    }
+
+    private async Task SelectHistoryRunAsync(ImportRun? run)
+    {
+        SelectedHistoryRun = run;
+        HistoryOutcomeFilter = "all";
+        HistoryOutcomeSearch = "";
+        NotifyHistoryDetail();
+        await HistoryOutcomesPager.LoadPageAsync(1, HistoryOutcomesPager.PageSize).ConfigureAwait(true);
+    }
+
+    [RelayCommand]
+    private async Task FilterHistoryOutcomesAsync(string filter)
+    {
+        HistoryOutcomeFilter = string.IsNullOrWhiteSpace(filter) ? "all" : filter;
+        await HistoryOutcomesPager.LoadPageAsync(1, HistoryOutcomesPager.PageSize).ConfigureAwait(true);
+    }
+
+    [RelayCommand]
+    private Task HistoryPreviousPageAsync(CancellationToken cancellationToken = default) =>
+        HistoryOutcomesPager.PreviousPageAsync(cancellationToken);
+
+    [RelayCommand]
+    private Task HistoryNextPageAsync(CancellationToken cancellationToken = default) =>
+        HistoryOutcomesPager.NextPageAsync(cancellationToken);
+
+    [RelayCommand]
+    private Task HistoryGoToPageAsync(int pageNumber, CancellationToken cancellationToken = default) =>
+        HistoryOutcomesPager.LoadPageAsync(pageNumber, HistoryOutcomesPager.PageSize, cancellationToken);
+
+    [RelayCommand]
+    private Task HistoryChangePageSizeAsync(int pageSize, CancellationToken cancellationToken = default) =>
+        HistoryOutcomesPager.LoadPageAsync(1, pageSize, cancellationToken);
 
     partial void OnTargetRepoChanged(RepositoryInfo? value) => NotifyGate();
     partial void OnLaneFilterChanged(string value) => _ = ApplyFilterAsync();
     partial void OnSearchTextChanged(string value) => _ = ApplyFilterAsync();
+    partial void OnHistoryOutcomeSearchChanged(string value) =>
+        _ = HistoryOutcomesPager.LoadPageAsync(1, HistoryOutcomesPager.PageSize);
 
     private void OnItemChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
@@ -407,6 +790,26 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
             History.Add(run);
     }
 
+    private async Task<PageResult<ImportOutcomeRow>> LoadHistoryOutcomePageAsync(
+        PageRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (SelectedHistoryRun is not { } run)
+            return PageResult<ImportOutcomeRow>.Empty(request);
+
+        var result = await _import.HistoryOutcomesPageAsync(
+            run.Id,
+            request,
+            HistoryOutcomeFilter,
+            HistoryOutcomeSearch,
+            cancellationToken).ConfigureAwait(true);
+        return new PageResult<ImportOutcomeRow>(
+            result.Items.Select(o => new ImportOutcomeRow(o)).ToList(),
+            result.TotalCount,
+            result.PageNumber,
+            result.PageSize);
+    }
+
     private void NotifyCounts()
     {
         foreach (var n in new[] { nameof(TotalScanned), nameof(NewCount), nameof(CjkCount), nameof(ExactCount),
@@ -416,10 +819,19 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
             OnPropertyChanged(n);
     }
 
+    private void NotifyPendingSources()
+    {
+        OnPropertyChanged(nameof(HasPendingSources));
+        OnPropertyChanged(nameof(HasScannedSources));
+        OnPropertyChanged(nameof(SourcesSummary));
+    }
+
     private void NotifyGate()
     {
         OnPropertyChanged(nameof(CanApply));
         OnPropertyChanged(nameof(CanScan));
+        OnPropertyChanged(nameof(GateHint));
+        OnPropertyChanged(nameof(SourcesSummary));
         ScanCommand.NotifyCanExecuteChanged();
         ApplyCommand.NotifyCanExecuteChanged();
     }

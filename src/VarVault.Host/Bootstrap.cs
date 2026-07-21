@@ -27,12 +27,16 @@ public static class Bootstrap
     /// Full app composition: built-in modules + the catalog DB under <paramref name="dataDirectory"/>,
     /// migrated and ready. Front-ends call this so they never bind to Infrastructure directly.
     /// </summary>
-    public static VarVaultHost BuildApp(string dataDirectory)
+    public static VarVaultHost BuildApp(string dataDirectory, Action<IServiceCollection>? configure = null)
     {
         var dbPath = System.IO.Path.Combine(dataDirectory, "catalog.db");
         var host = VarVaultHost.Build(
             new HostOptions("VarVault", dataDirectory),
-            services => services.AddVarVaultPersistence(dbPath),
+            services =>
+            {
+                services.AddVarVaultPersistence(dbPath);
+                configure?.Invoke(services);
+            },
             [.. BuiltInModules()]);
 
         using var scope = host.Services.CreateScope();

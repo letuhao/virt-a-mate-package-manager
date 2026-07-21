@@ -11,6 +11,8 @@ public enum LibrarySort
     Size = 2,
     LastUsed = 3,
     Class = 4,
+    Added = 5,
+    Installed = 6,
 }
 
 /// <summary>A filtered/sorted/paged query over the materialized library read model.</summary>
@@ -27,6 +29,7 @@ public sealed record LibraryQuery(
     string? PackageName = null,
     bool InstalledOnly = false,
     bool SingleCopyOnly = false,
+    long? TagId = null,
     IReadOnlyList<string>? Types = null,
     IReadOnlyList<int>? Tiers = null);
 
@@ -49,6 +52,7 @@ public sealed record PackageListEntry(
     int? Tier = null,
     IReadOnlyDictionary<string, int>? ContentCounts = null,
     DateTime? AddedAt = null,
+    DateTime? InstalledAt = null,
     int DependencyCount = 0,
     bool IsActive = false)
 {
@@ -106,4 +110,10 @@ public interface ILibraryQueryService
     /// OrderedSnapshot. Ignores <see cref="LibraryQuery.Skip"/>/<see cref="LibraryQuery.Take"/>. (1.39)
     /// </summary>
     Task<IReadOnlyList<long>> GetOrderedIdsAsync(LibraryQuery query, CancellationToken cancellationToken = default);
+
+    /// <summary>Load DTOs for a bounded slice of an OrderedSnapshot, preserving the requested id order.</summary>
+    Task<IReadOnlyList<PackageListEntry>> GetByIdsAsync(
+        IReadOnlyList<long> packageIds,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<PackageListEntry>>([]);
 }

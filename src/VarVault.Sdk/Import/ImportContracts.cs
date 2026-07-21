@@ -1,5 +1,6 @@
 using VarVault.Common;
 using VarVault.Sdk.Events;
+using VarVault.Sdk.Paging;
 
 namespace VarVault.Sdk.Import;
 
@@ -126,8 +127,14 @@ public sealed record VarsImported(
 public interface IImportService
 {
     Task<ImportSession> ScanAsync(ImportSpec spec, IProgressSink? progress = null, CancellationToken cancellationToken = default);
-    Task<ApplyResult> ApplyAsync(ImportSession session, CancellationToken cancellationToken = default);
+    Task<ApplyResult> ApplyAsync(ImportSession session, IProgressSink? progress = null, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ImportRun>> HistoryAsync(int take, CancellationToken cancellationToken = default);
+    Task<PageResult<ImportOutcome>> HistoryOutcomesPageAsync(
+        Guid runId,
+        PageRequest request,
+        string filter = "all",
+        string? searchText = null,
+        CancellationToken cancellationToken = default);
 
     /// <summary>Delete import temp-workspace dirs orphaned by a crashed run (called once at startup). (doc 30 §6/E5.)</summary>
     Task SweepTempWorkspacesAsync(CancellationToken cancellationToken = default);
@@ -151,4 +158,10 @@ public interface IImportHistoryStore
 {
     Task<Guid> RecordAsync(ImportRun run, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ImportRun>> RecentAsync(int take, CancellationToken cancellationToken = default);
+    Task<PageResult<ImportOutcome>> OutcomesPageAsync(
+        Guid runId,
+        PageRequest request,
+        string filter = "all",
+        string? searchText = null,
+        CancellationToken cancellationToken = default);
 }

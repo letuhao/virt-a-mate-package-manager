@@ -17,7 +17,7 @@ public sealed class ImportViewModelTests
     [Fact]
     public async Task Scan_gate_acceptAll_apply_over_real_services()
     {
-        await using var host = TestHost.Create(withPersistence: true);
+        await using var host = TestHost.Create(withPersistence: true, configure: ImportTestHelpers.RegisterImportJobs);
         using var catalogDir = new TempDirectory();
         using var targetDir = new TempDirectory();
         using var importDir = new TempDirectory();
@@ -38,9 +38,7 @@ public sealed class ImportViewModelTests
         WriteVar(importDir.Path, "Creator.PackB.1.var", "Creator", "PackB", ("Custom/b.vam", "CCC"), ("Custom/b2.vam", "X")); // Conflict
 
         using var read = host.Host.Services.CreateScope();
-        var vm = new ImportViewModel(
-            read.ServiceProvider.GetRequiredService<IImportService>(),
-            read.ServiceProvider.GetRequiredService<IRepositoryService>());
+        var vm = ImportTestHelpers.CreateImportViewModel(read.ServiceProvider);
         await vm.LoadAsync();
         vm.TargetRepo = vm.Repositories.First(r => r.Id == targetId);
         vm.AddSourcePath(importDir.Path);
@@ -59,12 +57,57 @@ public sealed class ImportViewModelTests
         Assert.True(File.Exists(Path.Combine(targetDir.Path, "Fresh.New.1.var")));   // New imported
         Assert.Contains("copied", vm.StatusMessage ?? "");
         Assert.Single(vm.History);                 // run recorded
+
+        // History detail is a reviewable, paged per-item ledger — not summary counts only.
+        await vm.OpenHistoryCommand.ExecuteAsync(null);
+        Assert.True(vm.HasHistoryDetail);
+        Assert.NotNull(vm.SelectedHistoryRun);
+        Assert.Equal(vm.SelectedHistoryRun!.Outcomes.Count, vm.HistoryOutcomesPager.TotalCount);
+        Assert.Equal(25, vm.HistoryOutcomesPager.PageSize);
+        Assert.Equal(vm.SelectedHistoryRun.Outcomes.Count, vm.HistoryOutcomesPager.Items.Count);
+
+        await vm.FilterHistoryOutcomesCommand.ExecuteAsync("failed");
+        Assert.Equal(vm.SelectedHistoryRun.Outcomes.Count(o => !o.Ok), vm.HistoryOutcomesPager.TotalCount);
+    }
+
+    [Fact]
+    public async Task Stale_scan_result_is_rejected_and_temp_is_cleaned()
+    {
+        await using var host = TestHost.Create(withPersistence: true, configure: ImportTestHelpers.RegisterImportJobs);
+        using var targetDir = new TempDirectory();
+        using var importDir = new TempDirectory();
+        using var otherDir = new TempDirectory();
+
+        WriteVar(importDir.Path, "Fresh.New.1.var", "Fresh", "New", ("Custom/n.vam", "N"));
+        WriteVar(otherDir.Path, "Other.Pack.1.var", "Other", "Pack", ("Custom/o.vam", "O"));
+
+        Guid targetId;
+        using (var scope = host.Host.Services.CreateScope())
+            targetId = (await scope.ServiceProvider.GetRequiredService<IRepositoryService>()
+                .RegisterAsync(new RegisterRepositoryRequest("target", targetDir.Path))).Value.Id;
+
+        using var read = host.Host.Services.CreateScope();
+        var vm = ImportTestHelpers.CreateImportViewModel(read.ServiceProvider);
+        await vm.LoadAsync();
+        vm.TargetRepo = vm.Repositories.First(r => r.Id == targetId);
+        vm.AddSourcePath(importDir.Path);
+
+        // Start scan, then mutate sources after the request token is captured — stale guard must reject + clean temp.
+        var scan = vm.ScanCommand.ExecuteAsync(null);
+        for (var i = 0; i < 200 && !vm.IsScanning; i++)
+            await Task.Delay(10);
+        Assert.True(vm.IsScanning);
+        vm.AddSourcePath(otherDir.Path);
+        await scan;
+
+        Assert.False(vm.HasSession);
+        Assert.Contains("inputs changed", vm.StatusMessage ?? "", StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public async Task Keyboard_navigates_and_decides_review_items()
     {
-        await using var host = TestHost.Create(withPersistence: true);
+        await using var host = TestHost.Create(withPersistence: true, configure: ImportTestHelpers.RegisterImportJobs);
         using var catalogDir = new TempDirectory();
         using var targetDir = new TempDirectory();
         using var importDir = new TempDirectory();
@@ -84,9 +127,7 @@ public sealed class ImportViewModelTests
         WriteVar(importDir.Path, "Creator.PackB.1.var", "Creator", "PackB", ("Custom/b.vam", "CCC"), ("Custom/b2.vam", "X")); // Conflict
 
         using var read = host.Host.Services.CreateScope();
-        var vm = new ImportViewModel(
-            read.ServiceProvider.GetRequiredService<IImportService>(),
-            read.ServiceProvider.GetRequiredService<IRepositoryService>());
+        var vm = ImportTestHelpers.CreateImportViewModel(read.ServiceProvider);
         await vm.LoadAsync();
         vm.TargetRepo = vm.Repositories.First(r => r.Id == targetId);
         vm.AddSourcePath(importDir.Path);
@@ -113,7 +154,7 @@ public sealed class ImportViewModelTests
     [Fact]
     public async Task Lane_flags_apply_plan_and_search_filter()
     {
-        await using var host = TestHost.Create(withPersistence: true);
+        await using var host = TestHost.Create(withPersistence: true, configure: ImportTestHelpers.RegisterImportJobs);
         using var catalogDir = new TempDirectory();
         using var targetDir = new TempDirectory();
         using var importDir = new TempDirectory();
@@ -134,9 +175,7 @@ public sealed class ImportViewModelTests
         WriteVar(importDir.Path, "Dup.Pack.1.var", "Dup", "Pack", ("Custom/d.vam", "D"));        // Exact dup
 
         using var read = host.Host.Services.CreateScope();
-        var vm = new ImportViewModel(
-            read.ServiceProvider.GetRequiredService<IImportService>(),
-            read.ServiceProvider.GetRequiredService<IRepositoryService>());
+        var vm = ImportTestHelpers.CreateImportViewModel(read.ServiceProvider);
         await vm.LoadAsync();
         vm.TargetRepo = vm.Repositories.First(r => r.Id == targetId);
         vm.AddSourcePath(importDir.Path);
@@ -157,6 +196,37 @@ public sealed class ImportViewModelTests
         Assert.Equal("Fresh.New.1.var", vm.Items[0].FileName);
         vm.SearchText = "";
         Assert.True(vm.Items.Count >= 2);
+    }
+
+    [Fact]
+    public async Task Pending_sources_show_before_scan_and_gate_hint_explains_disabled_scan()
+    {
+        await using var host = TestHost.Create(withPersistence: true, configure: ImportTestHelpers.RegisterImportJobs);
+        using var targetDir = new TempDirectory();
+        using var importDir = new TempDirectory();
+
+        using (var scope = host.Host.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<IRepositoryService>()
+                .RegisterAsync(new RegisterRepositoryRequest("target", targetDir.Path));
+
+        using var read = host.Host.Services.CreateScope();
+        var vm = ImportTestHelpers.CreateImportViewModel(read.ServiceProvider);
+        await vm.LoadAsync();
+
+        Assert.False(vm.HasPendingSources);
+        Assert.False(vm.CanScan);
+        Assert.Contains("folder or archive", vm.GateHint, StringComparison.OrdinalIgnoreCase);
+
+        vm.AddSourcePath(importDir.Path);
+        Assert.True(vm.HasPendingSources);
+        Assert.True(vm.CanScan);
+        Assert.Contains("Ready to Scan", vm.GateHint, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("1 source", vm.SourcesSummary, StringComparison.OrdinalIgnoreCase);
+
+        vm.RemoveSourceCommand.Execute(importDir.Path);
+        Assert.False(vm.HasPendingSources);
+        Assert.False(vm.CanScan);
+        Assert.Empty(vm.SourcePaths);
     }
 
     private static void WriteVar(string dir, string fileName, string creator, string package, params (string, string)[] entries)

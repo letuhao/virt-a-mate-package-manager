@@ -200,6 +200,98 @@ public sealed class EfDependencyResolver(VarVaultDbContext db) : IDependencyReso
         return touched;
     }
 
+    public async Task<int> ResolveReferenceAsync(string requestedRef, CancellationToken cancellationToken = default)
+    {
+        var key = IdentityFold.Compute(requestedRef);
+        var aliasTarget = await db.VarAliases.AsNoTracking()
+            .Where(a => a.MissingRefKey == key && a.ResolvedPackageId != null)
+            .Select(a => a.ResolvedPackageId)
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var dependencies = await db.Dependencies
+            .Where(d => d.DependsOnRefKey == key &&
+                        (d.IsMissing || d.ResolvedVia == ResolvedVia.Alias))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        var previousTargets = dependencies
+            .Where(d => d.ResolvedPackageId is not null)
+            .Select(d => d.ResolvedPackageId!.Value)
+            .Distinct()
+            .ToList();
+        var sourceVarFileIds = dependencies.Select(d => d.VarFileId).Distinct().ToList();
+        foreach (var dependency in dependencies)
+        {
+            dependency.ResolvedPackageId = aliasTarget;
+            dependency.IsMissing = aliasTarget is null;
+            dependency.IsVersionSubstituted = false;
+            dependency.ResolvedVia = aliasTarget is null ? ResolvedVia.None : ResolvedVia.Alias;
+        }
+
+        var saveDependencies = await db.SaveDependencies
+            .Where(d => d.DependsOnRefKey == key &&
+                        (aliasTarget == null || d.IsMissing || d.ResolvedPackageId == aliasTarget))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        foreach (var dependency in saveDependencies)
+        {
+            dependency.ResolvedPackageId = aliasTarget;
+            dependency.IsMissing = aliasTarget is null;
+        }
+        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        if (sourceVarFileIds.Count > 0)
+        {
+            var sourcePackageIds = await db.VarFiles.AsNoTracking()
+                .Where(v => sourceVarFileIds.Contains(v.Id) && v.PackageId != null)
+                .Select(v => v.PackageId!.Value)
+                .Distinct()
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+            foreach (var packageId in sourcePackageIds)
+            {
+                var canonicalId = await db.Packages.AsNoTracking()
+                    .Where(p => p.Id == packageId)
+                    .Select(p => p.CanonicalVarFileId)
+                    .FirstOrDefaultAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                var hasMissing = canonicalId is { } varFileId &&
+                    await db.Dependencies.AsNoTracking()
+                        .AnyAsync(d => d.VarFileId == varFileId && d.IsMissing, cancellationToken)
+                        .ConfigureAwait(false);
+                await db.PackageListItems.Where(i => i.PackageId == packageId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(i => i.HasMissingDeps, hasMissing), cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
+
+        var affectedTargets = previousTargets
+            .Select(id => (long?)id)
+            .Append(aliasTarget)
+            .Where(id => id is not null)
+            .Select(id => id!.Value)
+            .Distinct()
+            .ToList();
+        foreach (var targetId in affectedTargets)
+        {
+            var reverseCount = await (
+                from d in db.Dependencies.AsNoTracking()
+                join v in db.VarFiles.AsNoTracking() on d.VarFileId equals v.Id
+                where d.ResolvedPackageId == targetId && v.PackageId != null && v.PackageId != targetId
+                select v.PackageId!.Value)
+                .Distinct()
+                .CountAsync(cancellationToken)
+                .ConfigureAwait(false);
+            await db.Packages.Where(p => p.Id == targetId)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(p => p.ReverseDependentCount, reverseCount)
+                    .SetProperty(p => p.IsFoundational, reverseCount >= FoundationalThreshold), cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        return dependencies.Count + saveDependencies.Count;
+    }
+
     private static void ResolveOne(
         Dependency dep,
         long? containerPackage,

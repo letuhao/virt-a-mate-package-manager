@@ -16,6 +16,24 @@ public sealed class Profile
     public DateTime UpdatedAt { get; set; }
 
     public ICollection<ActivationLink> Links { get; } = new List<ActivationLink>();
+    public ICollection<ProfilePackageLink> PackageLinks { get; } = new List<ProfilePackageLink>();
+}
+
+/// <summary>
+/// M:N membership of a package materialized into a loading profile (distinct from physical
+/// <see cref="ActivationLink"/> rows). Tracks when each package entered the profile.
+/// </summary>
+public sealed class ProfilePackageLink
+{
+    public long ProfileId { get; set; }
+    public Profile? Profile { get; set; }
+
+    public long PackageId { get; set; }
+    public Package? Package { get; set; }
+
+    public DateTime InstalledAt { get; set; }
+    public ActivationReason Reason { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }
 
 /// <summary>A file link the app created inside a profile, pointing at a specific (hottest online) var copy.</summary>

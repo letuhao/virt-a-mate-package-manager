@@ -77,6 +77,7 @@ public static class PersistenceRegistration
         services.AddScoped<SqliteDatabaseBackup>();
         services.AddScoped<Sdk.Library.ITrashQueryService, Library.EfTrashQueryService>();
         services.AddScoped<Sdk.Library.IProfileService, Library.EfProfileService>();
+        services.AddScoped<Sdk.Library.IProfilePackageLinkService, Library.EfProfilePackageLinkService>();
         services.AddScoped<Sdk.Library.IProposalService, Library.EfProposalService>();
         services.AddScoped<Sdk.Library.IPackageDetailQuery, Library.EfPackageDetailQuery>();
         services.AddScoped<Sdk.Library.ILibraryActionService, Library.EfLibraryActionService>();

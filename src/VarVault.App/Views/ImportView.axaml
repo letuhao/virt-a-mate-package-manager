@@ -14,7 +14,8 @@
                    Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center" />
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" Margin="0,0,8,0">
           <TextBlock Text="Import into" Opacity="0.6" VerticalAlignment="Center" FontSize="12" />
-          <ComboBox ItemsSource="{Binding Repositories}" SelectedItem="{Binding TargetRepo}" MinWidth="180">
+          <ComboBox ItemsSource="{Binding Repositories}" SelectedItem="{Binding TargetRepo}" MinWidth="180"
+                    IsEnabled="{Binding CanEditSources}">
             <ComboBox.ItemTemplate>
               <DataTemplate x:DataType="repo:RepositoryInfo">
                 <StackPanel Orientation="Horizontal" Spacing="6">
@@ -25,15 +26,40 @@
             </ComboBox.ItemTemplate>
           </ComboBox>
         </StackPanel>
-        <Button Grid.Column="2" Content="📁 + Folder…" Command="{Binding AddFolderCommand}" Margin="0,0,6,0" />
-        <Button Grid.Column="3" Content="🗜 + Archive…" Command="{Binding AddArchiveCommand}" Margin="0,0,6,0" />
+        <Button Grid.Column="2" Content="📁 + Folder…" Command="{Binding AddFolderCommand}" Margin="0,0,6,0"
+                IsEnabled="{Binding CanEditSources}" />
+        <Button Grid.Column="3" Content="🗜 + Archive…" Command="{Binding AddArchiveCommand}" Margin="0,0,6,0"
+                IsEnabled="{Binding CanEditSources}" />
         <Button Grid.Column="4" Content="🕘 History" Command="{Binding OpenHistoryCommand}" Margin="0,0,6,0" />
         <Button Grid.Column="5" Content="Scan" Command="{Binding ScanCommand}"
-                Background="{DynamicResource AccentBrush}" Foreground="White" />
+                Background="{DynamicResource AccentBrush}" Foreground="White"
+                ToolTip.Tip="{Binding GateHint}" />
       </Grid>
 
-      <!-- Sources strip + summary -->
-      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8">
+      <!-- Sources strip: pending picks (before Scan) + scanned ImportSource chips (after Scan) -->
+      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8"
+                  IsVisible="{Binding HasPendingSources}">
+        <ItemsControl ItemsSource="{Binding SourcePaths}">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Background="{DynamicResource Bg1Brush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                      CornerRadius="14" Padding="10,4" Margin="0,0,8,4">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <TextBlock Text="📎" FontSize="11" VerticalAlignment="Center" Opacity="0.7" />
+                  <TextBlock Text="{Binding}" FontSize="11" Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center"
+                             TextTrimming="CharacterEllipsis" MaxWidth="220" />
+                  <Button Content="✕" FontSize="10" Padding="4,0"
+                          Command="{Binding $parent[UserControl].((vm:ImportViewModel)DataContext).RemoveSourceCommand}"
+                          CommandParameter="{Binding}" ToolTip.Tip="Remove source" />
+                </StackPanel>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,8"
+                  IsVisible="{Binding HasScannedSources}">
         <ItemsControl ItemsSource="{Binding Sources}">
           <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel Orientation="Horizontal" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate>
@@ -54,10 +80,26 @@
         </ItemsControl>
       </StackPanel>
       <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="12" Margin="0,0,0,8">
-        <TextBlock Text="{Binding SourcesSummary}" Opacity="0.6" FontSize="11.5" VerticalAlignment="Center"
-                   IsVisible="{Binding HasSession}" />
+        <TextBlock Text="{Binding SourcesSummary}" Opacity="0.6" FontSize="11.5" VerticalAlignment="Center" />
+        <TextBlock Text="{Binding GateHint}" Opacity="0.75" FontSize="11.5" VerticalAlignment="Center"
+                   Foreground="{DynamicResource WarnBrush}" />
         <TextBlock Text="{Binding StatusMessage}" Opacity="0.6" FontSize="11.5" VerticalAlignment="Center" />
       </StackPanel>
+
+      <!-- Background Scan/Apply progress (Jobs panel also shows the same job) -->
+      <Border DockPanel.Dock="Top" IsVisible="{Binding IsOperationRunning}" Margin="0,0,0,8"
+              Background="{DynamicResource Bg1Brush}" BorderBrush="{DynamicResource BorderBrush}"
+              BorderThickness="1" CornerRadius="6" Padding="10,8">
+        <Grid ColumnDefinitions="*,Auto,Auto">
+          <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,10,0">
+            <ProgressBar Minimum="0" Maximum="1" Value="{Binding OperationProgress}" Height="6" />
+            <TextBlock Text="{Binding OperationMessage}" FontSize="11.5" Opacity="0.75" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+          <TextBlock Grid.Column="1" Text="Running in background…" FontSize="11" Opacity="0.55" VerticalAlignment="Center" />
+          <Button Grid.Column="2" Content="Cancel" Command="{Binding CancelOperationCommand}"
+                  IsEnabled="{Binding CanCancelOperation}" VerticalAlignment="Center" />
+        </Grid>
+      </Border>
 
       <!-- D1 dedup-trust warnings (offline / unindexed target repo) -->
       <Border DockPanel.Dock="Top" IsVisible="{Binding HasWarnings}" Margin="0,0,0,8"
@@ -115,9 +157,11 @@
           </StackPanel>
           <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="12" Opacity="0.75"
                      Text="{Binding ApplyPlanSummary}" />
-          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" Margin="0,0,12,0">
+          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" Margin="0,0,12,0"
+                      IsEnabled="{Binding CanEditReview}">
             <Button Content="✨ Accept all recommendations" Command="{Binding AcceptAllCommand}" />
-            <CheckBox Content="Activate into VaM after import" IsChecked="{Binding ActivateAfter}" VerticalAlignment="Center" />
+            <CheckBox Content="Activate into VaM after import" IsChecked="{Binding ActivateAfter}" VerticalAlignment="Center"
+                      IsEnabled="{Binding CanEditSources}" />
           </StackPanel>
           <Button Grid.Column="4" Content="Apply →" Command="{Binding ApplyCommand}"
                   Background="{DynamicResource AccentBrush}" Foreground="White" FontWeight="SemiBold" />
@@ -262,6 +306,9 @@
 
               <TextBlock Text="Decision:" Opacity="0.6" FontSize="12" Margin="0,4,0,0" />
 
+              <!-- Decisions locked while Apply runs (snapshot already frozen for the job). -->
+              <StackPanel Spacing="0"
+                          IsEnabled="{Binding $parent[UserControl].((vm:ImportViewModel)DataContext).CanEditReview}">
               <!-- New / Exact: import vs skip -->
               <WrapPanel IsVisible="{Binding IsNew}">
                 <Button Content="✅ Import" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
@@ -295,6 +342,7 @@
                 <Button Content="🗑 Discard (recommended)" Command="{Binding ChooseCommand}" CommandParameter="Discard" Margin="0,0,6,6" />
                 <Button Content="⚠ Import anyway" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
               </WrapPanel>
+              </StackPanel>
 
               <TextBlock Text="{Binding DecisionLabel, StringFormat='Selected: {0}'}" Foreground="{DynamicResource GoodBrush}"
                          FontSize="12" IsVisible="{Binding IsResolved}" />
@@ -306,48 +354,149 @@
       </Grid>
     </DockPanel>
 
-    <!-- History overlay -->
-    <Border IsVisible="{Binding HistoryOpen}" Background="#88000000">
+    <!-- History overlay: run list + detail report (failed items / failed sources).
+         IsHitTestVisible must follow HistoryOpen — a full-Panel sibling that stays
+         hit-testable while IsVisible=False will eat clicks on + Folder / + Archive. -->
+    <Border IsVisible="{Binding HistoryOpen}"
+            IsHitTestVisible="{Binding HistoryOpen}"
+            Background="#88000000">
       <Border Background="{DynamicResource Bg1Brush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
-              CornerRadius="12" Width="640" MaxHeight="520" VerticalAlignment="Center" HorizontalAlignment="Center">
+              CornerRadius="12" Width="920" MaxHeight="620" VerticalAlignment="Center" HorizontalAlignment="Center">
         <DockPanel Margin="18">
           <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
             <TextBlock Grid.Column="0" Text="🕘 Import history" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
             <Button Grid.Column="1" Content="✕" Command="{Binding CloseHistoryCommand}" />
           </Grid>
-          <ScrollViewer>
-            <ItemsControl ItemsSource="{Binding History}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="imp:ImportRun">
-                  <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,8">
-                    <StackPanel>
-                      <StackPanel Orientation="Horizontal" Spacing="12">
-                        <TextBlock Text="{Binding StartedUtc}" FontFamily="{DynamicResource MonoFont}" FontSize="12" Foreground="{DynamicResource TextHiBrush}" />
-                        <TextBlock Text="{Binding SourceSummary}" FontSize="12" Opacity="0.6" />
-                        <TextBlock Text="{Binding Copied, StringFormat='✓ {0}'}" FontSize="12" Foreground="{DynamicResource GoodBrush}" />
-                        <TextBlock Text="{Binding Skipped, StringFormat='↷ {0}'}" FontSize="12" Opacity="0.6" />
-                        <TextBlock Text="{Binding Failed, StringFormat='✗ {0}'}" FontSize="12" Foreground="{DynamicResource CritBrush}" />
-                      </StackPanel>
-                      <ItemsControl ItemsSource="{Binding FailedSources}" Margin="0,4,0,0">
+          <Grid ColumnDefinitions="280,*" RowDefinitions="*">
+            <!-- Run list -->
+            <ScrollViewer Grid.Column="0" Margin="0,0,12,0">
+              <ItemsControl ItemsSource="{Binding History}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="imp:ImportRun">
+                    <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,6"
+                            Background="Transparent" Cursor="Hand">
+                      <Border.Styles>
+                        <Style Selector="Border:pointerover">
+                          <Setter Property="Background" Value="{DynamicResource Bg2Brush}" />
+                        </Style>
+                      </Border.Styles>
+                      <Button Background="Transparent" BorderThickness="0" HorizontalAlignment="Stretch"
+                              HorizontalContentAlignment="Left" Padding="6,4"
+                              Command="{Binding $parent[UserControl].((vm:ImportViewModel)DataContext).OpenHistoryDetailCommand}"
+                              CommandParameter="{Binding}">
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="{Binding StartedUtc}" FontFamily="{DynamicResource MonoFont}" FontSize="11.5"
+                                     Foreground="{DynamicResource TextHiBrush}" />
+                          <TextBlock Text="{Binding SourceSummary}" FontSize="11" Opacity="0.65" TextTrimming="CharacterEllipsis" />
+                          <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="{Binding Copied, StringFormat='✓ {0}'}" FontSize="11" Foreground="{DynamicResource GoodBrush}" />
+                            <TextBlock Text="{Binding Skipped, StringFormat='↷ {0}'}" FontSize="11" Opacity="0.6" />
+                            <TextBlock Text="{Binding Failed, StringFormat='✗ {0}'}" FontSize="11" Foreground="{DynamicResource CritBrush}" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Button>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+
+            <!-- Detail report -->
+            <Border Grid.Column="1" Background="{DynamicResource Bg0Brush}" BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="14"
+                    IsVisible="{Binding HasHistoryDetail}">
+              <DockPanel>
+                <c:PaginationBar DockPanel.Dock="Bottom" Margin="0,10,0,0"
+                                 PageNumber="{Binding HistoryOutcomesPager.PageNumber}"
+                                 PageCount="{Binding HistoryOutcomesPager.PageCount}"
+                                 PageSize="{Binding HistoryOutcomesPager.PageSize}"
+                                 TotalCount="{Binding HistoryOutcomesPager.TotalCount}"
+                                 SummaryLabel="{Binding HistoryOutcomesPager.SummaryLabel}"
+                                 PreviousCommand="{Binding HistoryPreviousPageCommand}"
+                                 NextCommand="{Binding HistoryNextPageCommand}"
+                                 GoToPageCommand="{Binding HistoryGoToPageCommand}"
+                                 PageSizeChangedCommand="{Binding HistoryChangePageSizeCommand}" />
+                <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,10">
+                  <TextBlock Text="{Binding SelectedHistoryTitle}" FontSize="13" FontWeight="SemiBold"
+                             Foreground="{DynamicResource TextHiBrush}" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding SelectedHistoryCounts}" FontSize="11.5" Opacity="0.75" TextWrapping="Wrap" />
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBox Grid.Column="0" Text="{Binding HistoryOutcomeSearch}"
+                             Watermark="Search filename, identity, or reason…" FontSize="11.5" Margin="0,0,8,0" />
+                    <WrapPanel Grid.Column="1">
+                      <Button Content="All" Command="{Binding FilterHistoryOutcomesCommand}" CommandParameter="all" Margin="0,0,4,0" />
+                      <Button Content="Failed" Command="{Binding FilterHistoryOutcomesCommand}" CommandParameter="failed" Margin="0,0,4,0" />
+                      <Button Content="Copied" Command="{Binding FilterHistoryOutcomesCommand}" CommandParameter="copied" Margin="0,0,4,0" />
+                      <Button Content="Skipped" Command="{Binding FilterHistoryOutcomesCommand}" CommandParameter="skipped" Margin="0,0,4,0" />
+                      <Button Content="Discarded" Command="{Binding FilterHistoryOutcomesCommand}" CommandParameter="discarded" />
+                    </WrapPanel>
+                  </Grid>
+
+                  <!-- Archive/folder extraction errors are not per-item outcomes. -->
+                  <StackPanel IsVisible="{Binding SelectedHasFailedSources}" Spacing="5">
+                    <TextBlock Text="Failed sources" FontSize="12" FontWeight="SemiBold"
+                               Foreground="{DynamicResource CritBrush}" />
+                    <ItemsControl ItemsSource="{Binding SelectedHistoryRun.FailedSources}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="imp:ImportFailedSource">
+                          <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                            <TextBlock Grid.Column="0" FontSize="11" Foreground="{DynamicResource CritBrush}"
+                                       TextWrapping="Wrap" VerticalAlignment="Center">
+                              <Run Text="🔒 " /><Run Text="{Binding Path}" /><Run Text=" — " /><Run Text="{Binding Reason}" />
+                            </TextBlock>
+                            <Button Grid.Column="1" Content="Retry…" FontSize="11" Padding="8,2"
+                                    Command="{Binding $parent[UserControl].((vm:ImportViewModel)DataContext).RetryFailedSourceCommand}"
+                                    CommandParameter="{Binding Path}" />
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </StackPanel>
+
+                <!-- Full, paged, reviewable per-file ledger. -->
+                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
+                  <DockPanel>
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="2*,1.4*,80,100,80,1.5*" Height="28"
+                          Background="{DynamicResource Bg2Brush}">
+                      <TextBlock Grid.Column="0" Text="File" FontWeight="SemiBold" FontSize="10.5" Margin="7,0" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="1" Text="Identity" FontWeight="SemiBold" FontSize="10.5" Margin="7,0" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="2" Text="Lane" FontWeight="SemiBold" FontSize="10.5" Margin="7,0" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="3" Text="Decision" FontWeight="SemiBold" FontSize="10.5" Margin="7,0" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="4" Text="Status" FontWeight="SemiBold" FontSize="10.5" Margin="7,0" VerticalAlignment="Center" />
+                      <TextBlock Grid.Column="5" Text="Reason / trace" FontWeight="SemiBold" FontSize="10.5" Margin="7,0" VerticalAlignment="Center" />
+                    </Grid>
+                    <ScrollViewer>
+                      <ItemsControl ItemsSource="{Binding HistoryOutcomesPager.Items}">
                         <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="imp:ImportFailedSource">
-                            <Grid ColumnDefinitions="*,Auto" Margin="0,2">
-                              <TextBlock Grid.Column="0" FontSize="11" Foreground="{DynamicResource CritBrush}" VerticalAlignment="Center">
-                                <Run Text="🔒" /><Run Text="{Binding Path}" /><Run Text=" — " /><Run Text="{Binding Reason}" />
-                              </TextBlock>
-                              <Button Grid.Column="1" Content="Retry…" FontSize="11" Padding="8,2"
-                                      Command="{Binding $parent[UserControl].((vm:ImportViewModel)DataContext).RetryFailedSourceCommand}"
-                                      CommandParameter="{Binding Path}" />
+                          <DataTemplate x:DataType="vm:ImportOutcomeRow">
+                            <Grid ColumnDefinitions="2*,1.4*,80,100,80,1.5*" MinHeight="30">
+                              <TextBlock Grid.Column="0" Text="{Binding FileName}" FontFamily="{DynamicResource MonoFont}"
+                                         FontSize="10.5" Margin="7,4" TextTrimming="CharacterEllipsis" />
+                              <TextBlock Grid.Column="1" Text="{Binding IdentityKey}" FontFamily="{DynamicResource MonoFont}"
+                                         FontSize="10.5" Margin="7,4" Opacity="0.7" TextTrimming="CharacterEllipsis" />
+                              <TextBlock Grid.Column="2" Text="{Binding Lane}" FontSize="10.5" Margin="7,4" />
+                              <TextBlock Grid.Column="3" Text="{Binding Decision}" FontSize="10.5" Margin="7,4" />
+                              <TextBlock Grid.Column="4" Text="{Binding Status}" FontSize="10.5" Margin="7,4"
+                                         Foreground="{DynamicResource TextHiBrush}" />
+                              <TextBlock Grid.Column="5" Text="{Binding Reason}" FontSize="10.5" Margin="7,4"
+                                         TextWrapping="Wrap" />
                             </Grid>
                           </DataTemplate>
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
-                    </StackPanel>
-                  </Border>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </ScrollViewer>
+                    </ScrollViewer>
+                  </DockPanel>
+                </Border>
+                <TextBlock Text="No outcomes match this filter." Opacity="0.55" HorizontalAlignment="Center"
+                           Margin="0,12" IsVisible="{Binding HistoryOutcomesPager.IsEmpty}" />
+              </DockPanel>
+            </Border>
+
+            <TextBlock Grid.Column="1" Text="Select a run on the left to see its detail report."
+                       Opacity="0.5" VerticalAlignment="Center" HorizontalAlignment="Center"
+                       IsVisible="{Binding !HasHistoryDetail}" />
+          </Grid>
         </DockPanel>
       </Border>
     </Border>
