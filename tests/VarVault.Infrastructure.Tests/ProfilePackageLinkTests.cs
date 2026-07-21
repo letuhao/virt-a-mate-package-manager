@@ -66,6 +66,32 @@ public sealed class ProfilePackageLinkTests
         Assert.Equal(1L, installed[1]); // null installed last
     }
 
+    [Fact]
+    public async Task Default_query_is_Added_descending_then_VarName()
+    {
+        using var fx = new SqliteTestDatabase();
+        var noon = new DateTime(2026, 7, 21, 5, 0, 0, DateTimeKind.Utc);   // same AddedAt
+        var afternoon = new DateTime(2026, 7, 21, 10, 0, 0, DateTimeKind.Utc);
+        using (var db = fx.NewContext())
+        {
+            db.Packages.AddRange(
+                new Package { Id = 1, VarName = "Z.Late.1", IdentityKey = "Z.Late.1", Creator = "Z", PackageName = "Late", VersionToken = "1", VersionSort = 1, FirstSeenAt = afternoon, LastIndexedAt = afternoon },
+                new Package { Id = 2, VarName = "M.Same.1", IdentityKey = "M.Same.1", Creator = "M", PackageName = "Same", VersionToken = "1", VersionSort = 1, FirstSeenAt = noon, LastIndexedAt = noon },
+                new Package { Id = 3, VarName = "A.Same.1", IdentityKey = "A.Same.1", Creator = "A", PackageName = "Same", VersionToken = "1", VersionSort = 1, FirstSeenAt = noon, LastIndexedAt = noon });
+            db.PackageListItems.AddRange(
+                new PackageListItem { PackageId = 1, VarName = "Z.Late.1", Creator = "Z", PackageName = "Late", VersionToken = "1", AddedAt = afternoon, Class = ContentClass.Cold },
+                new PackageListItem { PackageId = 2, VarName = "M.Same.1", Creator = "M", PackageName = "Same", VersionToken = "1", AddedAt = noon, Class = ContentClass.Cold },
+                new PackageListItem { PackageId = 3, VarName = "A.Same.1", Creator = "A", PackageName = "Same", VersionToken = "1", AddedAt = noon, Class = ContentClass.Cold });
+            await db.SaveChangesAsync();
+        }
+
+        using var read = fx.NewContext();
+        var svc = new EfLibraryQueryService(read);
+        // LibraryQuery() defaults must be Added ↓ then VarName ↑ (A before M among equal timestamps).
+        var ids = await svc.GetOrderedIdsAsync(new LibraryQuery());
+        Assert.Equal([1L, 3L, 2L], ids);
+    }
+
     private sealed class InlineWriteQueue(VarVaultDbContext db) : VarVault.Sdk.Threading.IWriteQueue
     {
         public Task<T> EnqueueAsync<T>(Func<CancellationToken, Task<T>> action, VarVault.Sdk.Threading.WritePriority priority = VarVault.Sdk.Threading.WritePriority.Normal, CancellationToken cancellationToken = default) =>

@@ -119,7 +119,7 @@ public sealed class LibraryQueryFlowTests
         using var scope = host.Host.Services.CreateScope();
         var library = scope.ServiceProvider.GetRequiredService<ILibraryQueryService>();
 
-        var ids = await library.GetOrderedIdsAsync(new LibraryQuery(Sort: LibrarySort.Name));
+        var ids = await library.GetOrderedIdsAsync(new LibraryQuery(Sort: LibrarySort.Name, Descending: false));
         var snapshot = new VarVault.Domain.Indexing.OrderedSnapshot(ids);
 
         Assert.Equal(2, snapshot.Count);

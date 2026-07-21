@@ -304,8 +304,8 @@ public sealed partial class LibraryViewModel(
     private static readonly TimeSpan DebounceInterval = TimeSpan.FromMilliseconds(250);
     private readonly Func<TimeSpan, CancellationToken, Task> _delay = delay ?? Task.Delay;
     private CancellationTokenSource? _debounceCts;
-    private const string PrefSort = "library.sort";
-    private const string PrefDescending = "library.descending";
+    private const string PrefSort = "library.sort.v2";
+    private const string PrefDescending = "library.descending.v2";
     private const string PrefViewMode = "library.view_mode";
     private const string PrefCreator = "library.creator";
     private const string PrefTagId = "library.tag_id";
@@ -653,7 +653,7 @@ public sealed partial class LibraryViewModel(
             card.IsSelected = packageId is not null && card.PackageId == packageId;
     }
 
-    /// <summary>Click a column header: toggle direction if already sorting by it, else sort by it ascending. (1.44)</summary>
+    /// <summary>Click a column header: toggle direction if already sorting by it, else sort by it (desc first). (1.44)</summary>
     [RelayCommand]
     public async Task SortByAsync(LibrarySort column, CancellationToken cancellationToken = default)
     {
@@ -662,7 +662,8 @@ public sealed partial class LibraryViewModel(
         else
         {
             Sort = column;
-            Descending = false;
+            // Newest / largest first on first click — matches the library default preference.
+            Descending = true;
         }
         await SavePreferencesAsync(cancellationToken).ConfigureAwait(true);
         await RefreshAsync(cancellationToken).ConfigureAwait(true);

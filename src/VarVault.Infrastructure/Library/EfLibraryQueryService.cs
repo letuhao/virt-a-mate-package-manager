@@ -182,13 +182,15 @@ public sealed class EfLibraryQueryService(VarVaultDbContext db) : ILibraryQueryS
             ? q.OrderByDescending(x => x.Class).ThenByDescending(x => x.LastUsedAt).ThenBy(x => x.PackageId)
             : q.OrderBy(x => x.Class).ThenBy(x => x.LastUsedAt).ThenBy(x => x.PackageId),
         LibrarySort.Added => desc
+            // Default library order (Quality #1): AddedAt ↓ then VarName ↑ then PackageId.
             ? q.OrderByDescending(x => x.AddedAt).ThenBy(x => x.VarName).ThenBy(x => x.PackageId)
             : q.OrderBy(x => x.AddedAt).ThenBy(x => x.VarName).ThenBy(x => x.PackageId),
         LibrarySort.Installed => desc
             ? q.OrderBy(x => x.InstalledAt == null).ThenByDescending(x => x.InstalledAt).ThenBy(x => x.VarName).ThenBy(x => x.PackageId)
             : q.OrderBy(x => x.InstalledAt == null).ThenBy(x => x.InstalledAt).ThenBy(x => x.VarName).ThenBy(x => x.PackageId),
+        // Name primary still keeps AddedAt as the secondary key so equal names (shouldn't happen) / stable browse feel.
         _ => desc
-            ? q.OrderByDescending(x => x.VarName).ThenBy(x => x.PackageId)
-            : q.OrderBy(x => x.VarName).ThenBy(x => x.PackageId),
+            ? q.OrderByDescending(x => x.VarName).ThenByDescending(x => x.AddedAt).ThenBy(x => x.PackageId)
+            : q.OrderBy(x => x.VarName).ThenByDescending(x => x.AddedAt).ThenBy(x => x.PackageId),
     };
 }

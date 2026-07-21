@@ -40,6 +40,23 @@ public class LibraryViewModelTests
     }
 
     [Fact]
+    public async Task SortBy_new_column_defaults_to_descending_then_toggles()
+    {
+        var query = new FakeLibraryQuery(total: 1, creators: []);
+        var vm = new LibraryViewModel(query) { Sort = LibrarySort.Name, Descending = false };
+
+        await vm.SortByAsync(LibrarySort.Added);
+        Assert.Equal(LibrarySort.Added, vm.Sort);
+        Assert.True(vm.Descending);
+        Assert.Equal(LibrarySort.Added, query.LastQuery!.Sort);
+        Assert.True(query.LastQuery.Descending);
+
+        await vm.SortByAsync(LibrarySort.Added);
+        Assert.False(vm.Descending);
+        Assert.False(query.LastQuery!.Descending);
+    }
+
+    [Fact]
     public async Task Load_more_appends_until_the_total_is_reached()
     {
         var query = new FakeLibraryQuery(total: 150, creators: []); // 2 pages of 100

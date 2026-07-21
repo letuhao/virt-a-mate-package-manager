@@ -23,8 +23,9 @@ public sealed record LibraryQuery(
     string? SearchText = null,
     bool FavoritesOnly = false,
     bool MissingDepsOnly = false,
-    LibrarySort Sort = LibrarySort.Name,
-    bool Descending = false,
+    // Default: newest AddedAt first, then VarName (Library Quality #1).
+    LibrarySort Sort = LibrarySort.Added,
+    bool Descending = true,
     // Facet extensions (BE-N12).
     string? PackageName = null,
     bool InstalledOnly = false,

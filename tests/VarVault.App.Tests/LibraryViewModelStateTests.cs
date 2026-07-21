@@ -20,14 +20,14 @@ public class LibraryViewModelStateTests
 
         await vm.SortByAsync(LibrarySort.Size);
         Assert.Equal(LibrarySort.Size, vm.Sort);
-        Assert.False(vm.Descending);
+        Assert.True(vm.Descending); // new column → desc first (library default)
 
         await vm.SortByAsync(LibrarySort.Size); // same column → flip direction
-        Assert.True(vm.Descending);
-
-        await vm.SortByAsync(LibrarySort.Creator); // new column → reset ascending
-        Assert.Equal(LibrarySort.Creator, vm.Sort);
         Assert.False(vm.Descending);
+
+        await vm.SortByAsync(LibrarySort.Creator); // new column → desc again
+        Assert.Equal(LibrarySort.Creator, vm.Sort);
+        Assert.True(vm.Descending);
     }
 
     [Fact]
