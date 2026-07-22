@@ -36,4 +36,17 @@ public interface IHealthService
 
     /// <summary>Fix one broken var → a new UTF-8 var; returns the new VarFile id.</summary>
     Task<Result<long>> FixAsync(long varFileId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fix every NeedsFix/PartiallyBroken var whose <c>DetectedCodepage</c> matches
+    /// <paramref name="codepageFilter"/> (exact or substring, e.g. <c>"GB"</c> → GBK/GB18030).
+    /// Null/empty filter = all detected encoding groups. (BE-N5 / m-fix apply-to-group.)
+    /// </summary>
+    Task<BulkActionResult> FixGroupAsync(string? codepageFilter, CancellationToken cancellationToken = default);
+
+    /// <summary>Same as <see cref="FixGroupAsync(string?, CancellationToken)"/> with progress for the jobs panel.</summary>
+    Task<BulkActionResult> FixGroupAsync(string? codepageFilter, IProgressSink progress, CancellationToken cancellationToken = default);
+
+    /// <summary>Fix the given var-file ids sequentially, reporting progress. Skips ids that cannot be fixed.</summary>
+    Task<BulkActionResult> FixManyAsync(IReadOnlyList<long> varFileIds, IProgressSink? progress = null, CancellationToken cancellationToken = default);
 }

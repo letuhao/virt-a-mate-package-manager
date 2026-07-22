@@ -19,7 +19,8 @@ public sealed class FakeDialogLauncher : IDialogLauncher
     public void OpenMigratePlan() => Opened.Add("migrate");
     public void OpenVarDetail(long packageId) => OpenVarDetail(packageId, push: false);
     public void OpenVarDetail(long packageId, bool push) => Opened.Add($"var-detail:{packageId}{(push ? ":push" : "")}");
-    public void OpenAlias(string missingRef, Action? onSaved = null) => Opened.Add($"alias:{missingRef}");
+    public void OpenAlias(string missingRef, Action? onSaved = null, string? suggestedOwnedQuery = null) =>
+        Opened.Add(string.IsNullOrWhiteSpace(suggestedOwnedQuery) ? $"alias:{missingRef}" : $"alias:{missingRef}:{suggestedOwnedQuery}");
     public void OpenConfirmDelete(IReadOnlyList<ConfirmItem> items, int reverseDepCount = 0) => Opened.Add($"confirm:{items.Count}");
     public void OpenFix(long varFileId, string? codepage) => Opened.Add($"fix:{codepage}");
     public void OpenDupeReview(DuplicateGroup group) => Opened.Add($"dupe:{group.IdentityKey}");
@@ -78,6 +79,12 @@ public sealed class StubHealth(IReadOnlyList<EncodingGroup>? groups = null) : IH
         Task.FromResult<IReadOnlyList<IntegrityIssue>>([]);
     public Task<Result<long>> FixAsync(long varFileId, CancellationToken ct = default) =>
         Task.FromResult(Result.Success(varFileId));
+    public Task<BulkActionResult> FixGroupAsync(string? codepageFilter, CancellationToken ct = default) =>
+        Task.FromResult(new BulkActionResult(0, 0));
+    public Task<BulkActionResult> FixGroupAsync(string? codepageFilter, IProgressSink progress, CancellationToken ct = default) =>
+        FixGroupAsync(codepageFilter, ct);
+    public Task<BulkActionResult> FixManyAsync(IReadOnlyList<long> varFileIds, IProgressSink? progress = null, CancellationToken ct = default) =>
+        Task.FromResult(new BulkActionResult(varFileIds.Count, 0));
 }
 
 public sealed class StubProposals(IReadOnlyList<Proposal>? pending = null) : IProposalService
@@ -158,6 +165,7 @@ public sealed class StubPresetsMin : VarVault.Sdk.Presets.IPresetService
     public Task<PageResult<string>> MembersPageAsync(long id, PageRequest request, CancellationToken ct = default) => Task.FromResult(new PageResult<string>([], 0, request.SafePageNumber, request.SafePageSize));
     public Task<IReadOnlyList<string>> MembersAsync(long id, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>([]);
     public Task<VarVault.Sdk.Presets.ActivationPreview?> PreviewActivationAsync(long id, CancellationToken ct = default) => Task.FromResult<VarVault.Sdk.Presets.ActivationPreview?>(null);
+    public Task RefreshMemberResolutionsAsync(long id, CancellationToken ct = default) => Task.CompletedTask;
 }
 
 public sealed class StubAnalytics(

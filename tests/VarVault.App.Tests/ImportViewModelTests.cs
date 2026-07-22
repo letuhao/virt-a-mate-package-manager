@@ -47,11 +47,12 @@ public sealed class ImportViewModelTests
         Assert.True(vm.TotalScanned >= 2);
         Assert.Equal(1, vm.ConflictCount);
         Assert.True(vm.ReviewRemaining >= 1);
-        Assert.False(vm.CanApply);                 // gated until reviewed
+        Assert.True(vm.CanApply);                  // Apply allowed; undecided → skip at apply
+        Assert.True(vm.HasUndecidedReview);
 
         vm.AcceptAllCommand.Execute(null);
         Assert.Equal(0, vm.ReviewRemaining);
-        Assert.True(vm.CanApply);                  // now unblocked
+        Assert.True(vm.CanApply);
 
         await vm.ApplyCommand.ExecuteAsync(null);
         Assert.True(File.Exists(Path.Combine(targetDir.Path, "Fresh.New.1.var")));   // New imported
@@ -134,7 +135,8 @@ public sealed class ImportViewModelTests
         await vm.ScanCommand.ExecuteAsync(null);
 
         Assert.Equal(1, vm.ConflictCount);
-        Assert.False(vm.CanApply);
+        Assert.True(vm.CanApply);                   // not gated on full review anymore
+        Assert.True(vm.HasUndecidedReview);
 
         // Land on the conflict item and resolve it via the keyboard map (] = keep-incoming).
         vm.MoveSelection(+1);
@@ -149,6 +151,54 @@ public sealed class ImportViewModelTests
 
         vm.DiscardSelected();                         // "Del" re-decides the selected review item
         Assert.Equal(ImportDecision.Discard, vm.Selected.Decision);
+    }
+
+    [Fact]
+    public async Task Apply_skips_undecided_review_items_and_keeps_explicit_choices()
+    {
+        await using var host = TestHost.Create(withPersistence: true, configure: ImportTestHelpers.RegisterImportJobs);
+        using var catalogDir = new TempDirectory();
+        using var targetDir = new TempDirectory();
+        using var importDir = new TempDirectory();
+
+        WriteVar(catalogDir.Path, "Creator.PackA.1.var", "Creator", "PackA", ("Custom/a.vam", "AAA"));
+        WriteVar(catalogDir.Path, "Creator.PackB.1.var", "Creator", "PackB", ("Custom/b.vam", "BBB"));
+
+        Guid targetId;
+        using (var scope = host.Host.Services.CreateScope())
+        {
+            var repos = scope.ServiceProvider.GetRequiredService<IRepositoryService>();
+            await repos.RegisterAsync(new RegisterRepositoryRequest("catalog", catalogDir.Path));
+            targetId = (await repos.RegisterAsync(new RegisterRepositoryRequest("target", targetDir.Path))).Value.Id;
+        }
+        using (var scope = host.Host.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<IIndexOrchestrator>().IndexAllAsync();
+
+        // Two conflicts + one fresh new.
+        WriteVar(importDir.Path, "Creator.PackA.1.var", "Creator", "PackA", ("Custom/a.vam", "AAA"), ("Custom/a2.vam", "X"));
+        WriteVar(importDir.Path, "Creator.PackB.1.var", "Creator", "PackB", ("Custom/b.vam", "BBB"), ("Custom/b2.vam", "Y"));
+        WriteVar(importDir.Path, "Fresh.Only.1.var", "Fresh", "Only", ("Custom/n.vam", "N"));
+
+        using var read = host.Host.Services.CreateScope();
+        var vm = ImportTestHelpers.CreateImportViewModel(read.ServiceProvider);
+        await vm.LoadAsync();
+        vm.TargetRepo = vm.Repositories.First(r => r.Id == targetId);
+        vm.AddSourcePath(importDir.Path);
+        await vm.ScanCommand.ExecuteAsync(null);
+
+        Assert.True(vm.ConflictCount >= 2, $"expected ≥2 conflicts, got {vm.ConflictCount}; lanes={string.Join(',', vm.Items.Select(i => $"{i.FileName}:{i.Lane}"))}");
+        Assert.True(vm.CanApply);
+
+        var keep = vm.Items.First(i => i.Lane == ImportLane.Conflict);
+        var otherConflict = vm.Items.First(i => i.Lane == ImportLane.Conflict && i.Model.Id != keep.Model.Id);
+        keep.Decision = ImportDecision.KeepIncoming;
+        // Leave otherConflict undecided — Apply must treat it as KeepExisting (skip incoming).
+
+        await vm.ApplyCommand.ExecuteAsync(null);
+
+        Assert.True(File.Exists(Path.Combine(targetDir.Path, keep.FileName))); // kept new
+        Assert.True(File.Exists(Path.Combine(targetDir.Path, "Fresh.Only.1.var"))); // auto New
+        Assert.False(File.Exists(Path.Combine(targetDir.Path, otherConflict.FileName))); // undecided → skipped
     }
 
     [Fact]

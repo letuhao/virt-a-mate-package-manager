@@ -8,7 +8,8 @@ public sealed record PresetInfo(long Id, string Name, int MemberCount);
 
 /// <summary>
 /// The dependency-aware activation preview: how many packages a preset resolves to directly, how many
-/// including the pulled-in forward closure, and which member refs are missing. (Checklist 3.8.)
+/// including the pulled-in forward closure, and which refs are missing (unresolved members + transitive
+/// unresolved dependency edges). (Checklist 3.8; deep dependency closure.)
 /// </summary>
 public sealed record ActivationPreview(int DirectResolved, int TotalWithClosure, IReadOnlyList<string> MissingRefs);
 
@@ -36,4 +37,10 @@ public interface IPresetService
 
     /// <summary>Resolve members + pull the forward-dependency closure → "will pull in N" preview. (3.8)</summary>
     Task<ActivationPreview?> PreviewActivationAsync(long presetId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Re-resolve every stored member ref against the current catalog so <c>.latest</c> and formerly-missing
+    /// snapshots stay fresh before preview/activation. (Deep dependency closure.)
+    /// </summary>
+    Task RefreshMemberResolutionsAsync(long presetId, CancellationToken cancellationToken = default);
 }

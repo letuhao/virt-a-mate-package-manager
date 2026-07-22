@@ -20,6 +20,7 @@ public sealed partial class PresetsViewModel : ObservableObject, ILoadableScreen
     private readonly Services.IDialogLauncher? _launcher;
     private readonly IActivationService? _activation;
     private readonly ISettingsService? _settings;
+    private CancellationTokenSource? _previewCts;
 
     public PresetsViewModel(
         IPresetService presets,
@@ -38,6 +39,8 @@ public sealed partial class PresetsViewModel : ObservableObject, ILoadableScreen
 
     private const string DevModeHint =
         "Enable Windows Developer Mode (Settings → Privacy & security → For developers) or run elevated to create symlinks.";
+    private const string PathHint =
+        "VaM install path is not set or does not exist — set it in Settings before activating.";
 
     public PagedListState<PresetMemberRow> MembersPager { get; }
 
@@ -70,9 +73,7 @@ public sealed partial class PresetsViewModel : ObservableObject, ILoadableScreen
         if (Selected is null || _activation is null)
             return;
         var r = await _activation.BuildProfileLinksAsync(Selected.Id, cancellationToken).ConfigureAwait(true);
-        StatusMessage = r.PrivilegeFailures > 0
-            ? DevModeHint
-            : $"Activated {Selected.Name}: {r.LinksCreated} linked · {r.MissingPackages} missing · {r.LinksRemoved} removed";
+        StatusMessage = FormatActivationStatus(Selected.Name, r, switched: false);
     }
 
     /// <summary>"Activate &amp; switch" → materialize links, then repoint AddonPackages to this profile. (T6.1)</summary>
@@ -82,6 +83,11 @@ public sealed partial class PresetsViewModel : ObservableObject, ILoadableScreen
         if (Selected is null || _activation is null)
             return;
         var r = await _activation.BuildProfileLinksAsync(Selected.Id, cancellationToken).ConfigureAwait(true);
+        if (r.PathUnavailable > 0)
+        {
+            StatusMessage = PathHint;
+            return;
+        }
         if (r.PrivilegeFailures > 0)
         {
             StatusMessage = DevModeHint;
@@ -89,13 +95,25 @@ public sealed partial class PresetsViewModel : ObservableObject, ILoadableScreen
         }
         if (_profiles is null)
         {
-            StatusMessage = $"Activated {Selected.Name}: {r.LinksCreated} linked";
+            StatusMessage = FormatActivationStatus(Selected.Name, r, switched: false);
             return;
         }
         var switched = await _profiles.SwitchToAsync(Selected.Name, cancellationToken).ConfigureAwait(true);
         StatusMessage = switched.IsSuccess
-            ? $"Activated & switched to {Selected.Name}: {r.LinksCreated} linked · {r.MissingPackages} missing"
+            ? FormatActivationStatus(Selected.Name, r, switched: true)
             : switched.Error.Message;
+    }
+
+    private static string FormatActivationStatus(string name, ActivationBuildResult r, bool switched)
+    {
+        if (r.PathUnavailable > 0)
+            return PathHint;
+        if (r.PrivilegeFailures > 0)
+            return DevModeHint;
+        var verb = switched ? $"Activated & switched to {name}" : $"Activated {name}";
+        return switched
+            ? $"{verb}: {r.LinksCreated} linked · {r.MissingPackages} offline · {r.UnresolvedDependencies} unresolved"
+            : $"{verb}: {r.LinksCreated} linked · {r.MissingPackages} offline · {r.UnresolvedDependencies} unresolved · {r.LinksRemoved} removed";
     }
 
     /// <summary>Screen-head "+ New preset" → preset-edit dialog on a fresh preset. (GD-8)</summary>
@@ -230,11 +248,31 @@ public sealed partial class PresetsViewModel : ObservableObject, ILoadableScreen
 
     private async Task LoadPreviewAsync(PresetInfo? preset)
     {
-        Preview = preset is null ? null : await _presets.PreviewActivationAsync(preset.Id).ConfigureAwait(true);
-        if (preset is null)
-            Members.Clear();
-        else
-            await MembersPager.ResetAndReloadAsync().ConfigureAwait(true);
+        _previewCts?.Cancel();
+        _previewCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        _previewCts = cts;
+        var token = cts.Token;
+
+        try
+        {
+            if (preset is null)
+            {
+                Preview = null;
+                Members.Clear();
+                return;
+            }
+
+            var preview = await _presets.PreviewActivationAsync(preset.Id, token).ConfigureAwait(true);
+            if (token.IsCancellationRequested || !ReferenceEquals(Selected, preset))
+                return;
+            Preview = preview;
+            await MembersPager.ResetAndReloadAsync(token).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // Superseded by a newer selection.
+        }
     }
 
     [RelayCommand]

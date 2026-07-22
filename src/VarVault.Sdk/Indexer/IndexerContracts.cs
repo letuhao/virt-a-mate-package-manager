@@ -8,7 +8,7 @@ namespace VarVault.Sdk.Indexer;
 /// <summary>Protocol version for the GUI ↔ Indexer named-pipe contract. (A12.)</summary>
 public static class IndexerProtocol
 {
-    public const int Version = 2;
+    public const int Version = 3;
     public const string PipeNamePrefix = "VarVault.Indexer.";
 
     public static string PipeNameFor(string dataDirectoryHash) =>
@@ -42,6 +42,8 @@ public enum IndexerCommandKind
     UnregisterOwner = 7,
     /// <summary>Extract and cache one requested content-item preview on demand.</summary>
     ExtractContentPreview = 8,
+    /// <summary>Extract a higher-res focus viewer image for one content item (separate cache).</summary>
+    ExtractContentFocusPreview = 9,
 }
 
 public enum IndexerJobState
@@ -101,6 +103,10 @@ public interface IIndexerClient
     /// <summary>Ask the writer worker to extract one content-item preview into the packed cache.</summary>
     Task<Result> ExtractContentPreviewAsync(long contentItemId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Result.Failure("indexer.preview", "Content preview extraction is unavailable."));
+
+    /// <summary>Ask the writer worker to extract a higher-res focus image for the gallery viewer.</summary>
+    Task<Result> ExtractContentFocusPreviewAsync(long contentItemId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Result.Failure("indexer.focus", "Content focus extraction is unavailable."));
 }
 
 /// <summary>

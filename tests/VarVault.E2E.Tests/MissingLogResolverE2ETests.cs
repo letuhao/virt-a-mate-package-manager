@@ -2,6 +2,7 @@ using System.IO;
 using Microsoft.Extensions.DependencyInjection;
 using VarVault.Sdk.Indexing;
 using VarVault.Sdk.Library;
+using VarVault.Sdk.Presets;
 using VarVault.Sdk.Repositories;
 using VarVault.TestKit;
 using Xunit.Abstractions;
@@ -107,16 +108,28 @@ public sealed class MissingLogResolverE2ETests(ITestOutputHelper log)
     }
 
     [Fact]
-    public async Task Activate_builds_the_repair_preset_from_the_found_set()
+    public async Task Activate_adds_to_existing_preset_not_a_repair_preset()
     {
         using var repo = new TempDirectory();
         await using var host = await SeededAsync(repo);
 
         using var scope = host.Host.Services.CreateScope();
+        var presets = scope.ServiceProvider.GetRequiredService<IPresetService>();
         var resolver = scope.ServiceProvider.GetRequiredService<IMissingLogResolver>();
 
-        // Privilege-independent: preset membership is built even if symlink creation needs Developer Mode.
+        var existing = await presets.CreateAsync("My Loading Set", ["Other.Thing.5"]);
+        Assert.True(existing.IsSuccess);
+
+        // Privilege-independent: membership is updated even if symlink creation needs Developer Mode.
         var result = await resolver.ActivateAsync(["Creator.Pack.2", "Other.Thing.5"]);
         Assert.Equal(2, result.MembersActivated);
+
+        var list = await presets.ListAsync();
+        Assert.DoesNotContain(list, p => p.Name.Contains("Log Repair", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(list, p => p.Name == "My Loading Set");
+        var members = await presets.MembersAsync(existing.Value.Id);
+        Assert.Contains("Creator.Pack.2", members);
+        Assert.Contains("Other.Thing.5", members);
+        Assert.Equal(2, members.Count); // idempotent re-add of Other.Thing.5
     }
 }

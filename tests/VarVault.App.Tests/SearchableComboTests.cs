@@ -29,7 +29,9 @@ public class SearchableComboTests
     {
         var combo = Build();
         combo.Refilter();
-        Assert.Equal(5, combo.FilteredOptions.Count);
+        // Full list + synthetic "(All creators)" clear row.
+        Assert.Equal(6, combo.FilteredOptions.Count);
+        Assert.Equal(SearchableCombo.ClearOptionName, combo.FilteredOptions[0].Name);
 
         combo.FilterText = "an"; // only DaniPunani contains "an"
         Assert.Single(combo.FilteredOptions);
@@ -50,15 +52,15 @@ public class SearchableComboTests
     public void Arrows_move_highlight_and_enter_picks()
     {
         var combo = Build();
-        combo.Open();                       // full list, highlight 0
+        combo.Open();                       // clear row at 0, then creators
         Assert.True(combo.IsOpen);
-        combo.MoveHighlight(1);
-        combo.MoveHighlight(1);             // index 2
+        combo.MoveHighlight(1);             // MeshedVR
+        combo.MoveHighlight(1);             // DaniPunani
         Assert.Equal(2, combo.HighlightedIndex);
         combo.MoveHighlight(50);            // clamps
-        Assert.Equal(4, combo.HighlightedIndex);
+        Assert.Equal(5, combo.HighlightedIndex);
 
-        combo.HighlightedIndex = 1;
+        combo.HighlightedIndex = 2;         // DaniPunani
         combo.CommitHighlighted();
         Assert.Equal("DaniPunani", combo.SelectedName);
         Assert.False(combo.IsOpen);         // Enter closes
@@ -68,11 +70,24 @@ public class SearchableComboTests
     public void Keyboard_map_down_then_enter_selects()
     {
         var combo = Build();
-        combo.Open();                       // full list, highlight 0
-        combo.HandleKey(Key.Down);          // -> 1
+        combo.Open();                       // highlight 0 = clear
+        combo.HandleKey(Key.Down);          // -> MeshedVR
+        combo.HandleKey(Key.Down);          // -> DaniPunani
         combo.HandleKey(Key.Enter);         // pick + close
 
         Assert.Equal("DaniPunani", combo.SelectedName);
+        Assert.False(combo.IsOpen);
+    }
+
+    [AvaloniaFact]
+    public void Clear_option_commits_null_selection()
+    {
+        var combo = Build();
+        combo.SelectedName = "MeshedVR";
+        combo.Open();
+        combo.HighlightedIndex = 0; // (All creators)
+        combo.CommitHighlighted();
+        Assert.Null(combo.SelectedName);
         Assert.False(combo.IsOpen);
     }
 
@@ -84,5 +99,18 @@ public class SearchableComboTests
         Assert.True(combo.IsOpen);
         combo.Close();
         Assert.False(combo.IsOpen);
+    }
+
+    [AvaloniaFact]
+    public void Reopen_after_close_works()
+    {
+        // Regression: one-way IsOpen + light-dismiss left IsOpen=true so the next Open() was a no-op.
+        var combo = Build();
+        combo.Open();
+        combo.Close();
+        Assert.False(combo.IsOpen);
+        combo.Open();
+        Assert.True(combo.IsOpen);
+        Assert.True(combo.FilteredOptions.Count > 0);
     }
 }

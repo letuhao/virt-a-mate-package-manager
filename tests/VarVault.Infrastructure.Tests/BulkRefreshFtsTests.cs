@@ -65,7 +65,8 @@ public sealed class BulkRefreshFtsTests
 
             // The whole FTS index was rebuilt: every package is searchable by its creator.
             var query = new EfLibraryQueryService(read);
-            var hit = await query.GetPageAsync(new LibraryQuery(SearchText: "Creator7", Take: 10));
+            // Prefer a token that does not prefix-match Creator70–79 under FTS.
+            var hit = await query.GetPageAsync(new LibraryQuery(SearchText: "Creator7.Pkg7", Take: 10));
             Assert.Contains(hit.Items, p => p.Creator == "Creator7");
 
             // A search that spans many rows returns them all (index is complete, not partial).

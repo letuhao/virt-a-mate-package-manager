@@ -18,9 +18,11 @@ public sealed class EfHealthService(VarVaultDbContext db, EncodingFixCoordinator
 {
     public async Task<IReadOnlyList<EncodingGroup>> EncodingGroupsAsync(CancellationToken cancellationToken = default)
     {
-        var groups = await db.VarFiles
+        // Superseded originals stay on disk for recovery but must not inflate "still needs fix" counts.
+        var groups = await db.VarFiles.AsNoTracking()
             .Where(v => (v.EncodingHealth == EncodingHealth.NeedsFix || v.EncodingHealth == EncodingHealth.PartiallyBroken)
-                        && v.DetectedCodepage != null)
+                        && v.DetectedCodepage != null
+                        && v.SupersededByVarFileId == null)
             .GroupBy(v => v.DetectedCodepage!)
             .Select(g => new EncodingGroup(g.Key, g.Count()))
             .ToListAsync(cancellationToken)
@@ -61,6 +63,58 @@ public sealed class EfHealthService(VarVaultDbContext db, EncodingFixCoordinator
             : sourcePath + ".fixed.var";
 
         return await coordinator.FixAsync(varFileId, outputPath, cancellationToken).ConfigureAwait(false);
+    }
+
+    public Task<BulkActionResult> FixGroupAsync(string? codepageFilter, CancellationToken cancellationToken = default) =>
+        FixGroupAsync(codepageFilter, IProgressSink.Null, cancellationToken);
+
+    public async Task<BulkActionResult> FixGroupAsync(string? codepageFilter, IProgressSink progress, CancellationToken cancellationToken = default)
+    {
+        Guard.NotNull(progress);
+        var query = db.VarFiles.AsNoTracking()
+            .Where(v => (v.EncodingHealth == EncodingHealth.NeedsFix || v.EncodingHealth == EncodingHealth.PartiallyBroken)
+                        && v.DetectedCodepage != null
+                        && v.SupersededByVarFileId == null);
+
+        if (!string.IsNullOrWhiteSpace(codepageFilter))
+        {
+            var filter = codepageFilter.Trim();
+            query = query.Where(v =>
+                v.DetectedCodepage == filter
+                || v.DetectedCodepage!.Contains(filter));
+        }
+
+        var ids = await query
+            .OrderBy(v => v.Id)
+            .Select(v => v.Id)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return await FixManyAsync(ids, progress, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<BulkActionResult> FixManyAsync(
+        IReadOnlyList<long> varFileIds,
+        IProgressSink? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        Guard.NotNull(varFileIds);
+        progress ??= IProgressSink.Null;
+        var ids = varFileIds.Where(id => id > 0).Distinct().ToList();
+        int ok = 0, fail = 0;
+        for (var i = 0; i < ids.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            progress.Report(new ProgressReport(i, ids.Count, $"Fixing {i + 1} of {ids.Count}"));
+            if ((await FixAsync(ids[i], cancellationToken).ConfigureAwait(false)).IsSuccess)
+                ok++;
+            else
+                fail++;
+        }
+
+        progress.Report(new ProgressReport(ids.Count, Math.Max(ids.Count, 1),
+            $"Done · {ok} fixed · originals retained"));
+        return new BulkActionResult(ok, fail);
     }
 
     private async Task<PageResult<IntegrityIssue>> PageIssuesAsync(

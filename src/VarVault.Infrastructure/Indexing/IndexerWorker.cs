@@ -99,22 +99,34 @@ public sealed class IndexerWorker(
             case IndexerCommandKind.ExtractContentPreview:
                 if (command.ContentItemId is not long contentItemId || contentItemId <= 0)
                     return Snapshot with { Error = "contentItemId required" };
-                return await ExtractContentPreviewAsync(contentItemId, cancellationToken).ConfigureAwait(false);
+                return await ExtractContentPreviewAsync(contentItemId, focus: false, cancellationToken).ConfigureAwait(false);
+
+            case IndexerCommandKind.ExtractContentFocusPreview:
+                if (command.ContentItemId is not long focusId || focusId <= 0)
+                    return Snapshot with { Error = "contentItemId required" };
+                return await ExtractContentPreviewAsync(focusId, focus: true, cancellationToken).ConfigureAwait(false);
 
             default:
                 return Snapshot with { Error = "unknown command" };
         }
     }
 
-    private async Task<IndexerStatus> ExtractContentPreviewAsync(long contentItemId, CancellationToken cancellationToken)
+    private async Task<IndexerStatus> ExtractContentPreviewAsync(long contentItemId, bool focus, CancellationToken cancellationToken)
     {
         try
         {
             using var scope = scopeFactory.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
             var thumbnails = scope.ServiceProvider.GetRequiredService<IThumbnailStore>();
-            if (await thumbnails.GetContentAsync(contentItemId, cancellationToken).ConfigureAwait(false) is not null)
+            if (focus)
+            {
+                if (await thumbnails.GetFocusContentAsync(contentItemId, cancellationToken).ConfigureAwait(false) is not null)
+                    return Snapshot with { Error = null };
+            }
+            else if (await thumbnails.GetContentAsync(contentItemId, cancellationToken).ConfigureAwait(false) is not null)
+            {
                 return Snapshot with { Error = null };
+            }
 
             var item = await (
                 from content in db.ContentItems.AsNoTracking()
@@ -139,26 +151,35 @@ public sealed class IndexerWorker(
                 return Snapshot with { Error = "content type has no preview" };
 
             var extractor = scope.ServiceProvider.GetRequiredService<PreviewExtractor>();
+            var maxDim = focus ? PreviewExtractor.FocusMaxDimension : PreviewExtractor.MaxDimension;
             var bytes = await extractor.ExtractAsync(
                 Path.Combine(item.MountPath, item.RelativePath),
                 item.EntryPath,
+                maxDim,
                 cancellationToken).ConfigureAwait(false);
             if (bytes is null)
                 return Snapshot with { Error = "preview is missing or corrupt" };
 
-            await thumbnails.PutContentAsync(contentItemId, bytes, cancellationToken).ConfigureAwait(false);
-            await writeQueue.EnqueueAsync(
-                ct => db.ContentItems.Where(c => c.Id == contentItemId)
-                    .ExecuteUpdateAsync(
-                        setters => setters.SetProperty(c => c.PreviewThumbRef, $"content-thumb:{contentItemId}"),
-                        ct),
-                WritePriority.Interactive,
-                cancellationToken).ConfigureAwait(false);
+            if (focus)
+            {
+                await thumbnails.PutFocusContentAsync(contentItemId, bytes, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await thumbnails.PutContentAsync(contentItemId, bytes, cancellationToken).ConfigureAwait(false);
+                await writeQueue.EnqueueAsync(
+                    ct => db.ContentItems.Where(c => c.Id == contentItemId)
+                        .ExecuteUpdateAsync(
+                            setters => setters.SetProperty(c => c.PreviewThumbRef, $"content-thumb:{contentItemId}"),
+                            ct),
+                    WritePriority.Interactive,
+                    cancellationToken).ConfigureAwait(false);
+            }
             return Snapshot with { Error = null };
         }
         catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
         {
-            logger.LogWarning(ex, "Content preview extraction failed for {ContentItemId}", contentItemId);
+            logger.LogWarning(ex, "Content preview extraction failed for {ContentItemId} (focus={Focus})", contentItemId, focus);
             return Snapshot with { Error = ex.Message };
         }
     }

@@ -38,7 +38,9 @@ public sealed record ContentItemDto(
     string Type,
     string EntryPath,
     bool IsPreset,
-    bool HasPreview);
+    bool HasPreview,
+    /// <summary>True when a wall thumbnail is already packed in the thumbnail store.</summary>
+    bool PreviewCached = false);
 
 /// <summary>A physical copy of a package (for the copies & lineage tab).</summary>
 public sealed record CopyDto(long VarFileId, int Tier, string Path, long SizeBytes, bool IsOnline, long? FixedFromVarFileId);
@@ -79,7 +81,12 @@ public interface IPackageDetailQuery
     Task<PageResult<DependencyEdgeDto>> GetSaveDependentsPageAsync(long packageId, PageRequest request, CancellationToken cancellationToken = default);
 
     Task<PageResult<ContentItemDto>> GetContentItemsPageAsync(
-        long packageId, long? varFileId, PageRequest request, CancellationToken cancellationToken = default);
+        long packageId,
+        long? varFileId,
+        PageRequest request,
+        CancellationToken cancellationToken = default,
+        string? typeFilter = null,
+        bool loadableOnly = false);
 
     Task<PageResult<CopyDto>> GetCopiesPageAsync(long packageId, PageRequest request, CancellationToken cancellationToken = default);
 

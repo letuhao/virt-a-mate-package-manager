@@ -64,6 +64,12 @@ public sealed class EfPackageDetailQueryTests
         Assert.Single(deps.Items);
         Assert.Equal("B.P.1", deps.Items[0].RequestedRefRaw);
         Assert.NotNull(deps.Items[0].ResolvedPackage);
+
+        var loadable = await query.GetContentItemsPageAsync(1, 10, new Sdk.Paging.PageRequest(1, 50), loadableOnly: true);
+        Assert.Equal(2, loadable.Items.Count); // Scene + preset Look
+        var looks = await query.GetContentItemsPageAsync(1, 10, new Sdk.Paging.PageRequest(1, 50), typeFilter: "Look");
+        Assert.Single(looks.Items);
+        Assert.Equal("Look", looks.Items[0].Type);
     }
 
     [Fact]

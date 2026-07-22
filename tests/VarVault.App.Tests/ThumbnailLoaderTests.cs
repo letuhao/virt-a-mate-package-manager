@@ -81,5 +81,8 @@ public class ThumbnailLoaderTests
         public Task PutContentAsync(long contentItemId, byte[] jpeg, CancellationToken cancellationToken = default) => Task.CompletedTask;
         public Task<byte[]?> GetContentAsync(long contentItemId, CancellationToken cancellationToken = default) =>
             Task.FromResult<byte[]?>(null);
+        public Task PutFocusContentAsync(long contentItemId, byte[] jpeg, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public Task<byte[]?> GetFocusContentAsync(long contentItemId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<byte[]?>(null);
     }
 }

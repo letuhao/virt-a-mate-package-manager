@@ -9,12 +9,6 @@ public partial class VarDetailDialog : UserControl
 {
     public VarDetailDialog() => AvaloniaXamlLoader.Load(this);
 
-    private void OnContentCardAttached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
-    {
-        if (sender is Control { DataContext: ContentCardViewModel card })
-            _ = card.LoadAsync();
-    }
-
     private void OnDependencyCardAttached(object? sender, Avalonia.VisualTreeAttachmentEventArgs e)
     {
         if (sender is Control { DataContext: DependencyCardViewModel card })

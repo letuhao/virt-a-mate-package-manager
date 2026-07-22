@@ -19,6 +19,7 @@ public class PresetEditDialogTests
         public Task<IReadOnlyList<PresetInfo>> ListAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<PresetInfo>>([]);
         public Task<Result<PresetInfo>> CreateAsync(string n, IEnumerable<string> m, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<bool> DeleteAsync(long id, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task RefreshMemberResolutionsAsync(long id, CancellationToken ct = default) => Task.CompletedTask;
     }
 
     [Fact]

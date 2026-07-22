@@ -143,9 +143,9 @@
                    Text="{Binding ReviewRemaining, StringFormat='Only {0} item(s) need your decision'}" />
       </Grid>
 
-      <!-- Action bar (bottom) -->
+      <!-- Action bar (bottom) — high Z so work-area overflow never steals clicks. -->
       <Border DockPanel.Dock="Bottom" Background="{DynamicResource Bg1Brush}" BorderBrush="{DynamicResource BorderBrush}"
-              BorderThickness="0,1,0,0" Padding="0,10,0,0" Margin="0,10,0,0">
+              BorderThickness="0,1,0,0" Padding="0,10,0,0" Margin="0,10,0,0" ZIndex="10">
         <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
           <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,12,0">
             <TextBlock VerticalAlignment="Center" Opacity="0.7" FontSize="12"
@@ -159,7 +159,11 @@
                      Text="{Binding ApplyPlanSummary}" />
           <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center" Margin="0,0,12,0"
                       IsEnabled="{Binding CanEditReview}">
-            <Button Content="✨ Accept all recommendations" Command="{Binding AcceptAllCommand}" />
+            <Button Content="✨ Accept all recommendations" Command="{Binding AcceptAllCommand}"
+                    ToolTip.Tip="Fill every undecided review item with the recommender’s choice (keeps decisions you already made)." />
+            <Button Content="↷ Skip remaining" Command="{Binding SkipRemainingCommand}"
+                    IsVisible="{Binding HasUndecidedReview}"
+                    ToolTip.Tip="Leave your current choices; mark everything else as skip / keep repo. Then Apply." />
             <CheckBox Content="Activate into VaM after import" IsChecked="{Binding ActivateAfter}" VerticalAlignment="Center"
                       IsEnabled="{Binding CanEditSources}" />
           </StackPanel>
@@ -168,8 +172,8 @@
         </Grid>
       </Border>
 
-      <!-- Work area: list | resolver -->
-      <Grid ColumnDefinitions="*,1.1*">
+      <!-- Work area: list | resolver — ClipToBounds so overflow cannot steal clicks from the action bar. -->
+      <Grid ColumnDefinitions="*,1.1*" ClipToBounds="True">
         <DockPanel Grid.Column="0">
           <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,6">
             <TextBox Grid.Column="0" Text="{Binding SearchText}" Watermark="Filter by name / creator…"
@@ -250,66 +254,13 @@
           </ListBox>
         </DockPanel>
 
-        <!-- Resolver -->
-        <c:Card Grid.Column="1" Margin="14,0,0,0" Header="Details"
+        <!-- Resolver: decisions stay docked; long diffs scroll inside a bounded viewport. -->
+        <c:Card Grid.Column="1" Margin="14,0,0,0" Header="Details" VerticalAlignment="Stretch"
                 IsVisible="{Binding Selected, Converter={x:Static ObjectConverters.IsNotNull}}">
-          <ScrollViewer>
-            <StackPanel Spacing="10" DataContext="{Binding Selected}" x:DataType="vm:ImportItemViewModel">
-              <TextBlock Text="{Binding FileName}" FontFamily="{DynamicResource MonoFont}" FontSize="14"
-                         Foreground="{DynamicResource TextHiBrush}" TextWrapping="Wrap" />
-              <Border CornerRadius="6" ClipToBounds="True" MaxHeight="180" HorizontalAlignment="Left"
-                      IsVisible="{Binding HasPreview}">
-                <Image Source="{Binding PreviewPath, Converter={StaticResource PathToBitmap}}" Stretch="Uniform" />
-              </Border>
-              <Border Background="{DynamicResource Bg2Brush}" CornerRadius="6" Padding="10">
-                <TextBlock Text="{Binding Reason}" FontSize="12" TextWrapping="Wrap" />
-              </Border>
-
-              <!-- Naming lane: filename identity vs meta.json identity (G2 · D3) -->
-              <Grid ColumnDefinitions="120,*,*" RowDefinitions="Auto,Auto" IsVisible="{Binding IsNaming}">
-                <TextBlock Grid.Row="0" Grid.Column="1" Text="By filename" Foreground="{DynamicResource WarnBrush}" FontWeight="SemiBold" FontSize="12" />
-                <TextBlock Grid.Row="0" Grid.Column="2" Text="By meta.json" Foreground="{DynamicResource ColdBrush}" FontWeight="SemiBold" FontSize="12" />
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="Identity" Opacity="0.6" FontSize="12" />
-                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding FilenameIdentity}" FontFamily="{DynamicResource MonoFont}" FontSize="11.5" TextWrapping="Wrap" />
-                <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding MetaIdentityLabel}" FontFamily="{DynamicResource MonoFont}" FontSize="11.5" FontWeight="SemiBold" TextWrapping="Wrap" />
-              </Grid>
-
-              <!-- Conflict side-by-side signal grid -->
-              <Grid ColumnDefinitions="120,*,*" IsVisible="{Binding HasExisting}"
-                    RowDefinitions="Auto,Auto,Auto,Auto,Auto">
-                <TextBlock Grid.Row="0" Grid.Column="1" Text="Incoming" Foreground="{DynamicResource GoodBrush}" FontWeight="SemiBold" FontSize="12" />
-                <TextBlock Grid.Row="0" Grid.Column="2" Text="In repo" Foreground="{DynamicResource ColdBrush}" FontWeight="SemiBold" FontSize="12" />
-                <TextBlock Grid.Row="1" Grid.Column="0" Text="Valid zip" Opacity="0.6" FontSize="12" />
-                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding IntegrityStatus}" FontSize="12" />
-                <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Existing.Signals.IntegrityStatus}" FontSize="12" />
-                <TextBlock Grid.Row="2" Grid.Column="0" Text="Size" Opacity="0.6" FontSize="12" />
-                <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SizeLabel}" FontSize="12" />
-                <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding Existing.Signals.SizeBytes, Converter={StaticResource BytesToSize}}" FontSize="12" />
-                <TextBlock Grid.Row="3" Grid.Column="0" Text="Entries" Opacity="0.6" FontSize="12" />
-                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding EntryCount}" FontSize="12" />
-                <TextBlock Grid.Row="3" Grid.Column="2" Text="{Binding Existing.Signals.EntryCount}" FontSize="12" />
-                <TextBlock Grid.Row="4" Grid.Column="0" Text="Repo" Opacity="0.6" FontSize="12" />
-                <TextBlock Grid.Row="4" Grid.Column="2" Text="{Binding Existing.RepositoryName}" FontSize="12" />
-              </Grid>
-
-              <!-- Per-entry diff (+/−/~) -->
-              <ItemsControl ItemsSource="{Binding Diff}" MaxHeight="150">
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="imp:EntryDelta">
-                    <StackPanel Orientation="Horizontal" Spacing="6">
-                      <TextBlock Text="{Binding Kind}" FontFamily="{DynamicResource MonoFont}" FontSize="11" FontWeight="Bold" Width="12" />
-                      <TextBlock Text="{Binding Path}" FontFamily="{DynamicResource MonoFont}" FontSize="11" Opacity="0.8" TextTrimming="CharacterEllipsis" />
-                    </StackPanel>
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-
-              <TextBlock Text="Decision:" Opacity="0.6" FontSize="12" Margin="0,4,0,0" />
-
-              <!-- Decisions locked while Apply runs (snapshot already frozen for the job). -->
-              <StackPanel Spacing="0"
-                          IsEnabled="{Binding $parent[UserControl].((vm:ImportViewModel)DataContext).CanEditReview}">
-              <!-- New / Exact: import vs skip -->
+          <DockPanel DataContext="{Binding Selected}" x:DataType="vm:ImportItemViewModel">
+            <StackPanel DockPanel.Dock="Bottom" Spacing="4" Margin="0,10,0,0"
+                        IsEnabled="{Binding $parent[UserControl].((vm:ImportViewModel)DataContext).CanEditReview}">
+              <TextBlock Text="Decision:" Opacity="0.6" FontSize="12" />
               <WrapPanel IsVisible="{Binding IsNew}">
                 <Button Content="✅ Import" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
                 <Button Content="⤫ Skip" Command="{Binding ChooseCommand}" CommandParameter="Skip" Margin="0,0,6,6" />
@@ -318,38 +269,85 @@
                 <Button Content="⤫ Skip (already have)" Command="{Binding ChooseCommand}" CommandParameter="Skip" Margin="0,0,6,6" />
                 <Button Content="✅ Import a copy" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
               </WrapPanel>
-              <!-- CJK: import+fix vs skip -->
               <WrapPanel IsVisible="{Binding IsCjk}">
                 <Button Content="🈶 Import + fix Unicode" Command="{Binding ChooseCommand}" CommandParameter="ImportAndFix" Margin="0,0,6,6" />
                 <Button Content="✅ Import (no fix)" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
                 <Button Content="⤫ Skip" Command="{Binding ChooseCommand}" CommandParameter="Skip" Margin="0,0,6,6" />
               </WrapPanel>
-              <!-- Naming: rename to meta / keep filename / discard -->
               <WrapPanel IsVisible="{Binding IsNaming}">
                 <Button Content="🏷 Rename to meta" Command="{Binding ChooseCommand}" CommandParameter="RenameToMeta" Margin="0,0,6,6" />
                 <Button Content="✅ Keep filename" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
                 <Button Content="🗑 Discard" Command="{Binding ChooseCommand}" CommandParameter="Discard" Margin="0,0,6,6" />
               </WrapPanel>
-              <!-- Conflict: keep new / keep old / both / discard -->
               <WrapPanel IsVisible="{Binding IsConflict}">
                 <Button Content="✅ Keep new" Command="{Binding ChooseCommand}" CommandParameter="KeepIncoming" Margin="0,0,6,6" />
                 <Button Content="↩︎ Keep existing" Command="{Binding ChooseCommand}" CommandParameter="KeepExisting" Margin="0,0,6,6" />
                 <Button Content="🔀 Keep both" Command="{Binding ChooseCommand}" CommandParameter="KeepBoth" Margin="0,0,6,6" />
                 <Button Content="🗑 Discard" Command="{Binding ChooseCommand}" CommandParameter="Discard" Margin="0,0,6,6" />
               </WrapPanel>
-              <!-- Corrupt: discard / import anyway -->
               <WrapPanel IsVisible="{Binding IsCorrupt}">
                 <Button Content="🗑 Discard (recommended)" Command="{Binding ChooseCommand}" CommandParameter="Discard" Margin="0,0,6,6" />
                 <Button Content="⚠ Import anyway" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
               </WrapPanel>
-              </StackPanel>
-
               <TextBlock Text="{Binding DecisionLabel, StringFormat='Selected: {0}'}" Foreground="{DynamicResource GoodBrush}"
                          FontSize="12" IsVisible="{Binding IsResolved}" />
               <TextBlock Text="J/K move · ] choice 1 · [ choice 2 · \ both · Del discard" Opacity="0.5" FontSize="11"
                          IsVisible="{Binding NeedsReview}" Margin="0,4,0,0" />
             </StackPanel>
-          </ScrollViewer>
+
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <StackPanel Spacing="10">
+                <TextBlock Text="{Binding FileName}" FontFamily="{DynamicResource MonoFont}" FontSize="14"
+                           Foreground="{DynamicResource TextHiBrush}" TextWrapping="Wrap" />
+                <Border CornerRadius="6" ClipToBounds="True" MaxHeight="180" HorizontalAlignment="Left"
+                        IsVisible="{Binding HasPreview}">
+                  <Image Source="{Binding PreviewPath, Converter={StaticResource PathToBitmap}}" Stretch="Uniform" />
+                </Border>
+                <Border Background="{DynamicResource Bg2Brush}" CornerRadius="6" Padding="10">
+                  <TextBlock Text="{Binding Reason}" FontSize="12" TextWrapping="Wrap" />
+                </Border>
+
+                <Grid ColumnDefinitions="120,*,*" RowDefinitions="Auto,Auto" IsVisible="{Binding IsNaming}">
+                  <TextBlock Grid.Row="0" Grid.Column="1" Text="By filename" Foreground="{DynamicResource WarnBrush}" FontWeight="SemiBold" FontSize="12" />
+                  <TextBlock Grid.Row="0" Grid.Column="2" Text="By meta.json" Foreground="{DynamicResource ColdBrush}" FontWeight="SemiBold" FontSize="12" />
+                  <TextBlock Grid.Row="1" Grid.Column="0" Text="Identity" Opacity="0.6" FontSize="12" />
+                  <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding FilenameIdentity}" FontFamily="{DynamicResource MonoFont}" FontSize="11.5" TextWrapping="Wrap" />
+                  <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding MetaIdentityLabel}" FontFamily="{DynamicResource MonoFont}" FontSize="11.5" FontWeight="SemiBold" TextWrapping="Wrap" />
+                </Grid>
+
+                <Grid ColumnDefinitions="120,*,*" IsVisible="{Binding HasExisting}"
+                      RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                  <TextBlock Grid.Row="0" Grid.Column="1" Text="Incoming" Foreground="{DynamicResource GoodBrush}" FontWeight="SemiBold" FontSize="12" />
+                  <TextBlock Grid.Row="0" Grid.Column="2" Text="In repo" Foreground="{DynamicResource ColdBrush}" FontWeight="SemiBold" FontSize="12" />
+                  <TextBlock Grid.Row="1" Grid.Column="0" Text="Valid zip" Opacity="0.6" FontSize="12" />
+                  <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding IntegrityStatus}" FontSize="12" />
+                  <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Existing.Signals.IntegrityStatus}" FontSize="12" />
+                  <TextBlock Grid.Row="2" Grid.Column="0" Text="Size" Opacity="0.6" FontSize="12" />
+                  <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SizeLabel}" FontSize="12" />
+                  <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding Existing.Signals.SizeBytes, Converter={StaticResource BytesToSize}}" FontSize="12" />
+                  <TextBlock Grid.Row="3" Grid.Column="0" Text="Entries" Opacity="0.6" FontSize="12" />
+                  <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding EntryCount}" FontSize="12" />
+                  <TextBlock Grid.Row="3" Grid.Column="2" Text="{Binding Existing.Signals.EntryCount}" FontSize="12" />
+                  <TextBlock Grid.Row="4" Grid.Column="0" Text="Repo" Opacity="0.6" FontSize="12" />
+                  <TextBlock Grid.Row="4" Grid.Column="2" Text="{Binding Existing.RepositoryName}" FontSize="12" />
+                </Grid>
+
+                <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto"
+                              IsVisible="{Binding HasDiff}">
+                  <ItemsControl ItemsSource="{Binding Diff}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="imp:EntryDelta">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="{Binding Kind}" FontFamily="{DynamicResource MonoFont}" FontSize="11" FontWeight="Bold" Width="12" />
+                          <TextBlock Text="{Binding Path}" FontFamily="{DynamicResource MonoFont}" FontSize="11" Opacity="0.8" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+              </StackPanel>
+            </ScrollViewer>
+          </DockPanel>
         </c:Card>
       </Grid>
     </DockPanel>

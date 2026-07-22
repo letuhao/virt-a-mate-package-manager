@@ -32,13 +32,8 @@ public sealed class EfLibraryActionService(
         return new BulkActionResult(ok, fail);
     }
 
-    public async Task<BulkActionResult> FixEncodingAsync(IReadOnlyList<long> varFileIds, CancellationToken cancellationToken = default)
-    {
-        int ok = 0, fail = 0;
-        foreach (var id in varFileIds)
-            if ((await health.FixAsync(id, cancellationToken).ConfigureAwait(false)).IsSuccess) ok++; else fail++;
-        return new BulkActionResult(ok, fail);
-    }
+    public async Task<BulkActionResult> FixEncodingAsync(IReadOnlyList<long> varFileIds, CancellationToken cancellationToken = default) =>
+        await health.FixManyAsync(varFileIds, progress: null, cancellationToken).ConfigureAwait(false);
 
     public async Task<BulkActionResult> DeleteAsync(IReadOnlyList<long> varFileIds, CancellationToken cancellationToken = default)
     {

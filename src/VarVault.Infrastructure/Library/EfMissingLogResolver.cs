@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using VarVault.Domain.Dependencies;
+using VarVault.Domain.Entities;
 using VarVault.Domain.Identity;
 using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Activation;
@@ -10,15 +11,19 @@ namespace VarVault.Infrastructure.Library;
 
 /// <summary>
 /// Resolves the packages a pasted VaM error log complains about (<see cref="VamLogParser"/>) against the whole
-/// library — dereferencing <c>.latest</c> to the newest version we actually hold — then activates the found set
-/// <b>plus its forward-dependency closure</b> into the active VaM profile via the preset/activation flow. That
-/// closure is the fix for the old importer that never pulled dependencies. (QoL log-repair.)
+/// library — dereferencing <c>.latest</c> to the newest version we actually hold — then adds the found set
+/// <b>plus its forward-dependency closure</b> into the <b>active</b> loading preset / VaM profile (never a
+/// throwaway "VaM Log Repair" preset). That closure is the fix for the old importer that never pulled
+/// dependencies. (QoL log-repair.)
 /// </summary>
 public sealed class EfMissingLogResolver(
-    VarVaultDbContext db, IDependencyGraph graph, IPresetService presets, IActivationService activation)
+    VarVaultDbContext db,
+    IPresetService presets,
+    IActivationService activation,
+    IProfileService profiles)
     : IMissingLogResolver
 {
-    private const string RepairPresetName = "VaM Log Repair";
+    private readonly ActivePresetActivationHelper _activator = new(db, presets, activation, profiles);
 
     public async Task<MissingLogAnalysis> AnalyzeAsync(string logText, CancellationToken cancellationToken = default)
     {
@@ -44,7 +49,7 @@ public sealed class EfMissingLogResolver(
     /// Both keys are folded client-side, then used as plain values EF can translate (LIKE prefix / equality).</summary>
     private async Task<Hit?> ResolveAsync(DependencyRef dep, CancellationToken ct)
     {
-        IQueryable<Domain.Entities.Package> q;
+        IQueryable<Package> q;
         if (dep.VersionKind == VersionSpecKind.Latest)
         {
             var prefix = IdentityFold.Compute($"{dep.Creator}.{dep.Package}") + ".";
@@ -67,27 +72,6 @@ public sealed class EfMissingLogResolver(
             .FirstOrDefaultAsync(ct).ConfigureAwait(false);
     }
 
-    public async Task<MissingLogActivation> ActivateAsync(IReadOnlyList<string> varNames, CancellationToken cancellationToken = default)
-    {
-        var members = varNames.Where(n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        if (members.Count == 0)
-            return new MissingLogActivation(0, 0, 0, 0);
-
-        // Replace the repair preset so each run activates exactly the current found set (+ its closure).
-        var existing = (await presets.ListAsync(cancellationToken).ConfigureAwait(false))
-            .FirstOrDefault(p => string.Equals(p.Name, RepairPresetName, StringComparison.OrdinalIgnoreCase));
-        if (existing is not null)
-            await presets.DeleteAsync(existing.Id, cancellationToken).ConfigureAwait(false);
-
-        var created = await presets.CreateAsync(RepairPresetName, members, cancellationToken).ConfigureAwait(false);
-        if (created.IsFailure)
-            return new MissingLogActivation(0, 0, 0, 0);
-
-        var build = await activation.BuildProfileLinksAsync(created.Value.Id, cancellationToken).ConfigureAwait(false);
-        return new MissingLogActivation(
-            MembersActivated: created.Value.MemberCount,
-            LinksCreated: build.LinksCreated,
-            StillMissing: build.MissingPackages,
-            PrivilegeFailures: build.PrivilegeFailures);
-    }
+    public Task<MissingLogActivation> ActivateAsync(IReadOnlyList<string> varNames, CancellationToken cancellationToken = default) =>
+        _activator.ActivateAsync(varNames, cancellationToken);
 }

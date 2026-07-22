@@ -34,7 +34,9 @@ public sealed partial class ProposalRowViewModel(Proposal proposal) : Observable
 /// (16-checklist SCR-8.)
 /// </summary>
 public sealed partial class ProposalsViewModel(
-    IProposalService proposals, Services.IDialogLauncher? launcher = null) : ObservableObject, ILoadableScreen
+    IProposalService proposals,
+    Services.IDialogLauncher? launcher = null,
+    Services.EncodingFixJobRunner? encodingJobs = null) : ObservableObject, ILoadableScreen
 {
     private readonly Dictionary<string, ProposalRowViewModel> _selectedById = [];
 
@@ -111,13 +113,45 @@ public sealed partial class ProposalsViewModel(
     public async Task ApproveSelectedAsync(CancellationToken cancellationToken = default)
     {
         var selected = Pending.Where(r => r.IsSelected || _selectedById.ContainsKey(r.Proposal.Id)).ToList();
-        foreach (var row in selected)
+        var encoding = selected.Where(r => r.Proposal.Kind == ProposalKind.EncodingFix).ToList();
+        var others = selected.Where(r => r.Proposal.Kind != ProposalKind.EncodingFix).ToList();
+
+        if (encoding.Count > 0 && encodingJobs is not null)
+        {
+            var ids = encoding.SelectMany(r => r.Proposal.VarFileIds).Distinct().ToList();
+            StatusMessage = "Encoding fix queued — watch the jobs panel";
+            var job = encodingJobs.StartVarFiles(ids, $"Fix encoding ({ids.Count} from proposals)");
+            try
+            {
+                var batch = await job.Result.ConfigureAwait(true);
+                StatusMessage = $"Fixed {batch.Succeeded}/{ids.Count} (originals retained as .fixed.var)";
+                foreach (var row in encoding)
+                {
+                    _selectedById.Remove(row.Proposal.Id);
+                    Pending.Remove(row);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                StatusMessage = "Encoding fix cancelled";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Encoding fix failed: {ex.Message}";
+            }
+        }
+        else
+        {
+            others = selected; // no job runner — approve encoding via IProposalService with the rest
+        }
+
+        foreach (var row in others)
         {
             var result = await proposals.ApproveAsync(row.Proposal, cancellationToken).ConfigureAwait(true);
             StatusMessage = result.Message;
             Pending.Remove(row);
+            _selectedById.Remove(row.Proposal.Id);
         }
-        _selectedById.Clear();
         NotifyPager();
     }
 
@@ -129,7 +163,7 @@ public sealed partial class ProposalsViewModel(
             return;
         switch (row.Proposal.Kind)
         {
-            case ProposalKind.EncodingFix: launcher.OpenFix(0, null); break;
+            case ProposalKind.EncodingFix: launcher.OpenFix(0, row.Proposal.Payload); break;
             default: launcher.OpenMigratePlan(); break;
         }
     }
@@ -139,6 +173,31 @@ public sealed partial class ProposalsViewModel(
     {
         if (row is null)
             return;
+
+        if (row.Proposal.Kind == ProposalKind.EncodingFix && encodingJobs is not null)
+        {
+            var ids = row.Proposal.VarFileIds;
+            StatusMessage = "Encoding fix queued — watch the jobs panel";
+            var job = encodingJobs.StartVarFiles(ids, "Fix encoding (proposal)");
+            try
+            {
+                var batch = await job.Result.ConfigureAwait(true);
+                StatusMessage = $"Fixed {batch.Succeeded}/{ids.Count} (originals retained as .fixed.var)";
+                _selectedById.Remove(row.Proposal.Id);
+                Pending.Remove(row);
+                NotifyPager();
+            }
+            catch (OperationCanceledException)
+            {
+                StatusMessage = "Encoding fix cancelled";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Encoding fix failed: {ex.Message}";
+            }
+            return;
+        }
+
         var result = await proposals.ApproveAsync(row.Proposal, cancellationToken).ConfigureAwait(true);
         StatusMessage = result.Message;
         _selectedById.Remove(row.Proposal.Id);

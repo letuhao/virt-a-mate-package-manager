@@ -65,9 +65,10 @@ public sealed class EfProposalService(
         // Encoding fix — one proposal per codepage group.
         foreach (var eg in await health.EncodingGroupsAsync(cancellationToken).ConfigureAwait(false))
         {
-            var brokenIds = await db.VarFiles
+            var brokenIds = await db.VarFiles.AsNoTracking()
                 .Where(v => v.DetectedCodepage == eg.Codepage
-                            && (v.EncodingHealth == EncodingHealth.NeedsFix || v.EncodingHealth == EncodingHealth.PartiallyBroken))
+                            && (v.EncodingHealth == EncodingHealth.NeedsFix || v.EncodingHealth == EncodingHealth.PartiallyBroken)
+                            && v.SupersededByVarFileId == null)
                 .Select(v => v.Id).ToListAsync(cancellationToken).ConfigureAwait(false);
             proposals.Add(new Proposal(
                 $"encoding:{eg.Codepage}", ProposalKind.EncodingFix, $"Fix {eg.Count} {eg.Codepage} vars → UTF-8",

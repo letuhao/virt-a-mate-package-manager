@@ -23,6 +23,8 @@ public sealed class EncodingFixCoordinator(VarVaultDbContext db, IEncodingFixer 
         var broken = await db.VarFiles.FirstOrDefaultAsync(v => v.Id == brokenVarFileId, cancellationToken).ConfigureAwait(false);
         if (broken is null)
             return Result.Failure<long>("fix.missing", "Var file not found.");
+        if (broken.SupersededByVarFileId is not null)
+            return Result.Failure<long>("fix.superseded", "Var already has a UTF-8 sibling — original retained.");
         if (broken.EncodingHealth is not (EncodingHealth.NeedsFix or EncodingHealth.PartiallyBroken))
             return Result.Failure<long>("fix.nothealthy", "Var is not flagged for an encoding fix.");
         if (string.IsNullOrEmpty(broken.DetectedCodepage))
@@ -67,6 +69,44 @@ public sealed class EncodingFixCoordinator(VarVaultDbContext db, IEncodingFixer 
 
         broken.SupersededByVarFileId = fixedVar.Id;
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        // Prefer the Fixed copy as canonical when the broken one was (or none was elected yet).
+        if (broken.PackageId is { } packageId)
+        {
+            var package = await db.Packages.FirstOrDefaultAsync(p => p.Id == packageId, cancellationToken).ConfigureAwait(false);
+            if (package is not null
+                && (package.CanonicalVarFileId is null || package.CanonicalVarFileId == broken.Id))
+            {
+                package.CanonicalVarFileId = fixedVar.Id;
+            }
+
+            // Keep PackageListItem copy counts in sync so Library doesn't look stale until a full reindex.
+            var item = await db.PackageListItems.FirstOrDefaultAsync(i => i.PackageId == packageId, cancellationToken)
+                .ConfigureAwait(false);
+            if (item is not null)
+            {
+                var copies = await db.VarFiles
+                    .Where(v => v.PackageId == packageId)
+                    .Select(v => new { v.Id, v.SizeBytes, v.RepositoryId })
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                var onlineRepos = await db.Repositories
+                    .Where(r => r.IsOnline)
+                    .Select(r => r.Id)
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                var onlineSet = onlineRepos.ToHashSet();
+                item.TotalInstanceCount = copies.Count;
+                item.OnlineInstanceCount = copies.Count(c => onlineSet.Contains(c.RepositoryId));
+                item.IsSingleCopy = item.OnlineInstanceCount <= 1;
+                var canonicalId = package?.CanonicalVarFileId ?? fixedVar.Id;
+                item.TotalSize = copies.FirstOrDefault(c => c.Id == canonicalId)?.SizeBytes
+                                 ?? copies.FirstOrDefault()?.SizeBytes
+                                 ?? item.TotalSize;
+            }
+
+            await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
 
         return fixedVar.Id;
     }

@@ -56,4 +56,14 @@ public sealed class InProcessIndexerClient(IIndexerWorker worker) : IIndexerClie
             ? Result.Success()
             : Result.Failure("indexer.preview", status.Error);
     }
+
+    public async Task<Result> ExtractContentFocusPreviewAsync(long contentItemId, CancellationToken cancellationToken = default)
+    {
+        var status = await worker.HandleAsync(
+            new IndexerCommand(IndexerCommandKind.ExtractContentFocusPreview, ContentItemId: contentItemId),
+            cancellationToken).ConfigureAwait(false);
+        return status.Error is null
+            ? Result.Success()
+            : Result.Failure("indexer.focus", status.Error);
+    }
 }

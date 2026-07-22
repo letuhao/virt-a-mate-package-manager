@@ -83,7 +83,7 @@ public partial class LibraryView : UserControl
         if (_detailColumn is null || DataContext is not LibraryViewModel vm)
             return;
         _suppressWidthSync = true;
-        _detailColumn.Width = new GridLength(Math.Clamp(vm.DetailPanelWidth, 220, 600));
+        _detailColumn.Width = new GridLength(Math.Max(PackageGalleryViewModel.MinPanelWidth, vm.DetailPanelWidth));
         _suppressWidthSync = false;
     }
 
@@ -93,7 +93,7 @@ public partial class LibraryView : UserControl
             return;
         if (_detailColumn is null || !_detailColumn.Width.IsAbsolute)
             return;
-        var width = Math.Clamp(_detailColumn.Width.Value, 220, 600);
+        var width = Math.Max(PackageGalleryViewModel.MinPanelWidth, _detailColumn.Width.Value);
         if (Math.Abs(vm.DetailPanelWidth - width) < 0.5)
             return;
         vm.DetailPanelWidth = width;
@@ -275,9 +275,38 @@ public partial class LibraryView : UserControl
         }
         else if (e.Key == Key.Escape)
         {
+            if (vm.PackageGallery.IsFocusMode)
+            {
+                vm.PackageGallery.ExitFocusCommand.Execute(null);
+                e.Handled = true;
+                return;
+            }
             vm.ClearSelection();
             vm.SelectedEntry = null;
             e.Handled = true;
+        }
+        else if (vm.PackageGallery.IsFocusMode)
+        {
+            // Focus lives in the sidebar; grid often has keyboard focus, so route nav here.
+            switch (e.Key)
+            {
+                case Key.Left:
+                    _ = vm.PackageGallery.FocusPreviousCommand.ExecuteAsync(null);
+                    e.Handled = true;
+                    break;
+                case Key.Right:
+                    _ = vm.PackageGallery.FocusNextCommand.ExecuteAsync(null);
+                    e.Handled = true;
+                    break;
+                case Key.Home:
+                    _ = vm.PackageGallery.FocusFirstCommand.ExecuteAsync(null);
+                    e.Handled = true;
+                    break;
+                case Key.End:
+                    _ = vm.PackageGallery.FocusLastCommand.ExecuteAsync(null);
+                    e.Handled = true;
+                    break;
+            }
         }
     }
 

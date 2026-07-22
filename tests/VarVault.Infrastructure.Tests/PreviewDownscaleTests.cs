@@ -52,4 +52,18 @@ public sealed class PreviewDownscaleTests
         var garbage = new byte[] { 1, 2, 3, 4, 5 };
         Assert.Same(garbage, PreviewExtractor.Downscale(garbage));
     }
+
+    [Fact]
+    public void Focus_cap_keeps_more_detail_than_wall_thumb_cap()
+    {
+        var big = Jpeg(2400, 1800);
+        var wall = PreviewExtractor.Downscale(big, PreviewExtractor.MaxDimension);
+        var focus = PreviewExtractor.Downscale(big, PreviewExtractor.FocusMaxDimension);
+
+        var (ww, wh) = Dimensions(wall!);
+        var (fw, fh) = Dimensions(focus!);
+        Assert.True(System.Math.Max(ww, wh) <= PreviewExtractor.MaxDimension);
+        Assert.True(System.Math.Max(fw, fh) <= PreviewExtractor.FocusMaxDimension);
+        Assert.True(System.Math.Max(fw, fh) > System.Math.Max(ww, wh));
+    }
 }

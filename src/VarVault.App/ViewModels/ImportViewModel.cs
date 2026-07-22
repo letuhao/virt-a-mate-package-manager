@@ -24,6 +24,7 @@ public sealed partial class ImportItemViewModel(ImportItem item) : ObservableObj
     public string Reason => Model.Reason;
     public ImportDecision Recommendation => Model.Recommendation;
     public System.Collections.Generic.IReadOnlyList<EntryDelta> Diff => Model.Diff;
+    public bool HasDiff => Diff.Count > 0;
 
     public string SizeLabel => Common.Formatting.ByteSize.Humanize(Model.Signals.SizeBytes);
     public bool NeedsReview => ImportViewModel.IsReviewLane(Lane);
@@ -236,6 +237,8 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
                 return "Choose a target repository (Import into).";
             if (SourcePaths.Count == 0)
                 return "Add at least one folder or archive with + Folder… / + Archive….";
+            if (_session is not null && ReviewRemaining > 0 && CanApply)
+                return $"{ReviewRemaining} undecided — Apply will skip them (keep repo / don’t import). Or Accept recommendations.";
             if (_session is not null && ReviewRemaining > 0)
                 return $"{ReviewRemaining} item(s) still need a decision before Apply.";
             if (_session is not null && CanApply)
@@ -256,8 +259,14 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
     public int DiscardPlanned => _all.Count(i => i.Decision == ImportDecision.Discard);
     public string ApplyPlanSummary =>
         $"Copy {CopyPlanned} · fix {FixPlanned} · skip {SkipPlanned} · discard {DiscardPlanned}";
-    public bool CanApply => _session is not null && ReviewRemaining == 0 && !IsApplying && !IsScanning && _all.Count > 0;
+    /// <summary>
+    /// Apply is available as soon as a scan exists. Undecided review items are treated as a lane-safe
+    /// skip at Apply time (Conflict→keep repo, Naming→skip, Corrupt→discard) so users can decide only
+    /// the vars they care about.
+    /// </summary>
+    public bool CanApply => _session is not null && !IsApplying && !IsScanning && _all.Count > 0;
     public bool CanScan => TargetRepo is not null && SourcePaths.Count > 0 && !IsScanning && !IsApplying;
+    public bool HasUndecidedReview => ReviewRemaining > 0;
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
@@ -428,7 +437,26 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
         if (IsApplying)
             return;
         foreach (var i in _all.Where(x => x.NeedsReview && !x.IsResolved))
-            i.Decision = i.Recommendation;
+        {
+            // Prefer the recommender; fall back to a lane-safe skip when it has no default (shouldn't).
+            i.Decision = i.Recommendation != ImportDecision.None
+                ? i.Recommendation
+                : SkipDecisionFor(i);
+        }
+        NotifyCounts();
+        NotifyGate();
+    }
+
+    /// <summary>
+    /// Leave already-chosen decisions alone; mark every remaining review item as a no-import skip
+    /// (Conflict keeps the repo copy). One-click path for "I only care about these few".
+    /// </summary>
+    [RelayCommand]
+    private void SkipRemaining()
+    {
+        if (IsApplying)
+            return;
+        ApplySkipToUndecided();
         NotifyCounts();
         NotifyGate();
     }
@@ -454,6 +482,10 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
     {
         if (_session is null)
             return;
+
+        // Partial review is intentional UX: undecided review lanes become a safe skip before freeze.
+        ApplySkipToUndecided();
+        NotifyCounts();
 
         var snapshot = ImportJobRunner.FreezeSession(
             _session,
@@ -673,8 +705,26 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
         if (Selected is not { NeedsReview: true } sel)
             return;
         if (pick(sel) is { } d)
+        {
             sel.Decision = d;
+            NotifyCounts();
+            NotifyGate();
+        }
     }
+
+    private void ApplySkipToUndecided()
+    {
+        foreach (var i in _all.Where(x => x.NeedsReview && !x.IsResolved))
+            i.Decision = SkipDecisionFor(i);
+    }
+
+    /// <summary>Lane-safe "don't change my library" default for an undecided review item.</summary>
+    private static ImportDecision SkipDecisionFor(ImportItemViewModel i) => i.Lane switch
+    {
+        ImportLane.Conflict => ImportDecision.KeepExisting,
+        ImportLane.Corrupt => ImportDecision.Discard,
+        _ => ImportDecision.Skip,
+    };
 
     [RelayCommand] private void ToggleView() => GalleryView = !GalleryView;
     [RelayCommand] private void Filter(string lane) { LaneFilter = lane; _ = ApplyFilterAsync(); }
@@ -815,7 +865,8 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
         foreach (var n in new[] { nameof(TotalScanned), nameof(NewCount), nameof(CjkCount), nameof(ExactCount),
             nameof(NamingCount), nameof(ConflictCount), nameof(CorruptCount), nameof(ReviewTotal),
             nameof(ReviewResolved), nameof(ReviewRemaining), nameof(ReviewProgress), nameof(HasSession),
-            nameof(CopyPlanned), nameof(FixPlanned), nameof(SkipPlanned), nameof(DiscardPlanned), nameof(ApplyPlanSummary) })
+            nameof(CopyPlanned), nameof(FixPlanned), nameof(SkipPlanned), nameof(DiscardPlanned), nameof(ApplyPlanSummary),
+            nameof(HasUndecidedReview) })
             OnPropertyChanged(n);
     }
 

@@ -14,8 +14,6 @@ public sealed partial class VarDetailViewModel : ObservableObject
     private readonly IPackageDetailQuery _detailQuery;
     private readonly IDialogLauncher? _launcher;
     private readonly IClipboard? _clipboard;
-    private readonly IThumbnailStore? _thumbnails;
-    private readonly IIndexerClient? _indexer;
     private readonly ThumbnailLoader<Avalonia.Media.Imaging.Bitmap>? _thumbnailLoader;
 
     public VarDetailViewModel(
@@ -28,31 +26,27 @@ public sealed partial class VarDetailViewModel : ObservableObject
         _detailQuery = detail;
         _launcher = launcher;
         _clipboard = clipboard;
-        _thumbnails = thumbnails;
-        _indexer = indexer;
         _thumbnailLoader = thumbnails is null ? null : ThumbnailLoader.ForBitmap(thumbnails);
+        PackageGallery = new PackageGalleryViewModel(detail, thumbnails, indexer);
         DirectDepsPager = new PagedListState<DependencyEdgeDto>((request, ct) => _detailQuery.GetDirectDependenciesPageAsync(PackageId, request, ct));
         ReverseDepsPager = new PagedListState<ReverseDependentDto>((request, ct) => _detailQuery.GetReverseDependentsPageAsync(PackageId, request, ct));
         SaveDepsPager = new PagedListState<DependencyEdgeDto>((request, ct) => _detailQuery.GetSaveDependentsPageAsync(PackageId, request, ct));
-        ContentPager = new PagedListState<ContentItemDto>((request, ct) => _detailQuery.GetContentItemsPageAsync(PackageId, SelectedVarFileId, request, ct));
         CopiesPager = new PagedListState<CopyDto>((request, ct) => _detailQuery.GetCopiesPageAsync(PackageId, request, ct));
     }
 
     [ObservableProperty] private long _packageId;
-    [ObservableProperty] private long? _selectedVarFileId;
 
     /// <summary>Sub-navigation tabs (GC-2).</summary>
     public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =
         [new("Overview"), new("Dependencies"), new("Content gallery"), new("Copies & lineage")];
     [ObservableProperty] private int _selectedTabIndex;
 
+    public PackageGalleryViewModel PackageGallery { get; }
     public PagedListState<DependencyEdgeDto> DirectDepsPager { get; }
     public PagedListState<ReverseDependentDto> ReverseDepsPager { get; }
     public PagedListState<DependencyEdgeDto> SaveDepsPager { get; }
-    public PagedListState<ContentItemDto> ContentPager { get; }
     public PagedListState<CopyDto> CopiesPager { get; }
     public ObservableCollection<DependencyCardViewModel> DirectDependencyCards { get; } = [];
-    public ObservableCollection<ContentCardViewModel> ContentCards { get; } = [];
 
     [ObservableProperty] private PackageDetail? _detail;
 
@@ -72,12 +66,6 @@ public sealed partial class VarDetailViewModel : ObservableObject
         _ = EnsureTabLoadedAsync();
     }
 
-    partial void OnSelectedVarFileIdChanged(long? value)
-    {
-        if (IsContentTab)
-            _ = LoadContentPageAsync(1, ContentPager.PageSize);
-    }
-
     [RelayCommand]
     public async Task LoadAsync(long packageId, CancellationToken cancellationToken = default)
     {
@@ -86,12 +74,9 @@ public sealed partial class VarDetailViewModel : ObservableObject
         DirectDependencyCards.Clear();
         ReverseDepsPager.Reset();
         SaveDepsPager.Reset();
-        ContentPager.Reset();
-        ContentCards.Clear();
+        PackageGallery.Clear();
         CopiesPager.Reset();
         Detail = await _detailQuery.GetAsync(packageId, cancellationToken).ConfigureAwait(true);
-        SelectedVarFileId = Detail?.Copies.FirstOrDefault(c => c.IsOnline)?.VarFileId
-                            ?? Detail?.Copies.FirstOrDefault()?.VarFileId;
         OnPropertyChanged(nameof(HasDetail));
         await EnsureTabLoadedAsync(cancellationToken).ConfigureAwait(true);
     }
@@ -132,12 +117,6 @@ public sealed partial class VarDetailViewModel : ObservableObject
     [RelayCommand] private Task SaveDepsGoToPageAsync(int page) => SaveDepsPager.LoadPageAsync(page, SaveDepsPager.PageSize);
     [RelayCommand] private Task SaveDepsChangePageSizeAsync(int size) => SaveDepsPager.LoadPageAsync(1, size);
 
-    // ── Content pager ─────────────────────────────────────────────────────────
-    [RelayCommand] private Task ContentPreviousPageAsync() => LoadContentPageAsync(Math.Max(1, ContentPager.PageNumber - 1), ContentPager.PageSize);
-    [RelayCommand] private Task ContentNextPageAsync() => LoadContentPageAsync(ContentPager.PageNumber + 1, ContentPager.PageSize);
-    [RelayCommand] private Task ContentGoToPageAsync(int page) => LoadContentPageAsync(page, ContentPager.PageSize);
-    [RelayCommand] private Task ContentChangePageSizeAsync(int size) => LoadContentPageAsync(1, size);
-
     // ── Copies pager ──────────────────────────────────────────────────────────
     [RelayCommand] private Task CopiesPreviousPageAsync() => CopiesPager.PreviousPageAsync();
     [RelayCommand] private Task CopiesNextPageAsync() => CopiesPager.NextPageAsync();
@@ -163,17 +142,6 @@ public sealed partial class VarDetailViewModel : ObservableObject
             DirectDependencyCards.Add(new DependencyCardViewModel(edge, _thumbnailLoader));
     }
 
-    private async Task LoadContentPageAsync(
-        int pageNumber = 1,
-        int pageSize = 50,
-        CancellationToken cancellationToken = default)
-    {
-        await ContentPager.LoadPageAsync(pageNumber, pageSize, cancellationToken).ConfigureAwait(true);
-        ContentCards.Clear();
-        foreach (var item in ContentPager.Items)
-            ContentCards.Add(new ContentCardViewModel(item, PackageId, _thumbnails, _indexer));
-    }
-
     private async Task EnsureTabLoadedAsync(CancellationToken cancellationToken = default)
     {
         if (PackageId <= 0)
@@ -187,8 +155,8 @@ public sealed partial class VarDetailViewModel : ObservableObject
             if (SaveDepsPager.Items.Count == 0 && !SaveDepsPager.IsLoading)
                 await SaveDepsPager.ResetAndReloadAsync(cancellationToken).ConfigureAwait(true);
         }
-        else if (IsContentTab && ContentPager.Items.Count == 0 && !ContentPager.IsLoading)
-            await LoadContentPageAsync(1, ContentPager.PageSize, cancellationToken).ConfigureAwait(true);
+        else if (IsContentTab && !PackageGallery.HasThumbs && !PackageGallery.IsBinding)
+            await PackageGallery.BindPackageAsync(PackageId, Detail?.Copies, cancellationToken).ConfigureAwait(true);
         else if (IsCopiesTab && CopiesPager.Items.Count == 0 && !CopiesPager.IsLoading)
             await CopiesPager.ResetAndReloadAsync(cancellationToken).ConfigureAwait(true);
     }

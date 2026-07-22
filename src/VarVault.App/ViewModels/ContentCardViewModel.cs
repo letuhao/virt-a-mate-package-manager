@@ -15,7 +15,7 @@ public sealed partial class ContentCardViewModel(
     IIndexerClient? indexer) : ObservableObject
 {
     private static readonly SemaphoreSlim Concurrency = new(4);
-    private bool _loaded;
+    private int _loadGeneration;
 
     public ContentItemDto Item => item;
     public long ContentItemId => item.ContentItemId;
@@ -33,13 +33,26 @@ public sealed partial class ContentCardViewModel(
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
-        if (_loaded || thumbnails is null)
+        if (thumbnails is null || HasThumbnail)
             return;
-        _loaded = true;
+        var generation = ++_loadGeneration;
         IsLoading = true;
-        await Concurrency.WaitAsync(cancellationToken).ConfigureAwait(true);
         try
         {
+            await Concurrency.WaitAsync(cancellationToken).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            if (generation == _loadGeneration)
+                IsLoading = false;
+            return;
+        }
+
+        try
+        {
+            if (generation != _loadGeneration)
+                return;
+
             var bytes = await thumbnails.GetContentAsync(item.ContentItemId, cancellationToken).ConfigureAwait(false);
             if (bytes is null && item.HasPreview && indexer is not null)
             {
@@ -56,19 +69,54 @@ public sealed partial class ContentCardViewModel(
                 IsFallback = bytes is not null;
             }
 
+            if (generation != _loadGeneration)
+                return;
+
             if (bytes is not null)
-                Thumbnail = await Task.Run(() => new Bitmap(new MemoryStream(bytes)), cancellationToken).ConfigureAwait(true);
+            {
+                var bitmap = await Task.Run(() => new Bitmap(new MemoryStream(bytes)), cancellationToken).ConfigureAwait(true);
+                if (generation != _loadGeneration)
+                {
+                    bitmap.Dispose();
+                    return;
+                }
+                Thumbnail?.Dispose();
+                Thumbnail = bitmap;
+                if (generation != _loadGeneration)
+                {
+                    Thumbnail?.Dispose();
+                    Thumbnail = null;
+                }
+            }
             else
+            {
                 PreviewStatus ??= item.HasPreview ? "Preview unavailable" : "No preview for this content type";
+            }
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (OperationCanceledException)
         {
-            PreviewStatus = "Preview unavailable";
+            // leave retryable
+        }
+        catch (Exception)
+        {
+            if (generation == _loadGeneration)
+                PreviewStatus = "Preview unavailable";
         }
         finally
         {
             Concurrency.Release();
-            IsLoading = false;
+            if (generation == _loadGeneration)
+                IsLoading = false;
         }
+    }
+
+    public void Invalidate()
+    {
+        _loadGeneration++;
+        IsLoading = false;
+        Thumbnail?.Dispose();
+        Thumbnail = null;
+        IsFallback = false;
+        PreviewStatus = null;
     }
 }

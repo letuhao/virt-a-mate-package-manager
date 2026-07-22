@@ -5,6 +5,7 @@
              xmlns:vm="clr-namespace:VarVault.App.ViewModels"
              xmlns:c="clr-namespace:VarVault.App.Controls"
              xmlns:dg="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.DataGrid"
+             xmlns:views="clr-namespace:VarVault.App.Views"
              x:Class="VarVault.App.Views.LibraryView"
              x:DataType="vm:LibraryViewModel"
              Focusable="True">
@@ -13,7 +14,7 @@
       <ColumnDefinition Width="180" />
       <ColumnDefinition Width="*" />
       <ColumnDefinition Width="5" />
-      <ColumnDefinition Width="360" MinWidth="220" MaxWidth="600" />
+      <ColumnDefinition Width="360" MinWidth="280" />
     </Grid.ColumnDefinitions>
 
     <!-- Rail -->
@@ -62,8 +63,10 @@
     <DockPanel Grid.Column="1" Margin="0,8">
       <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6">
         <c:SearchableCombo Width="150" ItemsSource="{Binding CreatorOptions}" SelectedName="{Binding CreatorFilter}" Margin="0,0,8,6" />
-        <TextBox x:Name="SearchBox" Width="240" MinWidth="180" Watermark="Search packages…" Text="{Binding SearchText}" Margin="0,0,8,6" />
-        <TextBox Width="140" Watermark="packageName…" Text="{Binding PackageNameFilter}" Margin="0,0,8,6" />
+        <TextBox x:Name="SearchBox" Width="240" MinWidth="180" Watermark="Search packages…"
+                 Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,6" />
+        <TextBox Width="140" Watermark="packageName…"
+                 Text="{Binding PackageNameFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,8,6" />
         <CheckBox Content="Installed" VerticalAlignment="Center" IsChecked="{Binding InstalledOnly}" Margin="0,0,8,6" />
         <Button Content="Reset" Command="{Binding ResetFiltersCommand}" Margin="0,0,8,6" />
         <ComboBox Width="110" ItemsSource="{Binding SortOptions}" SelectedItem="{Binding SelectedSortLabel}" Margin="0,0,8,6" />
@@ -140,13 +143,34 @@
                 </DataTemplate>
               </dg:DataGridTemplateColumn.CellTemplate>
             </dg:DataGridTemplateColumn>
-            <dg:DataGridTextColumn Header="Package" SortMemberPath="Name" CanUserSort="True" Binding="{Binding VarName}" Width="*" MinWidth="120" />
+            <dg:DataGridTemplateColumn Header="Package" SortMemberPath="Name" CanUserSort="True" Width="*" MinWidth="120">
+              <dg:DataGridTemplateColumn.CellTemplate>
+                <DataTemplate x:DataType="lib:PackageListEntry">
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="●" Foreground="{DynamicResource GoodBrush}" FontSize="11" VerticalAlignment="Center"
+                               IsVisible="{Binding IsActive}" ToolTip.Tip="Installed on active loading preset" />
+                    <TextBlock Text="★" Foreground="{DynamicResource WarnBrush}" FontSize="11" VerticalAlignment="Center"
+                               IsVisible="{Binding IsFavorite}" ToolTip.Tip="Favorite" />
+                    <TextBlock Text="{Binding VarName}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                  </StackPanel>
+                </DataTemplate>
+              </dg:DataGridTemplateColumn.CellTemplate>
+            </dg:DataGridTemplateColumn>
             <dg:DataGridTextColumn Header="Creator" SortMemberPath="Creator" CanUserSort="True" Binding="{Binding Creator}" Width="110" />
             <dg:DataGridTextColumn Header="Type" SortMemberPath="Type" CanUserSort="False" Binding="{Binding PrimaryType}" Width="70" />
             <dg:DataGridTextColumn Header="Size" SortMemberPath="Size" CanUserSort="True" Binding="{Binding TotalSize, Converter={StaticResource BytesToSize}}" Width="64" />
             <dg:DataGridTextColumn Header="Tier" SortMemberPath="Tier" CanUserSort="True" Binding="{Binding Tier, StringFormat='T{0}'}" Width="40" />
             <dg:DataGridTextColumn Header="Cop" SortMemberPath="Copies" CanUserSort="False" Binding="{Binding OnlineInstanceCount}" Width="36" />
-            <dg:DataGridTextColumn Header="Dep" SortMemberPath="Dependencies" CanUserSort="False" Binding="{Binding DependencyCount}" Width="36" />
+            <dg:DataGridTemplateColumn Header="Dep" SortMemberPath="Dependencies" CanUserSort="False" Width="72">
+              <dg:DataGridTemplateColumn.CellTemplate>
+                <DataTemplate x:DataType="lib:PackageListEntry">
+                  <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding DependencyCount}" VerticalAlignment="Center" />
+                    <c:StatePill State="Miss" Text="missing" IsVisible="{Binding HasMissingDeps}" />
+                  </StackPanel>
+                </DataTemplate>
+              </dg:DataGridTemplateColumn.CellTemplate>
+            </dg:DataGridTemplateColumn>
             <dg:DataGridTextColumn Header="Added" SortMemberPath="Added" CanUserSort="True" Binding="{Binding AddedAt, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" Width="140" />
             <dg:DataGridTextColumn Header="Installed" SortMemberPath="Installed" CanUserSort="True" Binding="{Binding InstalledAt, StringFormat='{}{0:yyyy-MM-dd HH:mm:ss}'}" Width="140" />
             <dg:DataGridTemplateColumn Header="" Width="104" SortMemberPath="Actions" CanUserSort="False">
@@ -189,8 +213,21 @@
                         <Border Background="#18808080" CornerRadius="4" IsVisible="{Binding !HasThumbnail}">
                           <TextBlock Text="{Binding PrimaryType}" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.6" />
                         </Border>
-                        <Border Background="#2633D67F" CornerRadius="3" Padding="4,1" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="3" IsVisible="{Binding IsActive}">
-                          <TextBlock Text="installed" FontSize="9" Foreground="#3DDC97" />
+                        <Border Background="{DynamicResource GoodBgBrush}" CornerRadius="3" Padding="4,1"
+                                HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="3"
+                                IsVisible="{Binding IsActive}">
+                          <TextBlock Text="installed" FontSize="9" Foreground="{DynamicResource GoodBrush}" />
+                        </Border>
+                        <Border Background="{DynamicResource CritBgBrush}" CornerRadius="3" Padding="4,1"
+                                HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="3"
+                                IsVisible="{Binding HasMissingDeps}">
+                          <TextBlock Text="!" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource CritBrush}"
+                                     ToolTip.Tip="Missing dependencies" />
+                        </Border>
+                        <Border Background="{DynamicResource WarnBgBrush}" CornerRadius="3" Padding="4,1"
+                                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="3"
+                                IsVisible="{Binding IsFavorite}">
+                          <TextBlock Text="★" FontSize="9" Foreground="{DynamicResource WarnBrush}" />
                         </Border>
                       </Panel>
                       <TextBlock Text="{Binding PackageName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
@@ -214,32 +251,34 @@
     <Border Grid.Column="3" Margin="8" Padding="12"
             BorderBrush="#22808080" BorderThickness="1" CornerRadius="6"
             IsVisible="{Binding SelectedEntry, Converter={x:Static ObjectConverters.IsNotNull}}">
-      <StackPanel Spacing="6">
-        <StackPanel DataContext="{Binding SelectedEntry}" x:DataType="lib:PackageListEntry" Spacing="6">
-          <TextBlock Text="{Binding VarName}" FontWeight="SemiBold" TextWrapping="Wrap" />
-          <TextBlock Text="{Binding Creator, StringFormat='by {0}'}" Opacity="0.8" />
-          <StackPanel Orientation="Horizontal" Spacing="5">
-            <c:Tag Content="{Binding StorageClass}" />
-            <c:Tag Content="★ favorite" Kind="Warn" IsVisible="{Binding IsFavorite}" />
-            <c:Tag Content="installed" Kind="Good" IsVisible="{Binding IsActive}" />
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,8">
+          <StackPanel DataContext="{Binding SelectedEntry}" x:DataType="lib:PackageListEntry" Spacing="4">
+            <TextBlock Text="{Binding VarName}" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding Creator, StringFormat='by {0}'}" Opacity="0.8" FontSize="12" />
+            <StackPanel Orientation="Horizontal" Spacing="5">
+              <c:Tag Content="{Binding StorageClass}" />
+              <c:Tag Content="★ favorite" Kind="Warn" IsVisible="{Binding IsFavorite}" />
+              <c:Tag Content="installed" Kind="Good" IsVisible="{Binding IsActive}" />
+              <c:Tag Content="missing deps" Kind="Crit" IsVisible="{Binding HasMissingDeps}" />
+            </StackPanel>
+            <TextBlock Text="{Binding AddedAt, StringFormat='Added: {0:yyyy-MM-dd HH:mm:ss}'}" Opacity="0.75" FontSize="11" />
+            <TextBlock Text="{Binding InstalledAt, StringFormat='Installed: {0:yyyy-MM-dd HH:mm:ss}'}" Opacity="0.75" FontSize="11" IsVisible="{Binding IsActive}" />
           </StackPanel>
-          <TextBlock Text="{Binding AddedAt, StringFormat='Added: {0:yyyy-MM-dd HH:mm:ss}'}" Opacity="0.8" />
-          <TextBlock Text="{Binding InstalledAt, StringFormat='Installed: {0:yyyy-MM-dd HH:mm:ss}'}" Opacity="0.8" IsVisible="{Binding IsActive}" />
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <Button Content="★ Favorite" Command="{Binding ToggleFavoriteCommand}" Padding="8,3" FontSize="11" />
+            <Button Content="⌖ Locate" Command="{Binding LocateCommand}" Padding="8,3" FontSize="11" />
+          </StackPanel>
+          <StackPanel DataContext="{Binding SelectedDetail}" x:DataType="lib:PackageDetail" Spacing="2"
+                      IsVisible="{Binding ., Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding DependedOnByCount, StringFormat='depended on by {0}'}" Opacity="0.75" FontSize="11" />
+          </StackPanel>
+          <Button Content="Open full detail →" HorizontalAlignment="Stretch"
+                  Command="{Binding OpenDetailCommand}" CommandParameter="{Binding SelectedEntry}" />
         </StackPanel>
-        <StackPanel Orientation="Horizontal" Spacing="6">
-          <Button Content="★ Favorite" Command="{Binding ToggleFavoriteCommand}" />
-          <Button Content="⌖ Locate" Command="{Binding LocateCommand}" />
-        </StackPanel>
-        <Border Height="118" CornerRadius="4" Background="#18808080" IsVisible="{Binding HasSelectedThumbnail}" ClipToBounds="True">
-          <Image Source="{Binding SelectedThumbnail}" Stretch="UniformToFill" />
-        </Border>
-        <StackPanel DataContext="{Binding SelectedDetail}" x:DataType="lib:PackageDetail" Spacing="2"
-                    IsVisible="{Binding ., Converter={x:Static ObjectConverters.IsNotNull}}">
-          <TextBlock Text="{Binding DependedOnByCount, StringFormat='depended on by {0}'}" Opacity="0.8" FontSize="12" />
-        </StackPanel>
-        <Button Content="Open full detail →" HorizontalAlignment="Stretch" Margin="0,6,0,0"
-                Command="{Binding OpenDetailCommand}" CommandParameter="{Binding SelectedEntry}" />
-      </StackPanel>
+
+        <views:PackageGalleryView DataContext="{Binding PackageGallery}" />
+      </DockPanel>
     </Border>
   </Grid>
 </UserControl>

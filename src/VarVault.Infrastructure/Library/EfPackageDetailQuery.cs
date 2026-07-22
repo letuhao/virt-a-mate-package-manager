@@ -114,7 +114,12 @@ public sealed class EfPackageDetailQuery(VarVaultDbContext db) : IPackageDetailQ
     }
 
     public async Task<PageResult<ContentItemDto>> GetContentItemsPageAsync(
-        long packageId, long? varFileId, PageRequest request, CancellationToken cancellationToken = default)
+        long packageId,
+        long? varFileId,
+        PageRequest request,
+        CancellationToken cancellationToken = default,
+        string? typeFilter = null,
+        bool loadableOnly = false)
     {
         var page = request.Normalize();
         var targetVar = varFileId ?? await CanonicalVarFileIdAsync(packageId, cancellationToken).ConfigureAwait(false);
@@ -122,13 +127,22 @@ public sealed class EfPackageDetailQuery(VarVaultDbContext db) : IPackageDetailQ
             return PageResult<ContentItemDto>.Empty(page);
 
         var query = db.ContentItems.AsNoTracking().Where(c => c.VarFileId == targetVar.Value);
+        if (loadableOnly)
+            query = query.Where(c => c.IsPreset || c.Type == Domain.Entities.ContentType.Scene);
+        if (!string.IsNullOrWhiteSpace(typeFilter) &&
+            Enum.TryParse<Domain.Entities.ContentType>(typeFilter, ignoreCase: true, out var typed) &&
+            typed != Domain.Entities.ContentType.Unknown)
+        {
+            query = query.Where(c => c.Type == typed);
+        }
+
         var total = await query.CountAsync(cancellationToken).ConfigureAwait(false);
         var rows = await query
             .OrderBy(c => c.EntryPath)
             .ThenBy(c => c.Id)
             .Skip(page.Skip)
             .Take(page.SafePageSize)
-            .Select(c => new { c.Id, c.Type, c.EntryPath, c.IsPreset })
+            .Select(c => new { c.Id, c.Type, c.EntryPath, c.IsPreset, c.PreviewThumbRef })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
         var items = rows.Select(c => new ContentItemDto(
@@ -136,7 +150,8 @@ public sealed class EfPackageDetailQuery(VarVaultDbContext db) : IPackageDetailQ
             c.Type.ToString(),
             c.EntryPath,
             c.IsPreset,
-            Domain.Content.PreviewRules.HasPreview(c.Type))).ToList();
+            Domain.Content.PreviewRules.HasPreview(c.Type),
+            !string.IsNullOrWhiteSpace(c.PreviewThumbRef))).ToList();
         return new PageResult<ContentItemDto>(items, total, page.SafePageNumber, page.SafePageSize);
     }
 

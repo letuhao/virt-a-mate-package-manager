@@ -28,7 +28,13 @@ public class VarDetailDialogTests
         public Task<PageResult<DependencyEdgeDto>> GetSaveDependentsPageAsync(long packageId, PageRequest request, CancellationToken cancellationToken = default) =>
             Task.FromResult(new PageResult<DependencyEdgeDto>([], 0, request.SafePageNumber, request.SafePageSize));
 
-        public Task<PageResult<ContentItemDto>> GetContentItemsPageAsync(long packageId, long? varFileId, PageRequest request, CancellationToken cancellationToken = default) =>
+        public Task<PageResult<ContentItemDto>> GetContentItemsPageAsync(
+            long packageId,
+            long? varFileId,
+            PageRequest request,
+            CancellationToken cancellationToken = default,
+            string? typeFilter = null,
+            bool loadableOnly = false) =>
             Task.FromResult(new PageResult<ContentItemDto>([new ContentItemDto(1, "Scene", "s.json", false, true)], 1, request.SafePageNumber, request.SafePageSize));
 
         public Task<PageResult<CopyDto>> GetCopiesPageAsync(long packageId, PageRequest request, CancellationToken cancellationToken = default) =>

@@ -4,7 +4,7 @@
 
   <!-- Shared control themes for the reusable GUI components (SC-2 … SC-12). -->
 
-  <!-- SC-2 · Card -->
+  <!-- SC-2 · Card — DockPanel (not StackPanel) so ScrollViewer children get a finite height. -->
   <ControlTheme x:Key="{x:Type c:Card}" TargetType="c:Card">
     <Setter Property="Template">
       <ControlTemplate>
@@ -12,15 +12,18 @@
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="1"
                 CornerRadius="{DynamicResource RadiusMd}"
-                Padding="14">
-          <StackPanel Spacing="2">
-            <TextBlock Text="{TemplateBinding Header}"
+                Padding="14"
+                ClipToBounds="True">
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Top"
+                       Text="{TemplateBinding Header}"
                        Foreground="{DynamicResource TextHiBrush}"
                        FontWeight="SemiBold" FontSize="14"
+                       Margin="0,0,0,8"
                        IsVisible="{Binding Header, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
             <ContentPresenter Content="{TemplateBinding Content}"
                               ContentTemplate="{TemplateBinding ContentTemplate}" />
-          </StackPanel>
+          </DockPanel>
         </Border>
       </ControlTemplate>
     </Setter>
@@ -116,32 +119,40 @@
     </Setter>
   </ControlTheme>
 
-  <!-- SC-8 · SearchableCombo -->
+  <!-- SC-8 · SearchableCombo — ToggleButton + TwoWay IsOpen so light-dismiss stays in sync. -->
   <ControlTheme x:Key="{x:Type c:SearchableCombo}" TargetType="c:SearchableCombo">
     <Setter Property="Template">
       <ControlTemplate>
         <Grid>
-          <Button Name="PART_Button" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+          <ToggleButton Name="PART_Button" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        IsChecked="{Binding IsOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
             <StackPanel Orientation="Horizontal" Spacing="6">
-              <TextBlock Text="{TemplateBinding SelectedName}" Foreground="{DynamicResource TextHiBrush}" />
+              <TextBlock Text="{TemplateBinding SelectedName}" Foreground="{DynamicResource TextHiBrush}"
+                         IsVisible="{Binding SelectedName, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <TextBlock Text="Creator…" Opacity="0.55"
+                         IsVisible="{Binding SelectedName, RelativeSource={RelativeSource TemplatedParent}, Converter={x:Static ObjectConverters.IsNull}}" />
               <TextBlock Text="▾" Opacity="0.6" />
             </StackPanel>
-          </Button>
-          <Popup Name="PART_Popup" IsOpen="{TemplateBinding IsOpen}" PlacementTarget="{Binding #PART_Button}"
+          </ToggleButton>
+          <Popup Name="PART_Popup"
+                 IsOpen="{Binding IsOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                 PlacementTarget="{Binding #PART_Button}"
                  Placement="BottomEdgeAlignedLeft" IsLightDismissEnabled="True">
             <Border Background="{DynamicResource Bg2Brush}" BorderBrush="{DynamicResource BorderHiBrush}"
                     BorderThickness="1" CornerRadius="{DynamicResource RadiusSm}" Padding="6" MinWidth="220">
               <StackPanel Spacing="6">
-                <TextBox Name="PART_Search" Text="{Binding FilterText, RelativeSource={RelativeSource TemplatedParent}}"
+                <TextBox Name="PART_Search"
+                         Text="{Binding FilterText, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
                          Watermark="Search…" />
                 <ListBox Name="PART_List" MaxHeight="260"
                          ItemsSource="{TemplateBinding FilteredOptions}"
-                         SelectedIndex="{Binding HighlightedIndex, RelativeSource={RelativeSource TemplatedParent}}">
+                         SelectedIndex="{Binding HighlightedIndex, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
                   <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="c:ComboOption">
                       <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="{Binding Name}" />
-                        <TextBlock Grid.Column="1" Text="{Binding Count}" Opacity="0.6" />
+                        <TextBlock Grid.Column="1" Text="{Binding Count}" Opacity="0.6"
+                                   IsVisible="{Binding Count, Converter={x:Static ObjectConverters.IsNotNull}}" />
                       </Grid>
                     </DataTemplate>
                   </ListBox.ItemTemplate>

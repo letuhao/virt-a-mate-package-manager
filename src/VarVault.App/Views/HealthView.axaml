@@ -22,13 +22,13 @@
           <c:Card Header="GBK / GB2312" Width="180" Margin="0,0,10,0">
             <StackPanel Spacing="4">
               <TextBlock Text="{Binding GbkCount}" FontSize="24" Foreground="{DynamicResource CritBrush}" />
-              <Button Content="Fix GBK…" Command="{Binding FixAllCommand}" />
+              <Button Content="Fix GBK…" Command="{Binding FixGbkCommand}" />
             </StackPanel>
           </c:Card>
           <c:Card Header="Shift-JIS" Width="180" Margin="0,0,10,0">
             <StackPanel Spacing="4">
               <TextBlock Text="{Binding ShiftJisCount}" FontSize="24" Foreground="{DynamicResource WarnBrush}" />
-              <Button Content="Fix Shift-JIS…" Command="{Binding FixAllCommand}" />
+              <Button Content="Fix Shift-JIS…" Command="{Binding FixShiftJisCommand}" />
             </StackPanel>
           </c:Card>
           <c:Card Header="Other / low-confidence" Width="180">

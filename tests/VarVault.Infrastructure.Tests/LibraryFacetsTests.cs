@@ -32,6 +32,28 @@ public sealed class LibraryFacetsTests
     }
 
     [Fact]
+    public async Task Search_falls_back_to_like_when_fts_index_is_empty()
+    {
+        using var fx = new SqliteTestDatabase();
+        using (var db = fx.NewContext())
+        {
+            Seed(db, 1, "Dress", active: true, ContentType.Scene, tier: 1, single: true);
+            Seed(db, 2, "Hair", active: true, ContentType.Look, tier: 1, single: true);
+            await db.SaveChangesAsync();
+            // Intentionally leave PackageSearch empty (simulates stale/unbuilt FTS).
+        }
+        using var read = fx.NewContext();
+        var svc = new EfLibraryQueryService(read);
+
+        var hits = await svc.GetPageAsync(new LibraryQuery(SearchText: "Dress"));
+        Assert.Equal(1, hits.TotalCount);
+        Assert.Equal("C.Dress.1", hits.Items[0].VarName);
+
+        var byCreator = await svc.GetPageAsync(new LibraryQuery(SearchText: "C"));
+        Assert.Equal(2, byCreator.TotalCount); // short search also matches Creator via LIKE
+    }
+
+    [Fact]
     public async Task Tag_create_apply_list_and_query()
     {
         using var fx = new SqliteTestDatabase();

@@ -50,6 +50,12 @@ public sealed class EncodingFixLineageFlowTests
         var reloadedBroken = await db.VarFiles.FirstAsync(v => v.Id == broken.Id);
         Assert.Equal(fixedVar.Id, reloadedBroken.SupersededByVarFileId);
         Assert.True(File.Exists(Path.Combine(repoDir.Path, "Creator.Broken.1.var"))); // original file retained
+
+        // Re-fix must refuse the superseded original (original retained lineage).
+        var again = await scope.ServiceProvider.GetRequiredService<EncodingFixCoordinator>()
+            .FixAsync(broken.Id, Path.Combine(repoDir.Path, "Creator.Broken.1.fixed2.var"));
+        Assert.False(again.IsSuccess);
+        Assert.Equal("fix.superseded", again.Error.Code);
     }
 
     private static async Task<Guid> Register(TestHost host, string path)

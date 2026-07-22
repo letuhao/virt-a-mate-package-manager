@@ -130,19 +130,29 @@ public sealed class EfLibraryQueryService(VarVaultDbContext db) : ILibraryQueryS
         {
             var text = query.SearchText.Trim();
             // Trigram FTS needs ≥3 chars (and handles space-less CJK); shorter → substring LIKE.
+            // If FTS returns nothing (index empty/stale), fall back to multi-field LIKE so search
+            // still works against PackageListItem rather than looking "broken".
             if (text.Length >= 3)
             {
                 var matchIds = await SearchIdsAsync(text, cancellationToken).ConfigureAwait(false);
-                q = q.Where(x => matchIds.Contains(x.PackageId));
+                if (matchIds.Count > 0)
+                    q = q.Where(x => matchIds.Contains(x.PackageId));
+                else
+                    q = ApplySubstringSearch(q, text);
             }
             else
             {
-                q = q.Where(x => EF.Functions.Like(x.VarName, $"%{text}%"));
+                q = ApplySubstringSearch(q, text);
             }
         }
 
         return q;
     }
+
+    private static IQueryable<PackageListItem> ApplySubstringSearch(IQueryable<PackageListItem> q, string text) =>
+        q.Where(x => EF.Functions.Like(x.VarName, $"%{text}%")
+                     || EF.Functions.Like(x.Creator, $"%{text}%")
+                     || EF.Functions.Like(x.PackageName, $"%{text}%"));
 
     public async Task<IReadOnlyList<string>> GetCreatorsAsync(CancellationToken cancellationToken = default) =>
         await db.PackageListItems.AsNoTracking()

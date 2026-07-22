@@ -23,6 +23,12 @@ public class HealthScreenTests
         public Task<IReadOnlyList<IntegrityIssue>> MissingMetaAsync(CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<IntegrityIssue>>([]);
         public Task<Result<long>> FixAsync(long id, CancellationToken ct = default) => Task.FromResult(Result.Success(1L));
+        public Task<BulkActionResult> FixGroupAsync(string? codepageFilter, CancellationToken ct = default) =>
+            Task.FromResult(new BulkActionResult(0, 0));
+        public Task<BulkActionResult> FixGroupAsync(string? codepageFilter, IProgressSink progress, CancellationToken ct = default) =>
+            FixGroupAsync(codepageFilter, ct);
+        public Task<BulkActionResult> FixManyAsync(IReadOnlyList<long> varFileIds, IProgressSink? progress = null, CancellationToken ct = default) =>
+            Task.FromResult(new BulkActionResult(0, 0));
     }
 
     [AvaloniaFact]

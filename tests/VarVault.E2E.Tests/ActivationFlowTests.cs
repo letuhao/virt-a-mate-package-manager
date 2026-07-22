@@ -73,6 +73,71 @@ public sealed class ActivationFlowTests
     }
 
     [Fact]
+    public async Task Builds_links_for_four_level_dependency_chain()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        using var vamDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+
+        WriteVar(repoDir, "A.Look.1.var", "A", "Look", "A.Mid.1");
+        WriteVar(repoDir, "A.Mid.1.var", "A", "Mid", "A.Deep.1");
+        WriteVar(repoDir, "A.Deep.1.var", "A", "Deep", "A.Leaf.1");
+        WriteVar(repoDir, "A.Leaf.1.var", "A", "Leaf");
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        await SeedVamRoot(scope, vamDir.Path);
+        await scope.ServiceProvider.GetRequiredService<IDependencyResolver>().ResolveAllAsync();
+        var preset = (await scope.ServiceProvider.GetRequiredService<IPresetService>()
+            .CreateAsync("P", ["A.Look.1"])).Value;
+
+        var result = await scope.ServiceProvider.GetRequiredService<IActivationService>().BuildProfileLinksAsync(preset.Id);
+        if (result.PrivilegeFailures > 0) return;
+
+        Assert.Equal(4, result.LinksCreated);
+        Assert.Equal(0, result.MissingPackages);
+        Assert.Equal(0, result.UnresolvedDependencies);
+
+        var varsLink = ActivationPaths.VarsLinkDir(vamDir.Path, "P");
+        Assert.True(File.Exists(Path.Combine(varsLink, "A.Look.1.var")));
+        Assert.True(File.Exists(Path.Combine(varsLink, "A.Mid.1.var")));
+        Assert.True(File.Exists(Path.Combine(varsLink, "A.Deep.1.var")));
+        Assert.True(File.Exists(Path.Combine(varsLink, "A.Leaf.1.var")));
+    }
+
+    [Fact]
+    public async Task Reports_offline_copy_and_unresolved_transitive_separately()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        using var vamDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+
+        WriteVar(repoDir, "A.Look.1.var", "A", "Look", "A.Base.1");
+        WriteVar(repoDir, "A.Base.1.var", "A", "Base", "Ghost.Missing.1");
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        await SeedVamRoot(scope, vamDir.Path);
+        await scope.ServiceProvider.GetRequiredService<IDependencyResolver>().ResolveAllAsync();
+
+        var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+        var repo = await db.Repositories.FirstAsync(r => r.Id == repoId);
+        repo.IsOnline = false;
+        await db.SaveChangesAsync();
+
+        var preset = (await scope.ServiceProvider.GetRequiredService<IPresetService>()
+            .CreateAsync("P", ["A.Look.1"])).Value;
+        var result = await scope.ServiceProvider.GetRequiredService<IActivationService>().BuildProfileLinksAsync(preset.Id);
+        if (result.PrivilegeFailures > 0) return;
+
+        Assert.Equal(0, result.LinksCreated);
+        Assert.Equal(2, result.MissingPackages); // Look + Base offline
+        Assert.True(result.UnresolvedDependencies >= 1); // Ghost.Missing.1
+    }
+
+    [Fact]
     public async Task Rebuild_is_idempotent_on_disk_and_in_db()
     {
         await using var host = TestHost.Create(withPersistence: true);
@@ -217,6 +282,93 @@ public sealed class ActivationFlowTests
         Assert.True(removed >= 1);
         Assert.Empty(await db.ActivationLinks.ToListAsync());
         Assert.False(File.Exists(soloLink)); // real link file removed from disk
+    }
+
+    [Fact]
+    public async Task Path_unavailable_is_reported_instead_of_silent_zero_success()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+        WriteVar(repoDir, "A.Solo.1.var", "A", "Solo");
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IDependencyResolver>().ResolveAllAsync();
+        // Intentionally leave VaM path unset.
+        var preset = (await scope.ServiceProvider.GetRequiredService<IPresetService>()
+            .CreateAsync("P", ["A.Solo.1"])).Value;
+
+        var result = await scope.ServiceProvider.GetRequiredService<IActivationService>()
+            .BuildProfileLinksAsync(preset.Id);
+
+        Assert.Equal(1, result.PathUnavailable);
+        Assert.Equal(0, result.LinksCreated);
+        Assert.Equal(0, result.MissingPackages);
+    }
+
+    [Fact]
+    public async Task Unresolved_preset_member_counts_as_unresolved_dependency()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        using var vamDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+        WriteVar(repoDir, "A.Solo.1.var", "A", "Solo");
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        await SeedVamRoot(scope, vamDir.Path);
+        await scope.ServiceProvider.GetRequiredService<IDependencyResolver>().ResolveAllAsync();
+        var preset = (await scope.ServiceProvider.GetRequiredService<IPresetService>()
+            .CreateAsync("P", ["A.Solo.1", "Ghost.Gone.1"])).Value;
+
+        var result = await scope.ServiceProvider.GetRequiredService<IActivationService>()
+            .BuildProfileLinksAsync(preset.Id);
+        if (result.PrivilegeFailures > 0) return;
+
+        Assert.True(result.UnresolvedDependencies >= 1);
+        Assert.Equal(0, result.PathUnavailable);
+    }
+
+    [Fact]
+    public async Task Offline_alias_target_is_not_double_counted_in_missing()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        using var vamDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+        WriteVar(repoDir, "Real.Target.1.var", "Real", "Target");
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        await SeedVamRoot(scope, vamDir.Path);
+        await scope.ServiceProvider.GetRequiredService<IDependencyResolver>().ResolveAllAsync();
+        var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+        var target = await db.Packages.FirstAsync(p => p.VarName == "Real.Target.1");
+        var repo = await db.Repositories.FirstAsync(r => r.Id == repoId);
+        repo.IsOnline = false;
+        await db.SaveChangesAsync();
+
+        var preset = (await scope.ServiceProvider.GetRequiredService<IPresetService>()
+            .CreateAsync("P", ["Renamed.Old.1"])).Value;
+        db.VarAliases.Add(new VarAlias
+        {
+            MissingRefKey = VarVault.Domain.Identity.IdentityFold.Compute("Renamed.Old.1"),
+            MissingRefRaw = "Renamed.Old.1",
+            ResolvedPackageId = target.Id,
+            Scope = AliasScope.Global,
+            CreatedAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        var result = await scope.ServiceProvider.GetRequiredService<IActivationService>()
+            .BuildProfileLinksAsync(preset.Id);
+        if (result.PrivilegeFailures > 0) return;
+
+        Assert.Equal(0, result.LinksCreated);
+        Assert.Equal(1, result.MissingPackages); // target once — not member + alias double-count
+        Assert.Equal(0, result.UnresolvedDependencies);
     }
 
     [Fact]

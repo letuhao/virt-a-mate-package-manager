@@ -25,6 +25,7 @@ public class PresetsScreenTests
         public Task<Result<PresetInfo>> AddMemberAsync(long id, string r, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<Result<PresetInfo>> RemoveMemberAsync(long id, string r, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<IReadOnlyList<string>> MembersAsync(long id, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<string>>([]);
+        public Task RefreshMemberResolutionsAsync(long id, CancellationToken ct = default) => Task.CompletedTask;
     }
 
     [AvaloniaFact]

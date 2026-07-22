@@ -7,18 +7,22 @@ using Avalonia.Input;
 
 namespace VarVault.App.Controls;
 
-/// <summary>A combo option: display name + count (e.g. "MeshedVR" · 412). (16-checklist SC-8.)</summary>
-public sealed record ComboOption(string Name, int Count);
+/// <summary>A combo option: display name + optional count (e.g. "MeshedVR" · 412). (16-checklist SC-8.)</summary>
+public sealed record ComboOption(string Name, int? Count = null);
 
 /// <summary>
-/// SC-8 · Searchable combo (prototype creator dropdown): a button (label + caret) opening a panel with a
-/// search box, a count-annotated filtered list, keyboard ↑/↓/Enter/Esc, and an empty state. Type-to-filter
-/// scales to tens of thousands of options (client filter). The filter/keyboard logic is exposed as methods
-/// so it is testable without a live popup. (16-checklist SC-8.)
+/// SC-8 · Searchable combo (prototype creator dropdown): a toggle (label + caret) opening a panel with a
+/// search box, a count-annotated filtered list, keyboard ↑/↓/Enter/Esc, click-to-select, and an empty state.
+/// Type-to-filter scales to tens of thousands of options (client filter). The filter/keyboard logic is
+/// exposed as methods so it is testable without a live popup. (16-checklist SC-8.)
 /// </summary>
 public class SearchableCombo : TemplatedControl
 {
+    /// <summary>Synthetic first option that clears the selection (maps to <c>SelectedName = null</c>).</summary>
+    public const string ClearOptionName = "(All creators)";
+
     private TextBox? _search;
+    private ListBox? _list;
 
     public SearchableCombo() => FilteredOptions = new AvaloniaList<ComboOption>();
 
@@ -32,7 +36,7 @@ public class SearchableCombo : TemplatedControl
         AvaloniaProperty.Register<SearchableCombo, string?>(nameof(SelectedName), defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
 
     public static readonly StyledProperty<bool> IsOpenProperty =
-        AvaloniaProperty.Register<SearchableCombo, bool>(nameof(IsOpen));
+        AvaloniaProperty.Register<SearchableCombo, bool>(nameof(IsOpen), defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
 
     public static readonly StyledProperty<int> HighlightedIndexProperty =
         AvaloniaProperty.Register<SearchableCombo, int>(nameof(HighlightedIndex));
@@ -57,11 +61,21 @@ public class SearchableCombo : TemplatedControl
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
     {
         base.OnApplyTemplate(e);
+
+        if (_search is not null)
+            _search.KeyDown -= OnSearchKeyDown;
+        if (_list is not null)
+            _list.PointerReleased -= OnListPointerReleased;
+
         _search = e.NameScope.Find<TextBox>("PART_Search");
+        _list = e.NameScope.Find<ListBox>("PART_List");
+        _ = e.NameScope.Find<ToggleButton>("PART_Button");
+
         if (_search is not null)
             _search.KeyDown += OnSearchKeyDown;
-        if (e.NameScope.Find<Button>("PART_Button") is { } button)
-            button.Click += (_, _) => Open();
+        if (_list is not null)
+            _list.PointerReleased += OnListPointerReleased;
+
         Refilter();
     }
 
@@ -70,6 +84,12 @@ public class SearchableCombo : TemplatedControl
         base.OnPropertyChanged(change);
         if (change.Property == FilterTextProperty || change.Property == ItemsSourceProperty)
             Refilter();
+        else if (change.Property == IsOpenProperty && change.GetNewValue<bool>())
+        {
+            FilterText = string.Empty;
+            Refilter();
+            _search?.Focus();
+        }
     }
 
     /// <summary>Rebuild the filtered list from the current filter text (Contains, case-insensitive).</summary>
@@ -80,17 +100,26 @@ public class SearchableCombo : TemplatedControl
         var matches = string.IsNullOrWhiteSpace(f)
             ? all.ToList()
             : all.Where(o => o.Name.Contains(f!, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        // Always offer a clear row when the popup shows the full (or matching) set.
+        if (string.IsNullOrWhiteSpace(f) || ClearOptionName.Contains(f!, StringComparison.OrdinalIgnoreCase))
+            matches.Insert(0, new ComboOption(ClearOptionName));
+
         FilteredOptions.Clear();
         FilteredOptions.AddRange(matches);
-        IsEmpty = matches.Count == 0;
-        HighlightedIndex = matches.Count > 0 ? 0 : -1;
+        var realCount = matches.Count(m => m.Name != ClearOptionName);
+        IsEmpty = realCount == 0 && !string.IsNullOrWhiteSpace(f);
+        if (matches.Count == 0)
+            HighlightedIndex = -1;
+        else if (!string.IsNullOrWhiteSpace(f) && matches[0].Name == ClearOptionName && matches.Count > 1)
+            HighlightedIndex = 1;
+        else
+            HighlightedIndex = 0;
     }
 
     public void Open()
     {
         IsOpen = true;
-        FilterText = string.Empty;
-        Refilter();
     }
 
     public void Close() => IsOpen = false;
@@ -106,8 +135,22 @@ public class SearchableCombo : TemplatedControl
     public void CommitHighlighted()
     {
         if (HighlightedIndex >= 0 && HighlightedIndex < FilteredOptions.Count)
-            SelectedName = FilteredOptions[HighlightedIndex].Name;
+        {
+            var name = FilteredOptions[HighlightedIndex].Name;
+            SelectedName = name == ClearOptionName ? null : name;
+        }
         Close();
+    }
+
+    private void OnListPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (e.InitialPressMouseButton != MouseButton.Left)
+            return;
+        if (_list is null || _list.SelectedIndex < 0)
+            return;
+        HighlightedIndex = _list.SelectedIndex;
+        CommitHighlighted();
+        e.Handled = true;
     }
 
     private void OnSearchKeyDown(object? sender, KeyEventArgs e)

@@ -3,6 +3,7 @@
              xmlns:vm="clr-namespace:VarVault.App.ViewModels"
              xmlns:c="clr-namespace:VarVault.App.Controls"
              xmlns:lib="clr-namespace:VarVault.Sdk.Library;assembly=VarVault.Sdk"
+             xmlns:views="clr-namespace:VarVault.App.Views"
              x:Class="VarVault.App.Views.VarDetailDialog"
              x:DataType="vm:VarDetailViewModel">
   <StackPanel Spacing="10" MinWidth="520" x:CompileBindings="False">
@@ -111,55 +112,21 @@
                        PageSizeChangedCommand="{Binding SaveDepsChangePageSizeCommand}" />
     </StackPanel>
 
-    <StackPanel IsVisible="{Binding IsContentTab}" Spacing="8">
-      <ComboBox ItemsSource="{Binding Detail.Copies}" SelectedValue="{Binding SelectedVarFileId}" SelectedValueBinding="{Binding VarFileId}">
-        <ComboBox.ItemTemplate>
-          <DataTemplate x:DataType="lib:CopyDto">
-            <TextBlock Text="{Binding Path}" FontFamily="{DynamicResource MonoFont}" FontSize="11" TextTrimming="CharacterEllipsis" />
-          </DataTemplate>
-        </ComboBox.ItemTemplate>
-      </ComboBox>
-      <ItemsControl ItemsSource="{Binding ContentCards}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="vm:ContentCardViewModel">
-            <Border Width="460" MinHeight="96" Padding="6" Margin="0,3" BorderBrush="#22808080" BorderThickness="1"
-                    AttachedToVisualTree="OnContentCardAttached">
-              <Grid ColumnDefinitions="128,*">
-                <Border Width="120" Height="82" CornerRadius="4" Background="#18808080" ClipToBounds="True">
-                  <Panel>
-                    <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" IsVisible="{Binding HasThumbnail}" />
-                    <TextBlock Text="{Binding PreviewStatus}" TextWrapping="Wrap" FontSize="10" Opacity="0.65"
-                               HorizontalAlignment="Center" VerticalAlignment="Center" Margin="6"
-                               IsVisible="{Binding !HasThumbnail}" />
-                    <c:Tag Content="package preview" HorizontalAlignment="Left" VerticalAlignment="Bottom"
-                           Margin="3" IsVisible="{Binding IsFallback}" />
-                  </Panel>
-                </Border>
-                <StackPanel Grid.Column="1" Spacing="4" Margin="8,0,0,0">
-                  <TextBlock Text="{Binding Type}" FontWeight="SemiBold" />
-                  <TextBlock Text="{Binding EntryPath}" FontFamily="{DynamicResource MonoFont}" FontSize="11"
-                             TextWrapping="Wrap" />
-                  <TextBlock Text="Loading preview…" IsVisible="{Binding IsLoading}" FontSize="10" Opacity="0.6" />
-                </StackPanel>
-              </Grid>
-            </Border>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-      <c:PaginationBar PageNumber="{Binding ContentPager.PageNumber}" PageCount="{Binding ContentPager.PageCount}"
-                       PageSize="{Binding ContentPager.PageSize}" TotalCount="{Binding ContentPager.TotalCount}"
-                       SummaryLabel="{Binding ContentPager.SummaryLabel}"
-                       PreviousCommand="{Binding ContentPreviousPageCommand}"
-                       NextCommand="{Binding ContentNextPageCommand}"
-                       GoToPageCommand="{Binding ContentGoToPageCommand}"
-                       PageSizeChangedCommand="{Binding ContentChangePageSizeCommand}" />
-    </StackPanel>
+    <Panel IsVisible="{Binding IsContentTab}" MinHeight="360">
+      <views:PackageGalleryView DataContext="{Binding PackageGallery}" />
+    </Panel>
 
     <StackPanel IsVisible="{Binding IsCopiesTab}">
       <ItemsControl ItemsSource="{Binding CopiesPager.Items}">
         <ItemsControl.ItemTemplate>
           <DataTemplate x:DataType="lib:CopyDto">
-            <Grid ColumnDefinitions="Auto,*,Auto"><c:Tag Grid.Column="0" Content="{Binding Tier, StringFormat='T{0}'}" /><TextBlock Grid.Column="1" Text="{Binding Path}" FontFamily="{DynamicResource MonoFont}" FontSize="11" Margin="6,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" /><c:StatePill Grid.Column="2" State="Ok" Text="online" IsVisible="{Binding IsOnline}" /></Grid>
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+              <c:Tag Grid.Column="0" Content="{Binding Tier, StringFormat='T{0}'}" />
+              <TextBlock Grid.Column="1" Text="{Binding Path}" FontFamily="{DynamicResource MonoFont}" FontSize="11" Margin="6,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+              <c:Tag Grid.Column="2" Content="fixed" Kind="Good" Margin="0,0,6,0"
+                     IsVisible="{Binding FixedFromVarFileId, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <c:StatePill Grid.Column="3" State="Ok" Text="online" IsVisible="{Binding IsOnline}" />
+            </Grid>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>

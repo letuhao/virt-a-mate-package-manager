@@ -23,15 +23,28 @@ public static class AppHost
         var dialogs = new Services.DialogService();
         // Forward-declared so the launcher's toast can reach the shell once it's built.
         ShellViewModel? shellRef = null;
-        var launcher = new Services.DialogLauncher(services, dialogs,
-            afterRepoAdded: () => EnqueueIndexAll(services),
-            toast: (msg, undo) => shellRef?.ShowToast(msg, undo));
 
         var importJobs = services.GetService<ImportJobRunner>()
             ?? new ImportJobRunner(
                 services.GetRequiredService<Sdk.Threading.IJobQueue>(),
                 services.GetRequiredService<IServiceScopeFactory>());
         var uiDispatcher = services.GetRequiredService<IUiDispatcher>();
+        // One shared runner for Library / Proposals / Fix dialog — never resolve a second orphan instance.
+        var encodingJobs = services.GetService<EncodingFixJobRunner>()
+            ?? new EncodingFixJobRunner(
+                services.GetRequiredService<Sdk.Threading.IJobQueue>(),
+                services.GetRequiredService<IServiceScopeFactory>(),
+                uiDispatcher);
+        var installedJobs = services.GetService<InstalledDepsRepairJobRunner>()
+            ?? new InstalledDepsRepairJobRunner(
+                services.GetRequiredService<Sdk.Threading.IJobQueue>(),
+                services.GetRequiredService<IServiceScopeFactory>(),
+                uiDispatcher);
+
+        var launcher = new Services.DialogLauncher(services, dialogs,
+            afterRepoAdded: () => EnqueueIndexAll(services),
+            toast: (msg, undo) => shellRef?.ShowToast(msg, undo),
+            encodingJobs: encodingJobs);
 
         var screens = new Dictionary<string, object>
         {
@@ -45,7 +58,9 @@ public static class AppHost
                 tags: services.GetService<ITagService>(),
                 thumbnails: services.GetService<Domain.Indexing.IThumbnailStore>(),
                 reveal: new Services.FileReveal(),
-                activation: services.GetService<Sdk.Activation.IActivationService>()),
+                activation: services.GetService<Sdk.Activation.IActivationService>(),
+                indexer: IndexerClientOverride.Current ?? services.GetService<Sdk.Indexer.IIndexerClient>(),
+                encodingJobs: encodingJobs),
             ["analytics"] = new AnalyticsViewModel(services.GetRequiredService<IAnalyticsService>(), services.GetService<ITieringService>()),
             ["dashboard"] = new DashboardViewModel(services.GetRequiredService<IDashboardService>(), launcher,
                 services.GetService<IReclaimService>(), services.GetService<IActivityLog>()),
@@ -59,8 +74,13 @@ public static class AppHost
                 importJobs,
                 uiDispatcher),
             ["history"] = new ActivityViewModel(services.GetRequiredService<IActivityLog>()),
-            ["missing"] = new MissingDepsViewModel(services.GetRequiredService<IMissingDepsQuery>(), launcher, services.GetService<Sdk.Library.IMissingLogResolver>()),
-            ["proposals"] = new ProposalsViewModel(services.GetRequiredService<IProposalService>(), launcher),
+            ["missing"] = new MissingDepsViewModel(
+                services.GetRequiredService<IMissingDepsQuery>(),
+                launcher,
+                services.GetService<IMissingLogResolver>(),
+                services.GetService<IInstalledDepsRepair>(),
+                installedJobs),
+            ["proposals"] = new ProposalsViewModel(services.GetRequiredService<IProposalService>(), launcher, encodingJobs),
             ["health"] = new HealthViewModel(services.GetRequiredService<IHealthService>(), launcher),
             ["trash"] = new TrashViewModel(services.GetRequiredService<ITrashQueryService>()),
             ["settings"] = new SettingsViewModel(services.GetRequiredService<Sdk.Settings.ISettingsService>()),
@@ -74,6 +94,23 @@ public static class AppHost
         var feeds = TryBuildFeeds(services, jobQueue);
         var shell = new ShellViewModel(screens, initial: "dashboard", dialogs: dialogs, jobQueue: jobQueue, feeds: feeds);
         shellRef = shell; // wires the launcher toast callback above
+
+        encodingJobs.ShowToast = msg => shell.ShowToast(msg, null);
+        encodingJobs.AfterCompleted = () =>
+        {
+            if (screens["health"] is HealthViewModel healthVm)
+                _ = healthVm.LoadAsync();
+            if (screens["library"] is LibraryViewModel libraryVm)
+                _ = libraryVm.RefreshAsync();
+        };
+
+        installedJobs.ShowToast = msg => shell.ShowToast(msg, null);
+        // Library only — MissingDepsViewModel applies leftovers then refreshes itself after await.
+        installedJobs.AfterCompleted = () =>
+        {
+            if (screens["library"] is LibraryViewModel libraryVm)
+                _ = libraryVm.RefreshAsync();
+        };
 
         // Import rail badge = the live review-lane count of the Import screen's current session (spec §10).
         if (screens["import"] is ImportViewModel importVm)
@@ -127,6 +164,15 @@ public static class AppHost
             {
                 lib.SearchText = string.IsNullOrWhiteSpace(text) ? null : text;
                 shell.Navigate("library");
+            };
+            // Typing in the top bar while already on Library should filter live (same as the in-page box).
+            shell.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName != nameof(ShellViewModel.SearchText))
+                    return;
+                if (!ReferenceEquals(shell.ActiveScreen, lib))
+                    return;
+                lib.SearchText = string.IsNullOrWhiteSpace(shell.SearchText) ? null : shell.SearchText;
             };
         }
 
@@ -337,6 +383,8 @@ public static class AppHost
                 services.RemoveAll<IUiDispatcher>();
                 services.AddSingleton<IUiDispatcher, AvaloniaUiDispatcher>();
                 services.AddSingleton<ImportJobRunner>();
+                services.AddSingleton<EncodingFixJobRunner>();
+                services.AddSingleton<InstalledDepsRepairJobRunner>();
             });
             var scope = host.Services.CreateScope(); // app-lifetime scope backing the shell's read services
             IndexerClientOverride.Current = IndexerProcessHost.ResolveClient(host.Services, dataDir);

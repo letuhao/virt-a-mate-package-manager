@@ -9,6 +9,7 @@ using VarVault.Domain.Entities;
 using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Activation;
 using VarVault.Sdk.Library;
+using VarVault.Sdk.Presets;
 using VarVault.Sdk.Settings;
 using VarVault.Sdk.Threading;
 
@@ -31,6 +32,7 @@ public sealed class EfActivationService(
     ISymlinkService symlinks,
     IWriteQueue writeQueue,
     IProfilePackageLinkService profileLinks,
+    IPresetService presets,
     ILogger<EfActivationService> logger) : IActivationService
 {
     // Serializes filesystem link operations so two concurrent activations can't race on a profile dir. (T7.3)
@@ -38,15 +40,15 @@ public sealed class EfActivationService(
 
     public async Task<ActivationBuildResult> BuildProfileLinksAsync(long presetId, CancellationToken cancellationToken = default)
     {
-        var (members, aliases) = await ResolvedMembersAsync(presetId, cancellationToken).ConfigureAwait(false);
-        return await RecomputeAsync(presetId, members, aliases, cancellationToken).ConfigureAwait(false);
+        var (members, aliases, unresolvedMembers) = await ResolvedMembersAsync(presetId, cancellationToken).ConfigureAwait(false);
+        return await RecomputeAsync(presetId, members, aliases, unresolvedMembers, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<ActivationBuildResult> DeactivateAsync(long presetId, long packageId, CancellationToken cancellationToken = default)
     {
-        var (members, aliases) = await ResolvedMembersAsync(presetId, cancellationToken).ConfigureAwait(false);
+        var (members, aliases, unresolvedMembers) = await ResolvedMembersAsync(presetId, cancellationToken).ConfigureAwait(false);
         members.Remove(packageId); // ref-counting: deps stay if another active member still needs them
-        return await RecomputeAsync(presetId, members, aliases, cancellationToken).ConfigureAwait(false);
+        return await RecomputeAsync(presetId, members, aliases, unresolvedMembers, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<int> RescueAsync(long profileId, CancellationToken cancellationToken = default)
@@ -123,26 +125,32 @@ public sealed class EfActivationService(
 
     private sealed record AliasMapping(string MissingRefKey, string MissingRefRaw, long TargetPackageId);
 
-    private async Task<(HashSet<long> Members, List<AliasMapping> Aliases)> ResolvedMembersAsync(long presetId, CancellationToken cancellationToken)
+    private async Task<(HashSet<long> Members, List<AliasMapping> Aliases, IReadOnlyList<string> UnresolvedMembers)> ResolvedMembersAsync(
+        long presetId, CancellationToken cancellationToken)
     {
+        // Fresh .latest / formerly-missing snapshots before materializing links.
+        await presets.RefreshMemberResolutionsAsync(presetId, cancellationToken).ConfigureAwait(false);
+
         var members = await db.PresetMembers.AsNoTracking()
             .Where(m => m.PresetId == presetId)
-            .Select(m => new { m.ResolvedPackageId, m.PackageRefKey })
+            .Select(m => new { m.ResolvedPackageId, m.PackageRefKey, m.PackageRefRaw })
             .ToListAsync(cancellationToken).ConfigureAwait(false);
 
         var ids = new HashSet<long>();
-        var unresolvedKeys = new List<string>();
+        var unresolved = new List<(string Key, string Raw)>();
         foreach (var m in members)
         {
             if (m.ResolvedPackageId is { } id)
                 ids.Add(id);
             else
-                unresolvedKeys.Add(m.PackageRefKey);
+                unresolved.Add((m.PackageRefKey, m.PackageRefRaw));
         }
 
         var aliases = new List<AliasMapping>();
-        if (unresolvedKeys.Count > 0)
+        var stillUnresolved = new List<string>();
+        if (unresolved.Count > 0)
         {
+            var unresolvedKeys = unresolved.Select(u => u.Key).ToList();
             // Persistent aliases (global + per-preset) re-apply automatically every build — no re-setup. (3.9)
             var matched = await db.VarAliases.AsNoTracking()
                 .Where(a => a.ResolvedPackageId != null
@@ -150,17 +158,24 @@ public sealed class EfActivationService(
                             && (a.Scope == AliasScope.Global || a.PresetId == presetId))
                 .Select(a => new { a.MissingRefKey, a.MissingRefRaw, TargetId = a.ResolvedPackageId!.Value })
                 .ToListAsync(cancellationToken).ConfigureAwait(false);
+            var aliasedKeys = matched.Select(a => a.MissingRefKey).ToHashSet(StringComparer.Ordinal);
             foreach (var a in matched)
                 aliases.Add(new AliasMapping(a.MissingRefKey, a.MissingRefRaw, a.TargetId));
+            foreach (var u in unresolved)
+            {
+                if (!aliasedKeys.Contains(u.Key))
+                    stillUnresolved.Add(u.Raw);
+            }
         }
 
-        return (ids, aliases);
+        return (ids, aliases, stillUnresolved);
     }
 
     // ── the core recompute (materializes disk + mirrors rows) ──────────────────
 
     private async Task<ActivationBuildResult> RecomputeAsync(
-        long presetId, HashSet<long> memberSet, IReadOnlyList<AliasMapping> aliases, CancellationToken cancellationToken)
+        long presetId, HashSet<long> memberSet, IReadOnlyList<AliasMapping> aliases,
+        IReadOnlyList<string> unresolvedMembers, CancellationToken cancellationToken)
     {
         var preset = await db.LoadingPresets.FirstOrDefaultAsync(p => p.Id == presetId, cancellationToken).ConfigureAwait(false);
         if (preset is null)
@@ -170,14 +185,16 @@ public sealed class EfActivationService(
         if (rootResult.IsFailure)
         {
             logger.LogWarning("Activation skipped for preset {PresetId}: {Reason}", presetId, rootResult.Error.Message);
-            return new ActivationBuildResult(0, 0, 0);
+            return new ActivationBuildResult(0, 0, 0, PathUnavailable: 1,
+                UnresolvedDependencies: unresolvedMembers.Count);
         }
         var vamRoot = rootResult.Value;
         if (!Directory.Exists(vamRoot))
         {
             // Defensive: never create a bogus profile tree under a mistyped/offline path. (T6.3a)
             logger.LogWarning("Activation skipped for preset {PresetId}: VaM path does not exist: {VamRoot}", presetId, vamRoot);
-            return new ActivationBuildResult(0, 0, 0);
+            return new ActivationBuildResult(0, 0, 0, PathUnavailable: 1,
+                UnresolvedDependencies: unresolvedMembers.Count);
         }
         var now = clock.UtcNow.UtcDateTime;
         var profile = await EnsureProfileAsync(preset, vamRoot, now, cancellationToken).ConfigureAwait(false);
@@ -188,25 +205,39 @@ public sealed class EfActivationService(
         // Forward closure: members + their deps, plus alias-target deps (the alias link itself stands in
         // for the target under the missing name, but the target's dependencies still need installing).
         var full = new HashSet<long>(memberSet);
+        var unresolvedRefs = new HashSet<string>(unresolvedMembers, StringComparer.OrdinalIgnoreCase);
         foreach (var id in memberSet)
-            foreach (var dep in await graph.ForwardClosureAsync(id, cancellationToken: cancellationToken).ConfigureAwait(false))
+        {
+            var closure = await graph.ForwardClosureDetailedAsync(id, cancellationToken).ConfigureAwait(false);
+            foreach (var dep in closure.PackageIds)
                 full.Add(dep);
+            foreach (var edge in closure.UnresolvedEdges)
+                unresolvedRefs.Add(edge.DependsOnRefRaw);
+        }
+        // Alias targets are NOT added to `full` — the alias link stands in for that package. Their
+        // dependency closure still is, and offline targets are counted once via offlinePackages below.
         foreach (var alias in aliases)
-            foreach (var dep in await graph.ForwardClosureAsync(alias.TargetPackageId, cancellationToken: cancellationToken).ConfigureAwait(false))
+        {
+            var closure = await graph.ForwardClosureDetailedAsync(alias.TargetPackageId, cancellationToken).ConfigureAwait(false);
+            foreach (var dep in closure.PackageIds)
                 full.Add(dep);
+            foreach (var edge in closure.UnresolvedEdges)
+                unresolvedRefs.Add(edge.DependsOnRefRaw);
+        }
 
         // Desired install links, keyed by absolute link path.
         var desired = new Dictionary<string, DesiredLink>(StringComparer.OrdinalIgnoreCase);
-        var missing = 0;
+        var offlinePackages = new HashSet<long>();
         foreach (var packageId in full)
         {
             var copy = await PickHottestOnlineCopyAsync(packageId, cancellationToken).ConfigureAwait(false);
-            if (copy is null) { missing++; continue; }
+            if (copy is null) { offlinePackages.Add(packageId); continue; }
 
             var fileName = ActivationPaths.LinkFileName(copy.VarName);
             if (fileName.IsFailure)
             {
                 logger.LogWarning("Skipping install link for {VarName}: {Reason}", copy.VarName, fileName.Error.Message);
+                offlinePackages.Add(packageId);
                 continue;
             }
             var linkPath = Path.Combine(varsLinkDir, fileName.Value);
@@ -216,10 +247,15 @@ public sealed class EfActivationService(
         }
 
         // Desired alias links (named after the still-missing ref) → the owned target's file.
+        // Count offline targets once here — they are not in `full`, so they won't double-count.
         foreach (var alias in aliases)
         {
             var copy = await PickHottestOnlineCopyAsync(alias.TargetPackageId, cancellationToken).ConfigureAwait(false);
-            if (copy is null) { missing++; continue; }
+            if (copy is null)
+            {
+                offlinePackages.Add(alias.TargetPackageId);
+                continue;
+            }
 
             var fileName = ActivationPaths.LinkFileName(alias.MissingRefRaw);
             if (fileName.IsFailure)
@@ -231,6 +267,8 @@ public sealed class EfActivationService(
             desired[linkPath] = new DesiredLink(linkPath, ActivationPaths.SourcePath(copy.MountPath, copy.RelativePath),
                 copy.VarFileId, LinkKind.Alias, ActivationReason.Explicit, AliasKey: alias.MissingRefKey);
         }
+
+        var missing = offlinePackages.Count;
 
         // Existing app-owned links for this preset (install + alias); never touch user (null) or temp links.
         var existing = await db.ActivationLinks
@@ -256,7 +294,8 @@ public sealed class EfActivationService(
                         foreach (var path in newlyCreated) DeleteLinkFile(path); // roll back this call
                         db.ChangeTracker.Clear();
                         logger.LogWarning("Activation aborted for preset {PresetId}: symlink privilege (Developer Mode).", presetId);
-                        return new ActivationBuildResult(0, 0, 0, PrivilegeFailures: 1);
+                        return new ActivationBuildResult(0, 0, 0, PrivilegeFailures: 1,
+                            UnresolvedDependencies: unresolvedRefs.Count);
                     case LinkOutcome.Created:
                     case LinkOutcome.Recreated:
                         newlyCreated.Add(d.LinkPath);
@@ -312,7 +351,7 @@ public sealed class EfActivationService(
             if (profile.IsActive)
                 await profileLinks.RefreshActiveProfileReadModelAsync(cancellationToken).ConfigureAwait(false);
 
-            return new ActivationBuildResult(present, removed, missing);
+            return new ActivationBuildResult(present, removed, missing, UnresolvedDependencies: unresolvedRefs.Count);
         }
     }
 

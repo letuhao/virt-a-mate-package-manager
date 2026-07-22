@@ -6,11 +6,14 @@ using VarVault.Sdk.Paging;
 
 namespace VarVault.App.ViewModels;
 
-/// <summary>Missing-deps screen: unresolved refs with needed-by counts, plus a "paste a VaM error log" repair that
-/// resolves the missing packages (incl. <c>.latest</c>) against the library and activates the ones we have — with
-/// their dependency closure — into VaM. (Checklist 2.14; 28-checklist D1 triage; QoL log-repair.)</summary>
+/// <summary>Missing-deps screen: unresolved refs with needed-by counts, VaM-log repair, and installed-set
+/// dependency repair (legacy Installed Packages / MissingDepends). (Checklist 2.14; QoL.)</summary>
 public sealed partial class MissingDepsViewModel(
-    IMissingDepsQuery query, Services.IDialogLauncher? launcher = null, IMissingLogResolver? logResolver = null)
+    IMissingDepsQuery query,
+    Services.IDialogLauncher? launcher = null,
+    IMissingLogResolver? logResolver = null,
+    IInstalledDepsRepair? installedRepair = null,
+    Services.InstalledDepsRepairJobRunner? installedJobs = null)
     : ObservableObject, ILoadableScreen
 {
     public PagedListState<MissingDependency> Pager { get; } =
@@ -39,7 +42,19 @@ public sealed partial class MissingDepsViewModel(
     private void Resolve(MissingDependency dep)
     {
         if (dep is not null)
-            launcher?.OpenAlias(dep.Ref);
+            launcher?.OpenAlias(dep.Ref, onSaved: () => _ = RefreshAsync());
+    }
+
+    /// <summary>Resolve a leftover from installed-deps analyze (optional suggested owned var). </summary>
+    [RelayCommand]
+    private void ResolveInstalledLeftover(InstalledDepsEntry? entry)
+    {
+        if (entry is null)
+            return;
+        launcher?.OpenAlias(
+            entry.Ref,
+            onSaved: () => _ = RefreshAsync(),
+            suggestedOwnedQuery: entry.ResolvedVarName);
     }
 
     /// <summary>ILoadableScreen: the shell loads this screen by refreshing it. (G-0)</summary>
@@ -104,6 +119,104 @@ public sealed partial class MissingDepsViewModel(
             all.OrderByDescending(i => i.NeededByCount).ThenBy(i => i.Ref, StringComparer.Ordinal).Select(i => i.Ref));
     }
 
+    // ── Installed Packages repair (legacy MissingDepends) ───────────────────────────────────────────────
+    public ObservableCollection<InstalledDepsEntry> InstalledLeftovers { get; } = [];
+
+    [ObservableProperty] private bool _isAnalyzingInstalled;
+    [ObservableProperty] private string? _installedStatus;
+    [ObservableProperty] private string? _installedActivationStatus;
+
+    public bool HasInstalledLeftovers => InstalledLeftovers.Count > 0;
+    public bool CanAnalyzeInstalled => (installedJobs is not null || installedRepair is not null) && !IsAnalyzingInstalled;
+
+    /// <summary>
+    /// Analyse deps of active/installed packages → auto-activate found → list leftovers for alias Resolve.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanAnalyzeInstalled))]
+    public async Task AnalyzeInstalledAsync()
+    {
+        IsAnalyzingInstalled = true;
+        InstalledStatus = null;
+        InstalledActivationStatus = null;
+        InstalledLeftovers.Clear();
+        NotifyInstalledState();
+        try
+        {
+            Services.InstalledDepsRepairOutcome outcome;
+            if (installedJobs is not null)
+            {
+                InstalledStatus = "Queued — watch the jobs panel…";
+                var job = installedJobs.Start();
+                outcome = await job.Result.ConfigureAwait(true);
+            }
+            else if (installedRepair is not null)
+            {
+                // Headless / unit tests without a job runner.
+                var analysis = await installedRepair.AnalyzeAsync().ConfigureAwait(true);
+                var activation = await installedRepair.ActivateFromAnalysisAsync(analysis).ConfigureAwait(true);
+                outcome = new Services.InstalledDepsRepairOutcome(analysis, activation);
+            }
+            else
+                return;
+
+            ApplyInstalledOutcome(outcome);
+            NotifyInstalledState();
+            await RefreshAsync().ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            InstalledStatus = "Cancelled.";
+        }
+        catch (Exception ex)
+        {
+            InstalledStatus = $"Analyze failed: {ex.Message}";
+            InstalledLeftovers.Clear();
+        }
+        finally
+        {
+            IsAnalyzingInstalled = false;
+            NotifyInstalledState();
+        }
+    }
+
+    private void ApplyInstalledOutcome(Services.InstalledDepsRepairOutcome outcome)
+    {
+        var a = outcome.Analysis;
+        var act = outcome.Activation;
+
+        if (a.ActivePackageCount == 0)
+        {
+            InstalledStatus = "No installed packages on the active profile — install something first, then retry.";
+            return;
+        }
+
+        InstalledStatus = a.Parsed == 0
+            ? $"Analyzed {a.ActivePackageCount} installed packages — no dependencies to repair."
+            : $"Analyzed {a.ActivePackageCount} installed · {a.Parsed} distinct deps · in library {a.InLibrary} · missing {a.NotInLibrary}" +
+              (a.Closest > 0 ? $" · closest substitute {a.Closest}" : "") + ".";
+
+        if (act.PrivilegeFailures > 0)
+            InstalledActivationStatus = "Symlink creation needs Developer Mode / admin — members may be queued but links failed.";
+        else if (act.PathUnavailable > 0)
+            InstalledActivationStatus = "VaM path unset — set Settings, activate a loading preset once, then retry.";
+        else if (act.MembersActivated > 0 || act.LinksCreated > 0)
+            InstalledActivationStatus =
+                $"Activated {act.MembersActivated} packages (+ deps, {act.LinksCreated} links). " +
+                $"{act.StillMissing} offline · {act.UnresolvedDependencies} unresolved branches.";
+        else if (a.InLibrary > 0)
+            InstalledActivationStatus = "Found packages were already on the active preset (or activate was a no-op).";
+
+        foreach (var e in a.Leftovers.OrderByDescending(x => x.NeededByCount).ThenBy(x => x.Ref, StringComparer.Ordinal))
+            InstalledLeftovers.Add(e);
+    }
+
+    private void NotifyInstalledState()
+    {
+        OnPropertyChanged(nameof(HasInstalledLeftovers));
+        OnPropertyChanged(nameof(CanAnalyzeInstalled));
+        AnalyzeInstalledCommand.NotifyCanExecuteChanged();
+    }
+
     // ── VaM-log repair (QoL) ─────────────────────────────────────────────────────────────────────────────
     /// <summary>Raw VaM error-log text pasted by the user (bound to a TextBox).</summary>
     [ObservableProperty] private string _logText = "";
@@ -139,6 +252,11 @@ public sealed partial class MissingDepsViewModel(
                 ? "No package names found in the log."
                 : $"Parsed {analysis.Parsed} packages · in library {analysis.InLibrary} · missing {analysis.NotInLibrary}.";
         }
+        catch (Exception ex)
+        {
+            LogStatus = $"Analyze failed: {ex.Message}";
+            LogEntries.Clear();
+        }
         finally
         {
             IsAnalyzingLog = false;
@@ -146,7 +264,7 @@ public sealed partial class MissingDepsViewModel(
         }
     }
 
-    /// <summary>Activate the in-library subset (+ their dependency closure) into the active VaM profile. (QoL)</summary>
+    /// <summary>Add the in-library subset to the active loading preset and rebuild profile links (+ deps). (QoL)</summary>
     [RelayCommand]
     public async Task ActivateFoundAsync()
     {
@@ -163,9 +281,14 @@ public sealed partial class MissingDepsViewModel(
             var r = await logResolver.ActivateAsync(names).ConfigureAwait(true);
             ActivationStatus = r.PrivilegeFailures > 0
                 ? "Symlink creation needs Developer Mode / admin — nothing activated. Enable Developer Mode and retry."
-                : r.LinksCreated == 0
-                    ? "Nothing activated — check the VaM path is set (Settings) and a profile is active."
-                    : $"Activated {r.MembersActivated} packages + dependencies ({r.LinksCreated} links). {r.StillMissing} still missing (need import / Hub).";
+                : r.PathUnavailable > 0
+                    ? "Nothing activated — set VaM path (Settings), activate a loading preset once, then retry."
+                    : $"Added {r.MembersActivated} packages to the active loading preset (+ dependencies, {r.LinksCreated} links). " +
+                      $"{r.StillMissing} offline/unavailable · {r.UnresolvedDependencies} unresolved dependency branches (need import / Hub).";
+        }
+        catch (Exception ex)
+        {
+            ActivationStatus = $"Activate failed: {ex.Message}";
         }
         finally
         {

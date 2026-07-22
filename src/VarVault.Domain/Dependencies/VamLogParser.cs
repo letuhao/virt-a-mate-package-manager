@@ -12,15 +12,16 @@ namespace VarVault.Domain.Dependencies;
 /// </summary>
 public static partial class VamLogParser
 {
-    // Candidate = <token>.<token>.(digits|latest), token = letters (incl. CJK) / digits / _ / -.
+    // Candidate = <token>.<token>.(digits|latest). Tokens = letters (incl. CJK) / digits / _ / - / +
+    // (no spaces — otherwise "could not load Creator.Pack.2" swallows the English prefix).
     // The regex only *finds* candidates; DependencyRef.Parse decides what's a real ref.
-    [GeneratedRegex(@"[\p{L}\p{N}_\-]+\.[\p{L}\p{N}_\-]+\.(?:\d+|latest)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"[\p{L}\p{N}_\-+]+\.[\p{L}\p{N}_\-+]+\.(?:\d+|latest)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex CandidateRegex();
 
     // VaM's canonical phrasing names the MISSING package right after this phrase; the rest of the line often names
     // the *depender* ("… that package<Depender> depends on") — sometimes glued to "package" with no space, so a
-    // naive scan would mis-read it. When a line uses this phrasing we take only the missing ref. (Real-log hardened.)
-    [GeneratedRegex(@"Missing addon package\s+([\p{L}\p{N}_\-]+\.[\p{L}\p{N}_\-]+\.(?:\d+|latest))", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    // naive scan would mis-read it. Creator may contain spaces (e.g. "Kamiyama Prod.…"). (Real-log hardened.)
+    [GeneratedRegex(@"Missing addon package\s+([\p{L}\p{N}_\-+ ]+?\.[\p{L}\p{N}_\-+]+\.(?:\d+|latest))", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
     private static partial Regex MissingPhraseRegex();
 
     /// <summary>
@@ -58,6 +59,7 @@ public static partial class VamLogParser
 
     private static void TryAdd(string token, HashSet<string> seen, List<DependencyRef> refs)
     {
+        token = token.Trim();
         if (token.EndsWith(".var", StringComparison.OrdinalIgnoreCase))
             token = token[..^4];
 

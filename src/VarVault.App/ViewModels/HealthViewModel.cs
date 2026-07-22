@@ -41,6 +41,12 @@ public sealed partial class HealthViewModel(
     /// <summary>Screen-head "Fix all detected…" → fix-encoding dialog. (GD-11)</summary>
     [RelayCommand] private void FixAll() => launcher?.OpenFix(0, null);
 
+    /// <summary>Summary card "Fix GBK…" — family filter matching <see cref="GbkCount"/>.</summary>
+    [RelayCommand] private void FixGbk() => launcher?.OpenFix(0, "GB");
+
+    /// <summary>Summary card "Fix Shift-JIS…" — family filter matching <see cref="ShiftJisCount"/>.</summary>
+    [RelayCommand] private void FixShiftJis() => launcher?.OpenFix(0, "Shift");
+
     public ObservableCollection<EncodingGroup> EncodingGroups { get; } = [];
 
     // Summary-card counts by codepage family (AC-16).

@@ -106,6 +106,33 @@ public sealed class ShardedThumbnailStore : IThumbnailStore
     public Task<byte[]?> GetContentAsync(long contentItemId, CancellationToken cancellationToken = default) =>
         GetAsync(ContentKey(contentItemId), cancellationToken);
 
+    public async Task PutFocusContentAsync(long contentItemId, byte[] jpeg, CancellationToken cancellationToken = default)
+    {
+        Guard.NotNull(jpeg);
+        var shard = ShardOf(contentItemId);
+        EnsureSchema(shard);
+        await using var connection = await OpenAsync(shard, cancellationToken).ConfigureAwait(false);
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "INSERT INTO FocusThumb(ContentItemId, Bytes) VALUES ($id, $bytes) " +
+                          "ON CONFLICT(ContentItemId) DO UPDATE SET Bytes = excluded.Bytes;";
+        cmd.Parameters.AddWithValue("$id", contentItemId);
+        cmd.Parameters.AddWithValue("$bytes", jpeg);
+        await cmd.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<byte[]?> GetFocusContentAsync(long contentItemId, CancellationToken cancellationToken = default)
+    {
+        var shard = ShardOf(contentItemId);
+        if (!File.Exists(ShardFile(shard)))
+            return null;
+        EnsureSchema(shard);
+        await using var connection = await OpenAsync(shard, cancellationToken).ConfigureAwait(false);
+        var cmd = connection.CreateCommand();
+        cmd.CommandText = "SELECT Bytes FROM FocusThumb WHERE ContentItemId = $id;";
+        cmd.Parameters.AddWithValue("$id", contentItemId);
+        return await cmd.ExecuteScalarAsync(cancellationToken).ConfigureAwait(false) as byte[];
+    }
+
     private static long ContentKey(long contentItemId) => checked(-contentItemId);
 
     /// <summary>
@@ -151,7 +178,8 @@ public sealed class ShardedThumbnailStore : IThumbnailStore
             connection.Open();
             using var cmd = connection.CreateCommand();
             cmd.CommandText = "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; " +
-                              "CREATE TABLE IF NOT EXISTS Thumb(PackageId INTEGER PRIMARY KEY, Bytes BLOB NOT NULL);";
+                              "CREATE TABLE IF NOT EXISTS Thumb(PackageId INTEGER PRIMARY KEY, Bytes BLOB NOT NULL); " +
+                              "CREATE TABLE IF NOT EXISTS FocusThumb(ContentItemId INTEGER PRIMARY KEY, Bytes BLOB NOT NULL);";
             cmd.ExecuteNonQuery();
             _schemaReady[shard] = true;
         }

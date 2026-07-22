@@ -86,4 +86,25 @@ public class VamLogParserTests
         Assert.Empty(VamLogParser.ExtractRefs(null));
         Assert.Empty(VamLogParser.ExtractRefs("   "));
     }
+
+    [Fact]
+    public void Extracts_creator_with_spaces_and_plus_in_package()
+    {
+        var log = """
+            !> Missing addon package Kamiyama Prod.Preset_Asuna_22y_V2.latest that packageMibkev.Princess_Destruction.1 depends on
+            !> Plugin file Blazedust.ToySerialController+VAMLaunch.12:/Custom/Scripts/Blazedust/ToySerialController+VAMLaunch/ADD_ME.cslist does not exist
+            """;
+        var refs = VamLogParser.ExtractRefs(log).Select(Ref).ToList();
+        Assert.Contains("Kamiyama Prod.Preset_Asuna_22y_V2.latest", refs);
+        Assert.Contains("Blazedust.ToySerialController+VAMLaunch.12", refs);
+        Assert.DoesNotContain(refs, r => r.Contains("Princess_Destruction"));
+    }
+
+    [Fact]
+    public void Extracts_plugin_file_lines()
+    {
+        var log = "!> Plugin file prestigitis.DesktopClothGrab.1:/Custom/Scripts/prestigitis/prestigitis_DesktopClothGrab.cs does not exist";
+        var refs = VamLogParser.ExtractRefs(log).Select(Ref).ToList();
+        Assert.Contains("prestigitis.DesktopClothGrab.1", refs);
+    }
 }

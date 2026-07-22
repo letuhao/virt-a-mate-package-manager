@@ -4,15 +4,20 @@ namespace VarVault.Sdk.Activation;
 /// Result of building a preset's profile links.
 /// <paramref name="LinksCreated"/> = links now present on disk for this build (install + alias);
 /// <paramref name="LinksRemoved"/> = orphaned links deleted from disk;
-/// <paramref name="MissingPackages"/> = closure packages with no online copy to link;
+/// <paramref name="MissingPackages"/> = closure packages with no online/enabled copy to link;
 /// <paramref name="PrivilegeFailures"/> = symlink-privilege denials (Developer Mode). When &gt; 0 the build
-/// aborted without partial links — surface the Developer-Mode hint. (Checklist 22 · T4.3/T4.4.)
+/// aborted without partial links — surface the Developer-Mode hint;
+/// <paramref name="UnresolvedDependencies"/> = unresolved members + transitive refs with no resolved package;
+/// <paramref name="PathUnavailable"/> = 1 when VaM path is unset or does not exist (build skipped).
+/// (Checklist 22 · T4.3/T4.4; deep dependency closure.)
 /// </summary>
 public sealed record ActivationBuildResult(
     int LinksCreated,
     int LinksRemoved,
     int MissingPackages,
-    int PrivilegeFailures = 0);
+    int PrivilegeFailures = 0,
+    int UnresolvedDependencies = 0,
+    int PathUnavailable = 0);
 
 /// <summary>
 /// Builds a loading preset's profile link set: resolves members + their forward-dependency closure,

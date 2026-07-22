@@ -24,18 +24,24 @@ public sealed record MissingLogActivation(
     int MembersActivated,     // explicit packages requested that were linked
     int LinksCreated,         // total links made this build (members + pulled-in dependency closure)
     int StillMissing,         // closure packages with no online copy to link (need importing / Hub)
-    int PrivilegeFailures);   // >0 → symlink privilege denied (needs Developer Mode / admin)
+    int PrivilegeFailures,    // >0 → symlink privilege denied (needs Developer Mode / admin)
+    int UnresolvedDependencies = 0, // unresolved members + transitive refs that stopped a branch
+    int PathUnavailable = 0); // 1 when VaM path unset/missing
 
 /// <summary>
 /// Turns a pasted VaM error log into an actionable repair: parse the missing <c>Creator.Package.version</c> refs
-/// (robust — see <c>VamLogParser</c>), resolve <c>.latest</c> + which packages the library already has, then
-/// activate the found set <b>plus its dependency closure</b> into VaM (reusing the preset/activation flow — the fix
-/// for the old importer that never pulled dependencies). (QoL log-repair.)
+/// (robust — see <c>VamLogParser</c>), resolve <c>.latest</c> to the highest <c>VersionSort</c> already in the
+/// library, then add the found set <b>plus its dependency closure</b> into the <b>active</b> loading preset /
+/// VaM profile (reusing the preset/activation flow — the fix for the old importer that never pulled
+/// dependencies). (QoL log-repair.)
 /// </summary>
 public interface IMissingLogResolver
 {
     Task<MissingLogAnalysis> AnalyzeAsync(string logText, CancellationToken cancellationToken = default);
 
-    /// <summary>Activate the given (in-library) var names + their forward-dependency closure into the active VaM profile.</summary>
+    /// <summary>
+    /// Add the given (in-library) var names to the active loading preset, then rebuild its profile links
+    /// (members + forward-dependency closure). Does not create a throwaway repair preset.
+    /// </summary>
     Task<MissingLogActivation> ActivateAsync(IReadOnlyList<string> varNames, CancellationToken cancellationToken = default);
 }

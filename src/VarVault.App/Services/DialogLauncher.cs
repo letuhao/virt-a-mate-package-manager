@@ -19,7 +19,7 @@ public interface IDialogLauncher
     void OpenMigratePlan();
     void OpenVarDetail(long packageId);
     void OpenVarDetail(long packageId, bool push);
-    void OpenAlias(string missingRef, Action? onSaved = null);
+    void OpenAlias(string missingRef, Action? onSaved = null, string? suggestedOwnedQuery = null);
     void OpenConfirmDelete(IReadOnlyList<ConfirmItem> items, int reverseDepCount = 0);
     void OpenFix(long varFileId, string? codepage);
     void OpenDupeReview(VarVault.Sdk.Library.DuplicateGroup group);
@@ -29,7 +29,8 @@ public interface IDialogLauncher
 /// <summary>Default launcher: resolves dialog VMs from the app service provider and shows them. (GD/GE.)</summary>
 public sealed class DialogLauncher(
     IServiceProvider services, IDialogService dialogs,
-    Action? afterRepoAdded = null, Action<string, Action?>? toast = null)
+    Action? afterRepoAdded = null, Action<string, Action?>? toast = null,
+    EncodingFixJobRunner? encodingJobs = null)
     : IDialogLauncher
 {
     public void OpenAddRepo() =>
@@ -77,7 +78,7 @@ public sealed class DialogLauncher(
             dialogs.Show(vm);
     }
 
-    public void OpenAlias(string missingRef, Action? onSaved = null)
+    public void OpenAlias(string missingRef, Action? onSaved = null, string? suggestedOwnedQuery = null)
     {
         var vm = new AliasViewModel(
             services.GetRequiredService<Sdk.Library.IAliasService>(),
@@ -87,6 +88,8 @@ public sealed class DialogLauncher(
             OnSaved = onSaved,
         };
         vm.MissingRef = missingRef;
+        if (!string.IsNullOrWhiteSpace(suggestedOwnedQuery))
+            vm.OwnedQuery = suggestedOwnedQuery;
         dialogs.Push(vm);
     }
 
@@ -103,7 +106,9 @@ public sealed class DialogLauncher(
 
     public void OpenFix(long varFileId, string? codepage)
     {
-        var vm = new FixEncodingViewModel(services.GetRequiredService<Sdk.Library.IHealthService>())
+        var vm = new FixEncodingViewModel(
+            services.GetRequiredService<Sdk.Library.IHealthService>(),
+            encodingJobs ?? services.GetService<EncodingFixJobRunner>())
         {
             VarFileId = varFileId,
             Codepage = codepage,

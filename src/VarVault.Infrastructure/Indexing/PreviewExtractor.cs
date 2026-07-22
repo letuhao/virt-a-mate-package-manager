@@ -8,19 +8,29 @@ using VarVault.Domain.Indexing;
 namespace VarVault.Infrastructure.Indexing;
 
 /// <summary>
-/// Extracts the sibling <c>.jpg</c> preview for a content entry inside a var (e.g. the preview beside a
-/// scene JSON) and <b>downscales it to a gallery thumbnail</b> so the packed cache stays small and grid
-/// rendering stays fast at 700k-item scale (VaM previews are often 1024²+ and 100KB–1MB raw; a 384px
-/// re-encode is ~15–40KB). Returns null when there is no sibling image (→ the caller uses a placeholder).
-/// (Checklist 1.32; scale review — downscale-on-extract.)
+/// Extracts the sibling <c>.jpg</c> preview for a content entry inside a var and downscales it.
+/// Wall thumbnails use <see cref="MaxDimension"/> (384); focus viewer uses <see cref="FocusMaxDimension"/>.
+/// (Checklist 1.32; Library sidebar gallery.)
 /// </summary>
 public sealed class PreviewExtractor
 {
-    /// <summary>Longest-edge cap for a stored thumbnail. Big enough for a crisp gallery card, small enough to keep the cache lean.</summary>
+    /// <summary>Longest-edge cap for a stored wall thumbnail.</summary>
     public const int MaxDimension = 384;
-    private const int JpegQuality = 80;
 
-    public async Task<byte[]?> ExtractAsync(string varPath, string contentEntryPath, CancellationToken cancellationToken = default)
+    /// <summary>Longest-edge cap for the on-demand focus viewer image (sidebar can be very wide).</summary>
+    public const int FocusMaxDimension = 1536;
+
+    private const int JpegQuality = 80;
+    private const int FocusJpegQuality = 85;
+
+    public Task<byte[]?> ExtractAsync(string varPath, string contentEntryPath, CancellationToken cancellationToken = default) =>
+        ExtractAsync(varPath, contentEntryPath, MaxDimension, cancellationToken);
+
+    public async Task<byte[]?> ExtractAsync(
+        string varPath,
+        string contentEntryPath,
+        int maxDimension,
+        CancellationToken cancellationToken = default)
     {
         Guard.NotNullOrWhiteSpace(varPath);
         Guard.NotNullOrWhiteSpace(contentEntryPath);
@@ -34,12 +44,24 @@ public sealed class PreviewExtractor
             var entry = archive.GetEntry(siblingJpg) ?? FindIgnoreCase(archive, siblingJpg);
             if (entry is null)
                 return null;
+            if (entry.Length > IngestLimits.MaxPreviewCompressedBytes)
+                return null;
 
             await using var stream = entry.Open();
             using var memory = new MemoryStream();
-            await stream.CopyToAsync(memory, cancellationToken).ConfigureAwait(false);
+            var buffer = new byte[8192];
+            long total = 0;
+            int read;
+            while ((read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken).ConfigureAwait(false)) > 0)
+            {
+                total += read;
+                if (total > IngestLimits.MaxPreviewCompressedBytes)
+                    return null;
+                await memory.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+            }
+
             var raw = memory.ToArray();
-            return Downscale(raw);
+            return Downscale(raw, maxDimension, maxDimension > MaxDimension ? FocusJpegQuality : JpegQuality);
         }
         catch (Exception ex) when (ex is InvalidDataException or IOException)
         {
@@ -48,17 +70,13 @@ public sealed class PreviewExtractor
     }
 
     /// <summary>
-    /// Resize a preview to fit within <see cref="MaxDimension"/> and re-encode as JPEG. If the image can't be
-    /// decoded, or is already within the cap, the original bytes are returned unchanged (never lose a preview to a
-    /// resize failure). Pure/allocating; safe to call on the indexing background thread.
+    /// Resize a preview to fit within <paramref name="maxDimension"/> and re-encode as JPEG.
+    /// Undecodable / already-small images keep original bytes when possible.
     /// </summary>
-    public static byte[]? Downscale(byte[] jpeg)
+    public static byte[]? Downscale(byte[] jpeg, int maxDimension = MaxDimension, int quality = JpegQuality)
     {
         try
         {
-            // Inspect dimensions before decoding pixels. SKBitmap.Decode(byte[]) allocates the full
-            // uncompressed bitmap first, so a tiny compressed image with extreme dimensions could
-            // otherwise consume hundreds of MB before the configured cap was checked.
             using var encoded = new SKMemoryStream(jpeg);
             using var codec = SKCodec.Create(encoded);
             if (codec is null)
@@ -70,13 +88,13 @@ public sealed class PreviewExtractor
 
             using var bitmap = SKBitmap.Decode(codec);
             if (bitmap is null)
-                return jpeg; // undecodable (or not really an image) → keep the original bytes
+                return jpeg;
 
             var longest = Math.Max(bitmap.Width, bitmap.Height);
-            if (longest <= MaxDimension)
-                return jpeg; // already thumbnail-sized — don't re-encode (avoids a needless quality loss)
+            if (longest <= maxDimension)
+                return jpeg;
 
-            var scale = (float)MaxDimension / longest;
+            var scale = (float)maxDimension / longest;
             var info = new SKImageInfo(
                 Math.Max(1, (int)Math.Round(bitmap.Width * scale)),
                 Math.Max(1, (int)Math.Round(bitmap.Height * scale)));
@@ -85,15 +103,13 @@ public sealed class PreviewExtractor
             if (resized is null)
                 return jpeg;
             using var image = SKImage.FromBitmap(resized);
-            using var data = image.Encode(SKEncodedImageFormat.Jpeg, JpegQuality);
+            using var data = image.Encode(SKEncodedImageFormat.Jpeg, quality);
             var thumb = data.ToArray();
-
-            // Guard: if re-encoding somehow grew the file, keep the smaller original.
             return thumb.Length > 0 && thumb.Length < jpeg.Length ? thumb : jpeg;
         }
         catch (Exception)
         {
-            return jpeg; // any Skia failure → keep the original preview rather than dropping it
+            return jpeg;
         }
     }
 

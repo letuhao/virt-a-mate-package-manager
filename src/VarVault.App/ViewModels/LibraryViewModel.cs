@@ -30,11 +30,16 @@ public sealed partial class LibraryViewModel(
     ITagService? tags = null,
     Domain.Indexing.IThumbnailStore? thumbnails = null,
     Services.IFileReveal? reveal = null,
-    Sdk.Activation.IActivationService? activation = null) : ObservableObject, ILoadableScreen
+    Sdk.Activation.IActivationService? activation = null,
+    Sdk.Indexer.IIndexerClient? indexer = null,
+    Services.EncodingFixJobRunner? encodingJobs = null) : ObservableObject, ILoadableScreen
 {
     // Off-thread, cached loader for the extracted preview thumbnails the indexer stores (gallery). (1.35)
     private readonly Services.ThumbnailLoader<Avalonia.Media.Imaging.Bitmap>? _thumbLoader =
         thumbnails is null ? null : Services.ThumbnailLoader.ForBitmap(thumbnails);
+
+    /// <summary>Right-sidebar package content gallery (wall + focus). Shared with Var detail.</summary>
+    public PackageGalleryViewModel PackageGallery { get; } = new(detail, thumbnails, indexer, settings);
 
     /// <summary>Gallery cards (row + extracted preview thumbnail) for the gallery view. (Gallery)</summary>
     public ObservableCollection<GalleryCardViewModel> GalleryItems { get; } = [];
@@ -196,11 +201,11 @@ public sealed partial class LibraryViewModel(
         launcher.OpenConfirmDelete(items, reverseDeps);
     }
 
-    /// <summary>Ops-bar "Fix encoding": fix mojibake on the selected packages' var files. (AC-3)</summary>
+    /// <summary>Ops-bar "Fix encoding": queue mojibake fix on the selected packages' var files. (AC-3)</summary>
     [RelayCommand]
     public async Task FixEncodingSelectedAsync(CancellationToken cancellationToken = default)
     {
-        if (actions is null || SelectedCount == 0)
+        if (SelectedCount == 0)
         {
             LastActionMessage = "Nothing selected";
             return;
@@ -208,9 +213,21 @@ public sealed partial class LibraryViewModel(
         var ids = (await SelectedConfirmItemsAsync(cancellationToken).ConfigureAwait(true)).Select(i => i.VarFileId).ToList();
         if (ids.Count == 0)
             return;
-        var result = await actions.FixEncodingAsync(ids, cancellationToken).ConfigureAwait(true);
-        LastActionMessage = $"Fixed {result.Succeeded} ({result.Failed} skipped)";
-        ShowToast?.Invoke($"Fixed encoding on {result.Succeeded} files", null);
+
+        if (encodingJobs is not null)
+        {
+            // Toast + Library refresh come from EncodingFixJobRunner.AfterCompleted / ShowToast.
+            _ = encodingJobs.StartVarFiles(ids);
+            LastActionMessage = $"Encoding fix queued for {ids.Count} files — watch the jobs panel";
+            return;
+        }
+
+        if (actions is null)
+            return;
+        var inline = await actions.FixEncodingAsync(ids, cancellationToken).ConfigureAwait(true);
+        LastActionMessage = $"Fixed {inline.Succeeded} ({inline.Failed} skipped)";
+        ShowToast?.Invoke($"Fixed encoding on {inline.Succeeded} files · originals retained", null);
+        await RefreshAsync(cancellationToken).ConfigureAwait(true);
     }
 
     /// <summary>Sub-folder name typed into the ops-bar "Move to subfolder…" input. (AC-9)</summary>
@@ -264,18 +281,44 @@ public sealed partial class LibraryViewModel(
     /// <summary>Whether a row is in the ops selection (drives the row checkbox state). (AC-11)</summary>
     public bool IsSelected(PackageListEntry entry) => entry is not null && _selectedPackageIds.Contains(entry.PackageId);
 
-    /// <summary>Per-row "Fix Var" (rebuild): fix encoding on that package's var files. (AC-11)</summary>
+    /// <summary>Per-row "Fix Var" (rebuild): queue encoding fix on that package's var files. (AC-11)</summary>
     [RelayCommand]
     public async Task FixRowAsync(PackageListEntry entry, CancellationToken cancellationToken = default)
     {
-        if (actions is null || entry is null || detail is null)
+        if (entry is null || detail is null)
             return;
         var copies = await GetAllCopiesAsync(entry.PackageId, cancellationToken).ConfigureAwait(true);
         if (copies.Count == 0)
             return;
-        var result = await actions.FixEncodingAsync(copies.Select(c => c.VarFileId).ToList(), cancellationToken).ConfigureAwait(true);
-        LastActionMessage = $"Fixed {result.Succeeded} ({result.Failed} skipped)";
-        ShowToast?.Invoke($"Fixed {entry.VarName}", null);
+        // Skip UTF-8 siblings and any original already superseded by a sibling in this list.
+        var superseded = copies
+            .Where(c => c.FixedFromVarFileId.HasValue)
+            .Select(c => c.FixedFromVarFileId!.Value)
+            .ToHashSet();
+        var ids = copies
+            .Where(c => c.FixedFromVarFileId is null && !superseded.Contains(c.VarFileId))
+            .Select(c => c.VarFileId)
+            .ToList();
+        if (ids.Count == 0)
+        {
+            LastActionMessage = "Nothing to fix — UTF-8 siblings already present";
+            return;
+        }
+
+        if (encodingJobs is not null)
+        {
+            // Toast + Library refresh come from EncodingFixJobRunner.AfterCompleted / ShowToast.
+            _ = encodingJobs.StartVarFiles(ids, $"Fix encoding ({entry.VarName})");
+            LastActionMessage = $"Encoding fix queued for {entry.VarName} — watch the jobs panel";
+            return;
+        }
+
+        if (actions is null)
+            return;
+        var inline = await actions.FixEncodingAsync(ids, cancellationToken).ConfigureAwait(true);
+        LastActionMessage = $"Fixed {inline.Succeeded} ({inline.Failed} skipped)";
+        ShowToast?.Invoke($"Fixed {entry.VarName} · original retained", null);
+        await RefreshAsync(cancellationToken).ConfigureAwait(true);
     }
 
     /// <summary>Ops-bar "Add to preset…": add the selected packages to the chosen preset. (AC-2)</summary>
@@ -404,18 +447,17 @@ public sealed partial class LibraryViewModel(
             {
                 SelectedDetail = null;
                 SelectedThumbnail = null;
+                PackageGallery.Clear();
             }
             return;
         }
         var detailTask = detail.GetAsync(entry.PackageId);
-        var thumbnailTask = _thumbLoader is null
-            ? Task.FromResult<Avalonia.Media.Imaging.Bitmap?>(null)
-            : _thumbLoader.LoadAsync(entry.PackageId);
-        await Task.WhenAll(detailTask, thumbnailTask).ConfigureAwait(true);
+        await detailTask.ConfigureAwait(true);
         if (generation != _detailGeneration || SelectedEntry?.PackageId != entry.PackageId)
             return;
         SelectedDetail = await detailTask.ConfigureAwait(true);
-        SelectedThumbnail = await thumbnailTask.ConfigureAwait(true);
+        SelectedThumbnail = null;
+        await PackageGallery.BindPackageAsync(entry.PackageId, SelectedDetail?.Copies).ConfigureAwait(true);
     }
 
     /// <summary>Detail-panel "resolve via alias →": open the alias dialog for the selected package. (AC-13)</summary>
@@ -643,7 +685,16 @@ public sealed partial class LibraryViewModel(
     partial void OnSelectedEntryChanged(PackageListEntry? value)
     {
         SyncGallerySelection(value?.PackageId);
+        // Favorite / in-place row replace keeps the same package — don't flash-clear the gallery.
+        // PackageId is set at the start of BindPackageAsync, before thumbs finish loading.
+        if (value is not null && value.PackageId == PackageGallery.PackageId && PackageGallery.PackageId > 0)
+            return;
+
         var generation = ++_detailGeneration;
+        // Clear stale detail/gallery immediately so the previous package never flashes.
+        SelectedDetail = null;
+        SelectedThumbnail = null;
+        PackageGallery.Clear();
         _ = LoadSelectedDetailAsync(value, generation);
     }
 
@@ -910,11 +961,12 @@ public sealed partial class LibraryViewModel(
             SelectedTagId = tagId;
         var width = await settings.GetAsync(PrefDetailWidth, cancellationToken).ConfigureAwait(true);
         if (double.TryParse(width, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var w))
-            DetailPanelWidth = Math.Clamp(w, 220, 600);
+            DetailPanelWidth = Math.Max(PackageGalleryViewModel.MinPanelWidth, w);
         FavoritesOnly = await settings.GetBoolAsync(PrefFavoritesOnly, false, cancellationToken).ConfigureAwait(true);
         MissingDepsOnly = await settings.GetBoolAsync(PrefMissingDepsOnly, false, cancellationToken).ConfigureAwait(true);
         InstalledOnly = await settings.GetBoolAsync(PrefInstalledOnly, false, cancellationToken).ConfigureAwait(true);
         SingleCopyOnly = await settings.GetBoolAsync(PrefSingleCopyOnly, false, cancellationToken).ConfigureAwait(true);
+        await PackageGallery.LoadPreferencesAsync(cancellationToken).ConfigureAwait(true);
         _suppressAutoRefresh = false;
     }
 
@@ -922,6 +974,7 @@ public sealed partial class LibraryViewModel(
     {
         if (settings is null)
             return;
+        DetailPanelWidth = Math.Max(PackageGalleryViewModel.MinPanelWidth, DetailPanelWidth);
         await settings.SetAsync(PrefDetailWidth, DetailPanelWidth.ToString(System.Globalization.CultureInfo.InvariantCulture), cancellationToken).ConfigureAwait(true);
     }
 
@@ -1009,6 +1062,8 @@ public sealed partial class LibraryViewModel(
     // Typing coalesces into one exact refresh after DebounceInterval; until then the count is approximate. (1.41)
     partial void OnSearchTextChanged(string? value)
     {
+        if (_suppressAutoRefresh)
+            return;
         IsCountApproximate = true;
         PendingRefresh = DebouncedRefreshAsync();
     }
