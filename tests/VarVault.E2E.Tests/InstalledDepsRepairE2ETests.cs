@@ -115,6 +115,35 @@ public sealed class InstalledDepsRepairE2ETests
     }
 
     [Fact]
+    public async Task Analyze_walks_transitive_deps_not_just_one_hop()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+
+        // Only Look is active. Mid is in library (not active). Deep is present. Ghost missing at depth 2.
+        WriteVar(repoDir, "A.Look.1.var", "A", "Look", "A.Mid.1");
+        WriteVar(repoDir, "A.Mid.1.var", "A", "Mid", "A.Deep.1", "Ghost.Missing.9");
+        WriteVar(repoDir, "A.Deep.1.var", "A", "Deep");
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IDependencyResolver>().ResolveAllAsync();
+
+        var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+        var look = await db.Packages.FirstAsync(p => p.VarName == "A.Look.1");
+        (await db.PackageListItems.FirstAsync(i => i.PackageId == look.Id)).IsActive = true;
+        await db.SaveChangesAsync();
+
+        var analysis = await scope.ServiceProvider.GetRequiredService<IInstalledDepsRepair>().AnalyzeAsync();
+
+        // One-hop would only see Mid. Deep + Ghost require transitive expansion through Mid.
+        Assert.Contains(analysis.Entries, e => e.Ref == "A.Mid.1" && e.InLibrary);
+        Assert.Contains(analysis.Entries, e => e.Ref == "A.Deep.1" && e.InLibrary && e.ResolvedVarName == "A.Deep.1");
+        Assert.Contains(analysis.Entries, e => e.Ref == "Ghost.Missing.9" && !e.InLibrary && e.NeedsAlias);
+    }
+
+    [Fact]
     public async Task Analyze_respects_global_alias_fallback()
     {
         await using var host = TestHost.Create(withPersistence: true);

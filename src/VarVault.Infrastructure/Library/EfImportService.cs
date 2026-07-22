@@ -84,12 +84,12 @@ public sealed class EfImportService(
             if (Directory.Exists(path))
             {
                 var label = new DirectoryInfo(path).Name;
-                var loose = Directory.EnumerateFiles(path, "*.var", SearchOption.AllDirectories).ToList();
+                var loose = LooseVarEnumerator.EnumerateVarFiles(path, cancellationToken).ToList();
                 foreach (var f in loose)
                     varRefs.Add((label, path, f));
                 sources.Add(new ImportSource(path, ImportSourceKind.Folder, ImportSourceStatus.Ok, loose.Count, null));
 
-                foreach (var archive in Directory.EnumerateFiles(path, "*.*", SearchOption.AllDirectories).Where(IsArchive))
+                foreach (var archive in LooseVarEnumerator.EnumerateArchiveFiles(path, cancellationToken))
                 {
                     progress?.Report(new ProgressReport(pathIndex, Math.Max(1, paths.Count),
                         $"Extracting {Path.GetFileName(archive)}…"));
@@ -545,6 +545,7 @@ public sealed class EfImportService(
         var cancelled = false;   // E5: a graceful cancel mid-apply still records a partial run (remainder skipped).
         var importedRefs = new List<string>();   // identities of vars that landed, for activate-after (5.9)
         var outcomes = new List<ImportOutcome>(session.Items.Count);   // per-item results, persisted (§8 · G3)
+        var copiedIncoming = new List<string>();
         var total = Math.Max(1, session.Items.Count);
         try
         {
@@ -562,14 +563,14 @@ public sealed class EfImportService(
                     case ImportDecision.KeepIncoming:
                     {
                         var r = await CopyItemAsync(item, Path.Combine(mount, item.FileName), item.Signals.GbkEntryCount > 0, cancellationToken).ConfigureAwait(false);
-                        if (r.Ok) { copied++; if (r.Fixed) fixedCount++; didImport = true; TrackImported(importedRefs, item, item.FileName); }
+                        if (r.Ok) { copied++; if (r.Fixed) fixedCount++; didImport = true; TrackImported(importedRefs, item, item.FileName); TrackCopiedIncoming(copiedIncoming, session, item); }
                         else { failed++; ok = false; reason = "copy failed"; }
                         break;
                     }
                     case ImportDecision.ImportAndFix:
                     {
                         var r = await CopyItemAsync(item, Path.Combine(mount, item.FileName), fix: true, cancellationToken).ConfigureAwait(false);
-                        if (r.Ok) { copied++; if (r.Fixed) fixedCount++; didImport = true; TrackImported(importedRefs, item, item.FileName); }
+                        if (r.Ok) { copied++; if (r.Fixed) fixedCount++; didImport = true; TrackImported(importedRefs, item, item.FileName); TrackCopiedIncoming(copiedIncoming, session, item); }
                         else { failed++; ok = false; reason = "copy failed"; }
                         break;
                     }
@@ -577,14 +578,14 @@ public sealed class EfImportService(
                     {
                         var targetName = RenameTarget(item);
                         var r = await CopyItemAsync(item, Uniquify(Path.Combine(mount, targetName)), item.Signals.GbkEntryCount > 0, cancellationToken).ConfigureAwait(false);
-                        if (r.Ok) { renamed++; if (r.Fixed) fixedCount++; didImport = true; TrackImported(importedRefs, item, targetName); reason = "→ " + targetName; }
+                        if (r.Ok) { renamed++; if (r.Fixed) fixedCount++; didImport = true; TrackImported(importedRefs, item, targetName); reason = "→ " + targetName; TrackCopiedIncoming(copiedIncoming, session, item); }
                         else { failed++; ok = false; reason = "copy failed"; }
                         break;
                     }
                     case ImportDecision.KeepBoth:
                     {
                         var r = await CopyItemAsync(item, Uniquify(Path.Combine(mount, item.FileName)), item.Signals.GbkEntryCount > 0, cancellationToken).ConfigureAwait(false);
-                        if (r.Ok) { copied++; if (r.Fixed) fixedCount++; didImport = true; TrackImported(importedRefs, item, item.FileName); }
+                        if (r.Ok) { copied++; if (r.Fixed) fixedCount++; didImport = true; TrackImported(importedRefs, item, item.FileName); TrackCopiedIncoming(copiedIncoming, session, item); }
                         else { failed++; ok = false; reason = "copy failed"; }
                         break;
                     }
@@ -650,9 +651,9 @@ public sealed class EfImportService(
                     cancellationToken).ConfigureAwait(false);
 
             if (cancelled)
-                throw new OperationCanceledException(cancellationToken);
+                return new ApplyResult(copied, fixedCount, renamed, skipped, discarded, failed, runId, copiedIncoming, Cancelled: true);
 
-            return new ApplyResult(copied, fixedCount, renamed, skipped, discarded, failed, runId);
+            return new ApplyResult(copied, fixedCount, renamed, skipped, discarded, failed, runId, copiedIncoming);
         }
         finally
         {
@@ -686,6 +687,28 @@ public sealed class EfImportService(
         var name = Path.GetFileNameWithoutExtension(landedFileName);
         if (!string.IsNullOrWhiteSpace(name))
             refs.Add(name);
+    }
+
+    /// <summary>
+    /// Remember loose source paths that were successfully copied (for Trash originals). Skips archive extracts
+    /// under the session temp root and anything under a link-farm directory.
+    /// </summary>
+    private static void TrackCopiedIncoming(List<string> copiedIncoming, ImportSession session, ImportItem item)
+    {
+        var path = item.IncomingPath;
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+        if (!string.IsNullOrEmpty(session.TempRoot)
+            && path.StartsWith(session.TempRoot, StringComparison.OrdinalIgnoreCase))
+            return;
+        if (!LooseVarEnumerator.IsRealFile(path))
+            return;
+        if (!string.IsNullOrWhiteSpace(item.SourcePath)
+            && Directory.Exists(item.SourcePath)
+            && LooseVarEnumerator.IsUnderLinkDirectory(item.SourcePath, path))
+            return;
+        if (!copiedIncoming.Contains(path, StringComparer.OrdinalIgnoreCase))
+            copiedIncoming.Add(path);
     }
 
     /// <summary>

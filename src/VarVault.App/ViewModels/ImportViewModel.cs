@@ -4,6 +4,8 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VarVault.App.Services;
 using VarVault.Common;
+using VarVault.Domain.Indexing;
+using VarVault.Domain.Safety;
 using VarVault.Sdk.Import;
 using VarVault.Sdk.Paging;
 using VarVault.Sdk.Repositories;
@@ -114,20 +116,27 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
     private readonly IRepositoryService _repos;
     private readonly ImportJobRunner _jobs;
     private readonly IUiDispatcher _ui;
+    private readonly IAddonPackagesLooseVarsLocator? _looseLocator;
+    private readonly ITrashService? _trash;
 
     private JobHandle? _activeJob;
     private CancellationTokenSource? _progressPollCts;
+    private readonly List<string> _pendingTrashOriginals = [];
 
     public ImportViewModel(
         IImportService import,
         IRepositoryService repos,
         ImportJobRunner jobs,
-        IUiDispatcher ui)
+        IUiDispatcher ui,
+        IAddonPackagesLooseVarsLocator? looseLocator = null,
+        ITrashService? trash = null)
     {
         _import = import;
         _repos = repos;
         _jobs = jobs;
         _ui = ui;
+        _looseLocator = looseLocator;
+        _trash = trash;
         Pager = new PagedListState<ImportItemViewModel>(LoadPageAsync);
         HistoryOutcomesPager = new PagedListState<ImportOutcomeRow>(LoadHistoryOutcomePageAsync, defaultPageSize: 25);
     }
@@ -236,7 +245,7 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
             if (TargetRepo is null)
                 return "Choose a target repository (Import into).";
             if (SourcePaths.Count == 0)
-                return "Add at least one folder or archive with + Folder… / + Archive….";
+                return "Add at least one folder or archive — or use Quick import (profile) for in-game downloads.";
             if (_session is not null && ReviewRemaining > 0 && CanApply)
                 return $"{ReviewRemaining} undecided — Apply will skip them (keep repo / don’t import). Or Accept recommendations.";
             if (_session is not null && ReviewRemaining > 0)
@@ -268,6 +277,27 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
     public bool CanScan => TargetRepo is not null && SourcePaths.Count > 0 && !IsScanning && !IsApplying;
     public bool HasUndecidedReview => ReviewRemaining > 0;
 
+    /// <summary>When true (default for Quick import sessions), trash successfully copied profile originals after Apply.</summary>
+    [ObservableProperty] private bool _trashOriginalsAfterApply;
+
+    [ObservableProperty] private string? _quickImportHint;
+    [ObservableProperty] private bool _isRefreshingQuickImport;
+
+    public bool CanQuickImport =>
+        _looseLocator is not null
+        && TargetRepo is not null
+        && !IsScanning
+        && !IsApplying
+        && CanEditSources;
+
+    public bool CanTrashOriginals =>
+        _trash is not null
+        && _pendingTrashOriginals.Count > 0
+        && !IsScanning
+        && !IsApplying;
+
+    public int PendingTrashOriginalsCount => _pendingTrashOriginals.Count;
+
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {
         Repositories.Clear();
@@ -275,7 +305,114 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
             Repositories.Add(r);
         TargetRepo ??= Repositories.FirstOrDefault(r => r.Tier == Repositories.Min(x => x.Tier)) ?? Repositories.FirstOrDefault();
         await RefreshHistoryAsync(cancellationToken).ConfigureAwait(true);
+        await RefreshQuickImportHintAsync(cancellationToken).ConfigureAwait(true);
         NotifyGate();
+    }
+
+    /// <summary>Refresh the Quick import status line (loose vars in the active profile).</summary>
+    [RelayCommand]
+    public async Task RefreshQuickImportHintAsync(CancellationToken cancellationToken = default)
+    {
+        if (_looseLocator is null)
+        {
+            QuickImportHint = null;
+            NotifyQuickImport();
+            return;
+        }
+
+        IsRefreshingQuickImport = true;
+        try
+        {
+            var locate = await _looseLocator.LocateAsync(cancellationToken).ConfigureAwait(true);
+            QuickImportHint = locate.Hint;
+        }
+        catch (Exception ex)
+        {
+            QuickImportHint = $"Can't read active profile: {ex.Message}";
+        }
+        finally
+        {
+            IsRefreshingQuickImport = false;
+            NotifyQuickImport();
+        }
+    }
+
+    /// <summary>
+    /// One-click source = active VaM profile folder (in-game downloads next to symlinks), then Scan.
+    /// Symlink farms are skipped by the import enumerator.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanQuickImport))]
+    public async Task QuickImportAsync(CancellationToken cancellationToken = default)
+    {
+        if (_looseLocator is null || TargetRepo is null)
+            return;
+
+        var locate = await _looseLocator.LocateAsync(cancellationToken).ConfigureAwait(true);
+        QuickImportHint = locate.Hint;
+        if (locate.Status != LooseVarsLocateStatus.Ready || string.IsNullOrWhiteSpace(locate.ProfilePath))
+        {
+            StatusMessage = locate.Hint;
+            NotifyQuickImport();
+            return;
+        }
+
+        if (locate.LooseVarCount == 0)
+        {
+            StatusMessage = locate.Hint;
+            NotifyQuickImport();
+            return;
+        }
+
+        // Replace pending sources with the profile path only (tidy session).
+        if (IsApplying)
+            return;
+        if (_session is not null)
+            ClearSessionKeepSources();
+        SourcePaths.Clear();
+        SourcePaths.Add(locate.ProfilePath);
+        TrashOriginalsAfterApply = true;
+        NotifyPendingSources();
+        StatusMessage = $"Quick import: {locate.LooseVarCount} loose var(s) from “{locate.ProfileName}”.";
+        NotifyGate();
+        await ScanAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Move successfully imported loose profile <c>.var</c> originals into VarVault Trash (restorable).
+    /// Never touches symlinks or link-farm dirs. Explicit tidy — does not change Discard semantics.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanTrashOriginals))]
+    public async Task TrashOriginalsAsync(CancellationToken cancellationToken = default)
+    {
+        if (_trash is null || _pendingTrashOriginals.Count == 0)
+            return;
+
+        var trashed = 0;
+        var failed = 0;
+        foreach (var path in _pendingTrashOriginals.ToList())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!IsSafeToTrashOriginal(path))
+            {
+                failed++;
+                continue;
+            }
+
+            var result = await _trash.TrashAsync(path, "import.tidy-original", cancellationToken).ConfigureAwait(true);
+            if (result.IsSuccess)
+            {
+                trashed++;
+                _pendingTrashOriginals.Remove(path);
+            }
+            else
+                failed++;
+        }
+
+        StatusMessage = failed == 0
+            ? $"Trashed {trashed} original{(trashed == 1 ? "" : "s")} from profile."
+            : $"Trashed {trashed} · skipped/failed {failed} (symlinks and missing files are left alone).";
+        await RefreshQuickImportHintAsync(cancellationToken).ConfigureAwait(true);
+        NotifyTrashOriginals();
     }
 
     /// <summary>"+ Folder…" — pick one or more source folders via the native OS dialog. (QoL)</summary>
@@ -503,17 +640,27 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
             StartProgressMirror(job.Handle);
 
             var r = await job.Result.ConfigureAwait(true);
-            StatusMessage = $"Done: copied {r.Copied} · fixed {r.Fixed} · renamed {r.Renamed} · skipped {r.Skipped} · discarded {r.Discarded}"
-                            + (r.Failed > 0 ? $" · failed {r.Failed}" : "");
+            CapturePendingTrashOriginals(r);
+            StatusMessage = r.Cancelled
+                ? $"Import cancelled — kept {r.Copied + r.Renamed} copied · skipped {r.Skipped} (logged to History)."
+                : $"Done: copied {r.Copied} · fixed {r.Fixed} · renamed {r.Renamed} · skipped {r.Skipped} · discarded {r.Discarded}"
+                  + (r.Failed > 0 ? $" · failed {r.Failed}" : "");
             ResetAfterApply();
             await RefreshHistoryAsync().ConfigureAwait(true);
+            // Don't gate on CanTrashOriginals — that requires !IsApplying, and we are still applying until finally.
+            if (TrashOriginalsAfterApply && _trash is not null && _pendingTrashOriginals.Count > 0)
+                await TrashOriginalsAsync().ConfigureAwait(true);
+            else
+                NotifyTrashOriginals();
+            await RefreshQuickImportHintAsync().ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
-            // Apply always cleans temp in its finally — session paths are gone.
+            // Job-level cancel before Apply returns (rare); temp already cleaned by Apply finally when it ran.
             ResetAfterApply();
             StatusMessage = "Import cancelled — copied items are kept, the rest skipped (logged to History).";
             await RefreshHistoryAsync().ConfigureAwait(true);
+            NotifyTrashOriginals();
         }
         catch (Exception ex)
         {
@@ -599,6 +746,52 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
         Selected = null;
         OnPropertyChanged(nameof(HasWarnings));
         NotifyPendingSources();
+    }
+
+    /// <summary>
+    /// Remember successfully-copied loose source files (not archive extracts under TempRoot) for Trash originals.
+    /// Unions with any prior pending paths so a second Apply does not drop untidy originals from the first.
+    /// </summary>
+    private void CapturePendingTrashOriginals(ApplyResult result)
+    {
+        foreach (var path in result.CopiedIncomingPaths ?? [])
+        {
+            if (!IsSafeToTrashOriginal(path))
+                continue;
+            if (!_pendingTrashOriginals.Contains(path, StringComparer.OrdinalIgnoreCase))
+                _pendingTrashOriginals.Add(path);
+        }
+        NotifyTrashOriginals();
+    }
+
+    private static bool IsSafeToTrashOriginal(string path, string? sourceFolder = null)
+    {
+        if (!LooseVarEnumerator.IsRealFile(path))
+            return false;
+        if (!string.IsNullOrWhiteSpace(sourceFolder)
+            && Directory.Exists(sourceFolder)
+            && LooseVarEnumerator.IsUnderLinkDirectory(sourceFolder, path))
+            return false;
+        // Absolute safety: refuse any path whose segment is a link-farm name.
+        foreach (var segment in path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+        {
+            if (RepositoryScanRules.IsLinkDirectory(segment))
+                return false;
+        }
+        return true;
+    }
+
+    private void NotifyQuickImport()
+    {
+        OnPropertyChanged(nameof(CanQuickImport));
+        QuickImportCommand.NotifyCanExecuteChanged();
+    }
+
+    private void NotifyTrashOriginals()
+    {
+        OnPropertyChanged(nameof(CanTrashOriginals));
+        OnPropertyChanged(nameof(PendingTrashOriginalsCount));
+        TrashOriginalsCommand.NotifyCanExecuteChanged();
     }
 
     private static void DiscardTemp(string? root)
@@ -885,6 +1078,8 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
         OnPropertyChanged(nameof(SourcesSummary));
         ScanCommand.NotifyCanExecuteChanged();
         ApplyCommand.NotifyCanExecuteChanged();
+        NotifyQuickImport();
+        NotifyTrashOriginals();
     }
 
     [RelayCommand(CanExecute = nameof(CanPreviousPage))]

@@ -20,6 +20,7 @@ public interface IDialogLauncher
     void OpenVarDetail(long packageId);
     void OpenVarDetail(long packageId, bool push);
     void OpenAlias(string missingRef, Action? onSaved = null, string? suggestedOwnedQuery = null);
+    void OpenManageAliases(Action? onChanged = null, string? focusMissingRef = null, string? suggestedOwnedQuery = null);
     void OpenConfirmDelete(IReadOnlyList<ConfirmItem> items, int reverseDepCount = 0);
     void OpenFix(long varFileId, string? codepage);
     void OpenDupeReview(VarVault.Sdk.Library.DuplicateGroup group);
@@ -83,7 +84,8 @@ public sealed class DialogLauncher(
         var vm = new AliasViewModel(
             services.GetRequiredService<Sdk.Library.IAliasService>(),
             services.GetService<Sdk.Library.ILibraryQueryService>(),
-            close: () => dialogs.Back())
+            close: () => dialogs.Back(),
+            clipboard: services.GetService<IClipboard>() ?? new AvaloniaClipboard())
         {
             OnSaved = onSaved,
         };
@@ -91,6 +93,24 @@ public sealed class DialogLauncher(
         if (!string.IsNullOrWhiteSpace(suggestedOwnedQuery))
             vm.OwnedQuery = suggestedOwnedQuery;
         dialogs.Push(vm);
+    }
+
+    public void OpenManageAliases(Action? onChanged = null, string? focusMissingRef = null, string? suggestedOwnedQuery = null)
+    {
+        var vm = new ManageAliasesViewModel(
+            services.GetRequiredService<Sdk.Library.IAliasService>(),
+            services.GetService<Sdk.Library.ILibraryQueryService>(),
+            services.GetService<IClipboard>() ?? new AvaloniaClipboard(),
+            close: () => dialogs.Close())
+        {
+            OnChanged = onChanged,
+        };
+        if (!string.IsNullOrWhiteSpace(focusMissingRef))
+            vm.MissingRef = focusMissingRef;
+        if (!string.IsNullOrWhiteSpace(suggestedOwnedQuery))
+            vm.OwnedQuery = suggestedOwnedQuery;
+        _ = vm.LoadAsync();
+        dialogs.Show(vm);
     }
 
     public void OpenConfirmDelete(IReadOnlyList<ConfirmItem> items, int reverseDepCount = 0)

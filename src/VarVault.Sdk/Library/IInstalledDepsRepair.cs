@@ -34,13 +34,14 @@ public sealed record InstalledDepsAnalysis(
 }
 
 /// <summary>
-/// Legacy <c>MissingDepends</c> / “Installed Packages”: analyse deps of packages active on the current
-/// VaM profile, auto-activate ones present in the library (incl. closest-version substitutes), and surface
-/// leftovers for alias Resolve. (varManager Form1.MissingDepends.)
+/// Legacy <c>MissingDepends</c> / “Installed Packages”, deepened: BFS from active packages through
+/// every resolvable dep (exact / latest / closest / alias) — same reach as legacy
+/// <c>VarsDependencies</c> + activation forward closure — then auto-activate found packages and
+/// surface leftovers for alias Resolve.
 /// </summary>
 public interface IInstalledDepsRepair
 {
-    /// <summary>Collect distinct deps of <c>PackageListItem.IsActive</c> packages and resolve each against the catalog.</summary>
+    /// <summary>BFS deps of <c>PackageListItem.IsActive</c> packages (transitive) and resolve each against the catalog.</summary>
     Task<InstalledDepsAnalysis> AnalyzeAsync(CancellationToken cancellationToken = default);
 
     /// <summary>

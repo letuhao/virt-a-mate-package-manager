@@ -6,13 +6,16 @@
              x:Class="VarVault.App.Views.MissingView"
              x:DataType="vm:MissingDepsViewModel">
   <DockPanel Margin="18">
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,12">
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,12">
       <TextBlock Grid.Column="0" Text="Missing dependencies" FontSize="21" FontWeight="SemiBold"
                  Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center" />
       <Button Grid.Column="1" Content="Analyze installed" Command="{Binding AnalyzeInstalledCommand}"
               ToolTip.Tip="Analyze dependencies of packages installed on the active profile. Found deps are activated; leftovers need Resolve/alias."
               Margin="0,0,8,0" IsEnabled="{Binding CanAnalyzeInstalled}" />
-      <Button Grid.Column="2" Content="Export links txt" Command="{Binding ExportLinksCommand}" />
+      <Button Grid.Column="2" Content="Manage aliases…" Command="{Binding ManageAliasesCommand}"
+              ToolTip.Tip="Review, unlink, or add missing→owned aliases (like the old Missing Vars dialog)."
+              Margin="0,0,8,0" />
+      <Button Grid.Column="3" Content="Export links txt" Command="{Binding ExportLinksCommand}" />
     </Grid>
     <!-- Legacy Installed Packages / MissingDepends: active-set deps → activate found → alias leftovers -->
     <c:Card DockPanel.Dock="Top" Header="Repair from installed packages (analyze deps → activate what you have)" Margin="0,0,0,12"
@@ -22,27 +25,40 @@
         <TextBlock Text="{Binding InstalledActivationStatus}" Foreground="{DynamicResource GoodBrush}" FontSize="12"
                    TextWrapping="Wrap" IsVisible="{Binding InstalledActivationStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="2"
-                MaxHeight="180" IsVisible="{Binding HasInstalledLeftovers}">
-          <ScrollViewer>
-            <ItemsControl ItemsSource="{Binding InstalledLeftovers}">
-              <ItemsControl.ItemTemplate>
+                MaxHeight="260" IsVisible="{Binding HasInstalledLeftovers}">
+          <DockPanel>
+            <c:PaginationBar DockPanel.Dock="Bottom" Margin="4,6,4,2"
+                             PageNumber="{Binding LeftoverPageNumber}"
+                             PageCount="{Binding LeftoverPageCount}"
+                             PageSize="{Binding LeftoverPageSize}"
+                             TotalCount="{Binding LeftoverTotalCount}"
+                             SummaryLabel="{Binding LeftoverSummaryLabel}"
+                             PreviousCommand="{Binding LeftoverPreviousCommand}"
+                             NextCommand="{Binding LeftoverNextCommand}"
+                             GoToPageCommand="{Binding LeftoverGoToPageCommand}"
+                             PageSizeChangedCommand="{Binding LeftoverChangePageSizeCommand}" />
+            <ListBox ItemsSource="{Binding InstalledLeftovers}" BorderThickness="0" Background="Transparent">
+              <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="lib:InstalledDepsEntry">
-                  <Grid ColumnDefinitions="*,Auto,Auto" Height="26" Margin="6,0">
-                    <TextBlock Grid.Column="0" Text="{Binding Ref}" VerticalAlignment="Center"
-                               FontFamily="{DynamicResource MonoFont}" FontSize="11.5" TextTrimming="CharacterEllipsis" />
+                  <Grid ColumnDefinitions="*,Auto,Auto,Auto" MinHeight="28" Margin="4,0">
+                    <SelectableTextBlock Grid.Column="0" Text="{Binding Ref}" VerticalAlignment="Center"
+                                         FontFamily="{DynamicResource MonoFont}" FontSize="11.5" TextWrapping="NoWrap" />
                     <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="11" Margin="0,0,8,0" Opacity="0.7"
                                Text="{Binding ResolvedVarName, StringFormat='suggest → {0}'}"
                                IsVisible="{Binding ResolvedVarName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     <c:Tag Grid.Column="1" Kind="Crit" VerticalAlignment="Center" Content="missing — need import"
                            Margin="0,0,8,0" IsVisible="{Binding !InLibrary}" />
-                    <Button Grid.Column="2" Content="Resolve…"
+                    <Button Grid.Column="2" Content="Copy" Margin="0,0,6,0"
+                            Command="{Binding ((vm:MissingDepsViewModel)DataContext).CopyRefCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding Ref}" />
+                    <Button Grid.Column="3" Content="Resolve…"
                             Command="{Binding ((vm:MissingDepsViewModel)DataContext).ResolveInstalledLeftoverCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                             CommandParameter="{Binding}" />
                   </Grid>
                 </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </ScrollViewer>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </DockPanel>
         </Border>
       </StackPanel>
     </c:Card>
@@ -61,26 +77,27 @@
         <TextBlock Text="{Binding ActivationStatus}" Foreground="{DynamicResource GoodBrush}" FontSize="12"
                    TextWrapping="Wrap" IsVisible="{Binding ActivationStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
         <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="2"
-                MaxHeight="180" IsVisible="{Binding HasLogResult}">
-          <ScrollViewer>
-            <ItemsControl ItemsSource="{Binding LogEntries}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="lib:MissingLogEntry">
-                  <Grid ColumnDefinitions="*,Auto,Auto" Height="24" Margin="6,0">
-                    <TextBlock Grid.Column="0" Text="{Binding Ref}" VerticalAlignment="Center"
-                               FontFamily="{DynamicResource MonoFont}" FontSize="11.5" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="11" Margin="0,0,8,0" Opacity="0.7"
-                               Text="{Binding ResolvedVarName, StringFormat='→ {0}'}"
-                               IsVisible="{Binding InLibrary}" />
-                    <c:Tag Grid.Column="2" Kind="Good" VerticalAlignment="Center" IsVisible="{Binding InLibrary}"
-                           Content="{Binding RepositoryName, StringFormat='have · {0}'}" />
-                    <c:Tag Grid.Column="2" Kind="Crit" VerticalAlignment="Center" Content="missing — need import"
-                           IsVisible="{Binding !InLibrary}" />
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </ScrollViewer>
+                MaxHeight="220" IsVisible="{Binding HasLogResult}">
+          <ListBox ItemsSource="{Binding LogEntries}" BorderThickness="0" Background="Transparent">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="lib:MissingLogEntry">
+                <Grid ColumnDefinitions="*,Auto,Auto,Auto" MinHeight="26" Margin="4,0">
+                  <SelectableTextBlock Grid.Column="0" Text="{Binding Ref}" VerticalAlignment="Center"
+                                       FontFamily="{DynamicResource MonoFont}" FontSize="11.5" />
+                  <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="11" Margin="0,0,8,0" Opacity="0.7"
+                             Text="{Binding ResolvedVarName, StringFormat='→ {0}'}"
+                             IsVisible="{Binding InLibrary}" />
+                  <c:Tag Grid.Column="2" Kind="Good" VerticalAlignment="Center" IsVisible="{Binding InLibrary}"
+                         Content="{Binding RepositoryName, StringFormat='have · {0}'}" Margin="0,0,6,0" />
+                  <c:Tag Grid.Column="2" Kind="Crit" VerticalAlignment="Center" Content="missing — need import"
+                         IsVisible="{Binding !InLibrary}" Margin="0,0,6,0" />
+                  <Button Grid.Column="3" Content="Copy"
+                          Command="{Binding ((vm:MissingDepsViewModel)DataContext).CopyRefCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                          CommandParameter="{Binding Ref}" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
         </Border>
       </StackPanel>
     </c:Card>
@@ -100,25 +117,27 @@
                        GoToPageCommand="{Binding GoToPageCommand}"
                        PageSizeChangedCommand="{Binding ChangePageSizeCommand}" />
       <c:Card Header="Referenced packages not in your library">
-      <ScrollViewer>
-        <ItemsControl ItemsSource="{Binding Items}">
-          <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="lib:MissingDependency">
-              <Grid ColumnDefinitions="*,Auto,70,Auto" Height="26">
-                <TextBlock Grid.Column="0" Text="{Binding Ref}" VerticalAlignment="Center" FontFamily="{DynamicResource MonoFont}" />
-                <TextBlock Grid.Column="1" Text="{Binding NeededByCount, StringFormat='{}{0} pkgs'}" VerticalAlignment="Center" Opacity="0.7" Margin="0,0,12,0" />
-                <c:Tag Grid.Column="2" Content="{Binding AliasTarget, StringFormat='alias → {0}'}" VerticalAlignment="Center"
-                       IsVisible="{Binding AliasTarget, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                <c:Tag Grid.Column="2" Content="no alias" VerticalAlignment="Center" Opacity="0.55"
-                       IsVisible="{Binding AliasTarget, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
-                <Button Grid.Column="3" Content="Resolve…"
-                        Command="{Binding ((vm:MissingDepsViewModel)DataContext).ResolveCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                        CommandParameter="{Binding}" />
-              </Grid>
-            </DataTemplate>
-          </ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </ScrollViewer>
+      <ListBox ItemsSource="{Binding Items}" BorderThickness="0" Background="Transparent">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="lib:MissingDependency">
+            <Grid ColumnDefinitions="*,Auto,70,Auto,Auto" MinHeight="28">
+              <SelectableTextBlock Grid.Column="0" Text="{Binding Ref}" VerticalAlignment="Center"
+                                   FontFamily="{DynamicResource MonoFont}" />
+              <TextBlock Grid.Column="1" Text="{Binding NeededByCount, StringFormat='{}{0} pkgs'}" VerticalAlignment="Center" Opacity="0.7" Margin="0,0,12,0" />
+              <c:Tag Grid.Column="2" Content="{Binding AliasTarget, StringFormat='alias → {0}'}" VerticalAlignment="Center"
+                     IsVisible="{Binding AliasTarget, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <c:Tag Grid.Column="2" Content="no alias" VerticalAlignment="Center" Opacity="0.55"
+                     IsVisible="{Binding AliasTarget, Converter={x:Static StringConverters.IsNullOrEmpty}}" />
+              <Button Grid.Column="3" Content="Copy" Margin="0,0,6,0"
+                      Command="{Binding ((vm:MissingDepsViewModel)DataContext).CopyRefCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                      CommandParameter="{Binding Ref}" />
+              <Button Grid.Column="4" Content="Resolve…"
+                      Command="{Binding ((vm:MissingDepsViewModel)DataContext).ResolveCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                      CommandParameter="{Binding}" />
+            </Grid>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
       </c:Card>
     </DockPanel>
     <TextBlock DockPanel.Dock="Top" Text="No missing dependencies." Opacity="0.6" IsVisible="{Binding IsEmpty}" Margin="0,8,0,0" />

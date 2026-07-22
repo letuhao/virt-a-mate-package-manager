@@ -1,0 +1,81 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             xmlns:lib="clr-namespace:VarVault.Sdk.Library;assembly=VarVault.Sdk"
+             x:Class="VarVault.App.Views.ManageAliasesDialog"
+             x:DataType="vm:ManageAliasesViewModel">
+  <!-- FormMissingVars-inspired: left = aliases (review/unlink), right = link missing → owned -->
+  <DockPanel MinWidth="720" MinHeight="420" MaxHeight="560">
+    <DockPanel DockPanel.Dock="Bottom" Margin="0,12,0,0">
+      <Button DockPanel.Dock="Right" Content="Done" Command="{Binding CloseCommand}" MinWidth="88" />
+      <TextBlock Text="{Binding StatusMessage}" Opacity="0.85" VerticalAlignment="Center" TextWrapping="Wrap"
+                 Foreground="{DynamicResource GoodBrush}" Margin="0,0,12,0" />
+      <TextBlock Text="{Binding ClipboardStatus}" Opacity="0.65" VerticalAlignment="Center" FontSize="11"
+                 IsVisible="{Binding ClipboardStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+    </DockPanel>
+
+    <Grid ColumnDefinitions="*,12,*" RowDefinitions="Auto,*">
+      <!-- Left: saved aliases -->
+      <DockPanel Grid.Column="0" Grid.Row="0" Grid.RowSpan="2">
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,8">
+          <TextBlock Text="Saved aliases" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+          <TextBlock Text="{Binding AliasSummary}" Opacity="0.7" FontSize="11.5" TextWrapping="Wrap" />
+          <TextBox Watermark="filter aliases…" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}" />
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+          <Button Content="Copy missing" Command="{Binding CopyMissingCommand}" />
+          <Button Content="Copy target" Command="{Binding CopyTargetCommand}" />
+          <Button Content="Unlink" Command="{Binding UnlinkCommand}"
+                  Background="{DynamicResource CritBrush}" Foreground="White" />
+        </StackPanel>
+        <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
+          <ListBox ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedAlias}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="lib:AliasDto">
+                <Grid ColumnDefinitions="*,Auto" Margin="2,2">
+                  <StackPanel Spacing="1">
+                    <SelectableTextBlock Text="{Binding MissingRef}" FontFamily="{DynamicResource MonoFont}" FontSize="11.5" />
+                    <TextBlock Text="{Binding ResolvedVarName, StringFormat='→ {0}'}" Opacity="0.7" FontSize="11"
+                               FontFamily="{DynamicResource MonoFont}" />
+                  </StackPanel>
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
+      </DockPanel>
+
+      <!-- Right: link / add -->
+      <StackPanel Grid.Column="2" Grid.Row="0" Spacing="6" Margin="0,0,0,8">
+        <TextBlock Text="Link missing → owned" FontSize="15" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+        <TextBlock Text="Type or paste a missing package name, pick a substitute from your library, then Link. That creates a ___MissingVarLink___ symlink on the active profile (legacy Createlink)."
+                   Opacity="0.7" FontSize="11.5" TextWrapping="Wrap" />
+        <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+          <TextBox Grid.Column="0" Watermark="Missing.Package.1"
+                   Text="{Binding MissingRef, UpdateSourceTrigger=PropertyChanged}"
+                   FontFamily="{DynamicResource MonoFont}" />
+          <Button Grid.Column="1" Content="Copy" Command="{Binding CopyMissingCommand}" Margin="6,0,0,0" />
+        </Grid>
+        <TextBox Watermark="search owned library…"
+                 Text="{Binding OwnedQuery, UpdateSourceTrigger=PropertyChanged}" />
+      </StackPanel>
+      <DockPanel Grid.Column="2" Grid.Row="1">
+        <Button DockPanel.Dock="Bottom" Content="Link alias" Command="{Binding LinkCommand}"
+                Background="{DynamicResource AccentBrush}" Foreground="White" Margin="0,8,0,0"
+                HorizontalAlignment="Stretch" />
+        <TextBlock DockPanel.Dock="Bottom" Text="{Binding SelectedOwned.VarName, StringFormat='Will map to {0}'}"
+                   Opacity="0.75" Foreground="{DynamicResource GoodBrush}" Margin="0,6,0,0"
+                   IsVisible="{Binding CanLink}" FontFamily="{DynamicResource MonoFont}" FontSize="11.5" />
+        <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6">
+          <ListBox ItemsSource="{Binding OwnedMatches}" SelectedItem="{Binding SelectedOwned}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="lib:PackageListEntry">
+                <SelectableTextBlock Text="{Binding VarName}" FontFamily="{DynamicResource MonoFont}" FontSize="12" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
+      </DockPanel>
+    </Grid>
+  </DockPanel>
+</UserControl>

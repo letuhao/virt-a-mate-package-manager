@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using VarVault.App.Services;
 using VarVault.App.ViewModels;
+using VarVault.Domain.Safety;
 using VarVault.Sdk.Import;
 using VarVault.Sdk.Repositories;
 using VarVault.Sdk.Threading;
@@ -14,7 +15,9 @@ internal static class ImportTestHelpers
             services.GetRequiredService<IImportService>(),
             services.GetRequiredService<IRepositoryService>(),
             services.GetRequiredService<ImportJobRunner>(),
-            services.GetRequiredService<IUiDispatcher>());
+            services.GetRequiredService<IUiDispatcher>(),
+            services.GetService<IAddonPackagesLooseVarsLocator>(),
+            services.GetService<ITrashService>());
 
     public static void RegisterImportJobs(IServiceCollection services) =>
         services.AddSingleton<ImportJobRunner>();

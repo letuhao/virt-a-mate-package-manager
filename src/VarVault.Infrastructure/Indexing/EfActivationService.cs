@@ -146,26 +146,25 @@ public sealed class EfActivationService(
                 unresolved.Add((m.PackageRefKey, m.PackageRefRaw));
         }
 
-        var aliases = new List<AliasMapping>();
+        // All in-scope aliases → ___MissingVarLink___ (legacy Createlink): not only unresolved members.
+        // Dependency aliases must land on disk under the missing name so VaM can resolve them.
+        var aliasRows = await db.VarAliases.AsNoTracking()
+            .Where(a => a.ResolvedPackageId != null
+                        && (a.Scope == AliasScope.Global || a.PresetId == presetId))
+            .Select(a => new { a.MissingRefKey, a.MissingRefRaw, TargetId = a.ResolvedPackageId!.Value })
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        var aliases = aliasRows
+            .GroupBy(a => a.MissingRefKey, StringComparer.Ordinal)
+            .Select(g => g.First())
+            .Select(a => new AliasMapping(a.MissingRefKey, a.MissingRefRaw, a.TargetId))
+            .ToList();
+        var aliasedKeys = aliases.Select(a => a.MissingRefKey).ToHashSet(StringComparer.Ordinal);
+
         var stillUnresolved = new List<string>();
-        if (unresolved.Count > 0)
+        foreach (var u in unresolved)
         {
-            var unresolvedKeys = unresolved.Select(u => u.Key).ToList();
-            // Persistent aliases (global + per-preset) re-apply automatically every build — no re-setup. (3.9)
-            var matched = await db.VarAliases.AsNoTracking()
-                .Where(a => a.ResolvedPackageId != null
-                            && unresolvedKeys.Contains(a.MissingRefKey)
-                            && (a.Scope == AliasScope.Global || a.PresetId == presetId))
-                .Select(a => new { a.MissingRefKey, a.MissingRefRaw, TargetId = a.ResolvedPackageId!.Value })
-                .ToListAsync(cancellationToken).ConfigureAwait(false);
-            var aliasedKeys = matched.Select(a => a.MissingRefKey).ToHashSet(StringComparer.Ordinal);
-            foreach (var a in matched)
-                aliases.Add(new AliasMapping(a.MissingRefKey, a.MissingRefRaw, a.TargetId));
-            foreach (var u in unresolved)
-            {
-                if (!aliasedKeys.Contains(u.Key))
-                    stillUnresolved.Add(u.Raw);
-            }
+            if (!aliasedKeys.Contains(u.Key))
+                stillUnresolved.Add(u.Raw);
         }
 
         return (ids, aliases, stillUnresolved);
@@ -257,7 +256,7 @@ public sealed class EfActivationService(
                 continue;
             }
 
-            var fileName = ActivationPaths.LinkFileName(alias.MissingRefRaw);
+            var fileName = ActivationPaths.AliasLinkFileName(alias.MissingRefRaw, copy.VarName);
             if (fileName.IsFailure)
             {
                 logger.LogWarning("Skipping alias link for {MissingRef}: {Reason}", alias.MissingRefRaw, fileName.Error.Message);

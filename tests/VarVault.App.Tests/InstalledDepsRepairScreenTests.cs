@@ -67,7 +67,56 @@ public sealed class InstalledDepsRepairScreenTests
         Assert.Contains("Analyzed 3 installed", vm.InstalledStatus);
 
         vm.ResolveInstalledLeftoverCommand.Execute(vm.InstalledLeftovers.Single(e => e.Ref == "A.Pack.2"));
-        Assert.Contains("alias:A.Pack.2:A.Pack.1", launcher.Opened);
+        Assert.Contains("manage-aliases:A.Pack.2:A.Pack.1", launcher.Opened);
+    }
+
+    [Fact]
+    public async Task Alias_changed_removes_leftover_without_reanalyze()
+    {
+        var repair = new StubRepair
+        {
+            Analysis = new InstalledDepsAnalysis(
+            [
+                new("Ghost.Missing.9", false, null, InstalledDepsResolveVia.None, 2, NeedsAlias: true),
+                new("A.Pack.2", true, "A.Pack.1", InstalledDepsResolveVia.Closest, 1, NeedsAlias: true),
+            ], ActivePackageCount: 2),
+        };
+        var vm = new MissingDepsViewModel(new StubMissing(), installedRepair: repair);
+        await vm.AnalyzeInstalledCommand.ExecuteAsync(null);
+        Assert.Equal(2, vm.LeftoverTotalCount);
+
+        await vm.OnAliasChangedAsync("A.Pack.2");
+
+        Assert.Equal(1, vm.LeftoverTotalCount);
+        Assert.DoesNotContain(vm.InstalledLeftovers, e => e.Ref == "A.Pack.2");
+        Assert.Contains(vm.InstalledLeftovers, e => e.Ref == "Ghost.Missing.9");
+    }
+
+    [Fact]
+    public async Task Leftover_paging_slices_large_sets()
+    {
+        var leftovers = Enumerable.Range(1, 120)
+            .Select(i => new InstalledDepsEntry($"Ghost.Missing.{i}", false, null, InstalledDepsResolveVia.None, 1, NeedsAlias: true))
+            .ToList();
+        var repair = new StubRepair
+        {
+            Analysis = new InstalledDepsAnalysis(leftovers, ActivePackageCount: 1),
+        };
+        var vm = new MissingDepsViewModel(new StubMissing(), installedRepair: repair);
+        await vm.AnalyzeInstalledCommand.ExecuteAsync(null);
+
+        Assert.Equal(120, vm.LeftoverTotalCount);
+        Assert.Equal(50, vm.InstalledLeftovers.Count);
+        Assert.True(vm.CanLeftoverNext);
+
+        vm.LeftoverNextCommand.Execute(null);
+        Assert.Equal(2, vm.LeftoverPageNumber);
+        Assert.Equal(50, vm.InstalledLeftovers.Count);
+
+        vm.LeftoverChangePageSizeCommand.Execute(100);
+        Assert.Equal(1, vm.LeftoverPageNumber);
+        Assert.Equal(100, vm.InstalledLeftovers.Count);
+        Assert.Equal(2, vm.LeftoverPageCount);
     }
 
     [Fact]

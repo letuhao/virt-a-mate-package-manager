@@ -21,6 +21,12 @@ public sealed class FakeDialogLauncher : IDialogLauncher
     public void OpenVarDetail(long packageId, bool push) => Opened.Add($"var-detail:{packageId}{(push ? ":push" : "")}");
     public void OpenAlias(string missingRef, Action? onSaved = null, string? suggestedOwnedQuery = null) =>
         Opened.Add(string.IsNullOrWhiteSpace(suggestedOwnedQuery) ? $"alias:{missingRef}" : $"alias:{missingRef}:{suggestedOwnedQuery}");
+    public void OpenManageAliases(Action? onChanged = null, string? focusMissingRef = null, string? suggestedOwnedQuery = null) =>
+        Opened.Add(string.IsNullOrWhiteSpace(focusMissingRef)
+            ? "manage-aliases"
+            : string.IsNullOrWhiteSpace(suggestedOwnedQuery)
+                ? $"manage-aliases:{focusMissingRef}"
+                : $"manage-aliases:{focusMissingRef}:{suggestedOwnedQuery}");
     public void OpenConfirmDelete(IReadOnlyList<ConfirmItem> items, int reverseDepCount = 0) => Opened.Add($"confirm:{items.Count}");
     public void OpenFix(long varFileId, string? codepage) => Opened.Add($"fix:{codepage}");
     public void OpenDupeReview(DuplicateGroup group) => Opened.Add($"dupe:{group.IdentityKey}");

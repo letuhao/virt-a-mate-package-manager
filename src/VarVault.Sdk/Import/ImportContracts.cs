@@ -80,7 +80,21 @@ public sealed record ImportSession(
 }
 
 /// <summary>Result of applying a session. (doc 30 §5.)</summary>
-public sealed record ApplyResult(int Copied, int Fixed, int Renamed, int Skipped, int Discarded, int Failed, Guid RunId);
+/// <param name="CopiedIncomingPaths">
+/// Absolute paths of source <c>.var</c> files that were successfully durable-copied (for profile tidy / Trash originals).
+/// Excludes archive extracts under the session temp root.
+/// </param>
+/// <param name="Cancelled">True when the apply stopped early on a graceful cancel (partial copies may still be listed).</param>
+public sealed record ApplyResult(
+    int Copied,
+    int Fixed,
+    int Renamed,
+    int Skipped,
+    int Discarded,
+    int Failed,
+    Guid RunId,
+    IReadOnlyList<string>? CopiedIncomingPaths = null,
+    bool Cancelled = false);
 
 /// <summary>A failed source recorded in history (password/corrupt/space). (doc 30 §8.)</summary>
 public sealed record ImportFailedSource(string Path, ImportSourceKind Kind, string Reason);

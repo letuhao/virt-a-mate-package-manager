@@ -192,7 +192,7 @@ public class FullAppWalkthroughE2ETests
             if (missing.Items.Count > 0)
             {
                 missing.ResolveCommand.Execute(missing.Items[0]);
-                Assert.IsType<AliasViewModel>(shell.Dialogs.Current); // DIALOG: alias
+                Assert.IsType<ManageAliasesViewModel>(shell.Dialogs.Current); // DIALOG: manage aliases
                 shell.Dialogs.Close();
             }
             UiE2E.Screenshot(window, "walk-11-missing");

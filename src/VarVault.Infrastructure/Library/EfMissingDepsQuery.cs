@@ -57,7 +57,18 @@ public sealed class EfMissingDepsQuery(VarVaultDbContext db) : IMissingDepsQuery
 
     public async Task<IReadOnlyList<MissingDependency>> GetMissingAsync(CancellationToken cancellationToken = default)
     {
-        var first = await GetPageAsync(new PageRequest(1, 100), cancellationToken: cancellationToken).ConfigureAwait(false);
-        return first.Items;
+        const int pageSize = 500;
+        var all = new List<MissingDependency>();
+        var pageNumber = 1;
+        while (true)
+        {
+            var page = await GetPageAsync(new PageRequest(pageNumber, pageSize), cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+            all.AddRange(page.Items);
+            if (all.Count >= page.TotalCount || page.Items.Count == 0)
+                break;
+            pageNumber++;
+        }
+        return all;
     }
 }

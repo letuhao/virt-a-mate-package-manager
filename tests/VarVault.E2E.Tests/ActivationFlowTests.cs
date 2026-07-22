@@ -415,6 +415,80 @@ public sealed class ActivationFlowTests
         Assert.Equal(Path.Combine(repoDir.Path, "Real.Target.1.var"), new FileInfo(aliasLink).LinkTarget);
     }
 
+    [Fact]
+    public async Task Dependency_alias_creates_MissingVarLink_not_only_member_aliases()
+    {
+        // Legacy FormMissingVars: alias a *dependency* name → owned file under ___MissingVarLink___.
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        using var vamDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+        WriteVar(repoDir, "A.Look.1.var", "A", "Look", "Gone.Missing.1");
+        WriteVar(repoDir, "Owned.Sub.2.var", "Owned", "Sub");
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        await SeedVamRoot(scope, vamDir.Path);
+        await scope.ServiceProvider.GetRequiredService<IDependencyResolver>().ResolveAllAsync();
+        var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+        var owned = await db.Packages.FirstAsync(p => p.VarName == "Owned.Sub.2");
+
+        var preset = (await scope.ServiceProvider.GetRequiredService<IPresetService>()
+            .CreateAsync("P", ["A.Look.1"])).Value;
+        db.VarAliases.Add(new VarAlias
+        {
+            MissingRefKey = VarVault.Domain.Identity.IdentityFold.Compute("Gone.Missing.1"),
+            MissingRefRaw = "Gone.Missing.1",
+            ResolvedPackageId = owned.Id,
+            ResolvedVarName = owned.VarName,
+            Scope = AliasScope.Global,
+            CreatedAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+        await scope.ServiceProvider.GetRequiredService<IDependencyResolver>().ResolveReferenceAsync("Gone.Missing.1");
+
+        var result = await scope.ServiceProvider.GetRequiredService<IActivationService>()
+            .BuildProfileLinksAsync(preset.Id);
+        if (result.PrivilegeFailures > 0) return;
+
+        var aliasLink = Path.Combine(ActivationPaths.MissingVarLinkDir(vamDir.Path, "P"), "Gone.Missing.1.var");
+        Assert.True(File.Exists(aliasLink), "dependency alias must create ___MissingVarLink___ symlink");
+        Assert.Equal(Path.Combine(repoDir.Path, "Owned.Sub.2.var"), new FileInfo(aliasLink).LinkTarget);
+        Assert.True(File.Exists(Path.Combine(ActivationPaths.VarsLinkDir(vamDir.Path, "P"), "A.Look.1.var")));
+    }
+
+    [Fact]
+    public async Task SetAlias_materializes_MissingVarLink_immediately()
+    {
+        // Legacy Createlink on OK — do not wait for a separate Activate.
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        using var vamDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+        WriteVar(repoDir, "A.Look.1.var", "A", "Look");
+        WriteVar(repoDir, "Owned.Sub.2.var", "Owned", "Sub");
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        await SeedVamRoot(scope, vamDir.Path);
+        await scope.ServiceProvider.GetRequiredService<IDependencyResolver>().ResolveAllAsync();
+        var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+        var owned = await db.Packages.FirstAsync(p => p.VarName == "Owned.Sub.2");
+
+        var preset = (await scope.ServiceProvider.GetRequiredService<IPresetService>()
+            .CreateAsync("P", ["A.Look.1"])).Value;
+        var activation = scope.ServiceProvider.GetRequiredService<IActivationService>();
+        var primed = await activation.BuildProfileLinksAsync(preset.Id);
+        if (primed.PrivilegeFailures > 0) return;
+
+        var aliases = scope.ServiceProvider.GetRequiredService<VarVault.Sdk.Library.IAliasService>();
+        Assert.True((await aliases.SetAsync("Ghost.Need.9", owned.Id)).IsSuccess);
+
+        var aliasLink = Path.Combine(ActivationPaths.MissingVarLinkDir(vamDir.Path, "P"), "Ghost.Need.9.var");
+        Assert.True(File.Exists(aliasLink), "SetAsync must Createlink immediately under ___MissingVarLink___");
+        Assert.Equal(Path.Combine(repoDir.Path, "Owned.Sub.2.var"), new FileInfo(aliasLink).LinkTarget);
+    }
+
     private static async Task SeedVamRoot(IServiceScope scope, string vamRoot) =>
         await scope.ServiceProvider.GetRequiredService<ISettingsService>().SetAsync(SettingKeys.VamPath, vamRoot);
 

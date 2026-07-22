@@ -52,6 +52,31 @@ public static class ActivationPaths
             : Result.Success($"{parsed.Value.VarName}.var");
     }
 
+    /// <summary>
+    /// Alias link filename under <c>___MissingVarLink___</c> (legacy <c>FormMissingVars.Createlink</c>).
+    /// Numeric missing refs keep their verbatim name; <c>.latest</c> is rewritten to the owned target's
+    /// version token so VaM can parse the link name.
+    /// </summary>
+    public static Result<string> AliasLinkFileName(string missingRefRaw, string targetVarName)
+    {
+        Guard.NotNullOrWhiteSpace(missingRefRaw);
+        Guard.NotNullOrWhiteSpace(targetVarName);
+
+        var missing = missingRefRaw.EndsWith(".var", StringComparison.OrdinalIgnoreCase)
+            ? missingRefRaw[..^4]
+            : missingRefRaw;
+        var lastDot = missing.LastIndexOf('.');
+        if (lastDot > 0 && string.Equals(missing[(lastDot + 1)..], "latest", StringComparison.OrdinalIgnoreCase))
+        {
+            var target = PackageId.TryParse(targetVarName);
+            if (target.IsFailure)
+                return Result.Failure<string>(target.Error.Code, target.Error.Message);
+            return Result.Success($"{missing[..lastDot]}.{target.Value.VersionToken}.var");
+        }
+
+        return LinkFileName(missing);
+    }
+
     /// <summary>Absolute path of a source var in its repository = repository mount + relative path.</summary>
     public static string SourcePath(string repositoryMountPath, string relativePath)
     {

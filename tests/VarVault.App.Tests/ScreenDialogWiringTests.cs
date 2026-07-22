@@ -53,12 +53,21 @@ public class ScreenDialogWiringTests
     }
 
     [Fact]
-    public void Missing_resolve_opens_alias_dialog()
+    public void Missing_resolve_opens_manage_aliases_dialog()
     {
         var l = new FakeDialogLauncher();
         var vm = new MissingDepsViewModel(new StubMissing(), l);
         vm.ResolveCommand.Execute(new MissingDependency("Gone.Deleted.1", 83));
-        Assert.Contains("alias:Gone.Deleted.1", l.Opened);
+        Assert.Contains("manage-aliases:Gone.Deleted.1", l.Opened);
+    }
+
+    [Fact]
+    public void Missing_manage_aliases_opens_dialog()
+    {
+        var l = new FakeDialogLauncher();
+        var vm = new MissingDepsViewModel(new StubMissing(), l);
+        vm.ManageAliasesCommand.Execute(null);
+        Assert.Contains("manage-aliases", l.Opened);
     }
 
     [Fact]

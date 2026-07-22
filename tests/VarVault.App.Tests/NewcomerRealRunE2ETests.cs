@@ -369,7 +369,7 @@ public class NewcomerRealRunE2ETests(ITestOutputHelper output)
         if (missing.Items.Count > 0)
         {
             missing.ResolveCommand.Execute(missing.Items[0]);
-            Line($"- Missing-deps alias dialog reachable: {shell.Dialogs.Current is AliasViewModel}");
+            Line($"- Missing-deps alias dialog reachable: {shell.Dialogs.Current is ManageAliasesViewModel}");
             shell.Dialogs.Close();
         }
         else Line("- Missing deps: none reported for this corpus.");

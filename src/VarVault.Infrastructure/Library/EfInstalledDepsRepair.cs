@@ -11,9 +11,11 @@ using VarVault.Sdk.Presets;
 namespace VarVault.Infrastructure.Library;
 
 /// <summary>
-/// Legacy Installed Packages / <c>MissingDepends</c>: analyse dependencies of packages active on the
-/// current profile (<see cref="PackageListItem.IsActive"/>), resolve via <see cref="VersionResolver"/>
-/// (exact / latest / closest) with alias fallback, and activate found names into the active loading preset.
+/// Installed-packages dependency repair: BFS from active packages through every resolvable dep
+/// (exact / latest / closest / alias), surface true leftovers for alias Resolve, and activate found
+/// names into the active loading preset. Deeper than legacy <c>MissingDepends</c> (one hop) — matches
+/// legacy <c>VarsDependencies</c> recursive closure used by other install paths, plus activation's
+/// forward-closure materialization.
 /// </summary>
 public sealed class EfInstalledDepsRepair(
     VarVaultDbContext db,
@@ -22,6 +24,7 @@ public sealed class EfInstalledDepsRepair(
     IProfileService profiles)
     : IInstalledDepsRepair
 {
+    private const int FrontierChunkSize = 500;
     private readonly ActivePresetActivationHelper _activator = new(db, presets, activation, profiles);
 
     public async Task<InstalledDepsAnalysis> AnalyzeAsync(CancellationToken cancellationToken = default)
@@ -35,35 +38,19 @@ public sealed class EfInstalledDepsRepair(
         if (activePackageIds.Count == 0)
             return new InstalledDepsAnalysis([], 0);
 
-        var canonicalVarFileIds = await db.Packages.AsNoTracking()
-            .Where(p => activePackageIds.Contains(p.Id) && p.CanonicalVarFileId != null)
-            .Select(p => p.CanonicalVarFileId!.Value)
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        if (canonicalVarFileIds.Count == 0)
-            return new InstalledDepsAnalysis([], activePackageIds.Count);
-
-        // Needed-by = distinct source packages (matches Missing deps screen semantics).
-        var grouped = await (
-                from d in db.Dependencies.AsNoTracking()
-                join v in db.VarFiles.AsNoTracking() on d.VarFileId equals v.Id
-                where canonicalVarFileIds.Contains(d.VarFileId) && d.RefKind != RefKind.Self && v.PackageId != null
-                group v.PackageId!.Value by d.DependsOnRefRaw into g
-                select new { Ref = g.Key, Count = g.Distinct().Count() })
-            .ToListAsync(cancellationToken)
-            .ConfigureAwait(false);
-
         var allVersions = await db.Packages.AsNoTracking()
-            .Select(p => new { p.Id, p.VarName, p.VersionSort, p.Creator, p.PackageName })
+            .Select(p => new { p.Id, p.VarName, p.VersionSort, p.Creator, p.PackageName, p.CanonicalVarFileId })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
         var familyMap = new Dictionary<string, List<AvailableVersion>>(StringComparer.Ordinal);
         var idToName = new Dictionary<long, string>();
+        var idToCanonical = new Dictionary<long, long>();
         foreach (var p in allVersions)
         {
             idToName[p.Id] = p.VarName;
+            if (p.CanonicalVarFileId is long vf)
+                idToCanonical[p.Id] = vf;
             var familyKey = IdentityFold.Compute($"{p.Creator}.{p.PackageName}");
             if (!familyMap.TryGetValue(familyKey, out var list))
             {
@@ -73,65 +60,64 @@ public sealed class EfInstalledDepsRepair(
             list.Add(new AvailableVersion(p.VersionSort, p.Id));
         }
 
-        // Global aliases only — same map the catalog resolver uses when no real match exists.
         var aliasMap = await db.VarAliases.AsNoTracking()
             .Where(a => a.Scope == AliasScope.Global && a.ResolvedPackageId != null)
             .Select(a => new { a.MissingRefKey, PackageId = a.ResolvedPackageId!.Value })
             .ToDictionaryAsync(a => a.MissingRefKey, a => a.PackageId, cancellationToken)
             .ConfigureAwait(false);
 
-        var entries = new List<InstalledDepsEntry>(grouped.Count);
-        foreach (var row in grouped.OrderByDescending(g => g.Count).ThenBy(g => g.Ref, StringComparer.Ordinal))
+        // BFS: walk every package reachable through resolvable deps (and alias targets).
+        var visitedPackages = new HashSet<long>(activePackageIds);
+        var frontier = new List<long>(activePackageIds);
+        var byRef = new Dictionary<string, RefAccum>(StringComparer.OrdinalIgnoreCase);
+
+        while (frontier.Count > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var parsed = DependencyRef.Parse(row.Ref);
-            if (parsed.IsFailure)
-            {
-                entries.Add(Missing(row.Ref, row.Count));
-                continue;
-            }
+            var next = new List<long>();
 
-            var reference = parsed.Value;
-            var available = familyMap.GetValueOrDefault(reference.FamilyKey) ?? [];
-            var resolution = VersionResolver.Resolve(reference, available);
-            if (resolution is not null)
+            for (var offset = 0; offset < frontier.Count; offset += FrontierChunkSize)
             {
-                var via = MapVia(resolution.Via);
-                var varName = idToName.GetValueOrDefault(resolution.PackageId);
-                if (string.IsNullOrWhiteSpace(varName))
-                {
-                    entries.Add(Missing(row.Ref, row.Count));
+                var chunk = frontier.Skip(offset).Take(FrontierChunkSize).ToList();
+                var varFileIds = chunk
+                    .Where(id => idToCanonical.ContainsKey(id))
+                    .Select(id => idToCanonical[id])
+                    .Distinct()
+                    .ToList();
+                if (varFileIds.Count == 0)
                     continue;
+
+                var edges = await (
+                        from d in db.Dependencies.AsNoTracking()
+                        join v in db.VarFiles.AsNoTracking() on d.VarFileId equals v.Id
+                        where varFileIds.Contains(d.VarFileId) && d.RefKind != RefKind.Self && v.PackageId != null
+                        select new { SourcePackageId = v.PackageId!.Value, d.DependsOnRefRaw })
+                    .ToListAsync(cancellationToken)
+                    .ConfigureAwait(false);
+
+                foreach (var edge in edges)
+                {
+                    if (!byRef.TryGetValue(edge.DependsOnRefRaw, out var accum))
+                    {
+                        accum = ResolveRef(edge.DependsOnRefRaw, familyMap, idToName, aliasMap);
+                        byRef[edge.DependsOnRefRaw] = accum;
+                    }
+                    accum.NeededBy.Add(edge.SourcePackageId);
+
+                    // Expand into packages we can actually walk (real/closest/alias targets).
+                    if (accum.ExpandPackageId is { } expandId && visitedPackages.Add(expandId))
+                        next.Add(expandId);
                 }
-
-                entries.Add(new InstalledDepsEntry(
-                    row.Ref,
-                    InLibrary: true,
-                    ResolvedVarName: varName,
-                    via,
-                    row.Count,
-                    NeedsAlias: via == InstalledDepsResolveVia.Closest));
-                continue;
             }
 
-            // Alias fallback (outranked by real match — same as EfDependencyResolver).
-            var refKey = IdentityFold.Compute(row.Ref);
-            if (aliasMap.TryGetValue(refKey, out var aliasTargetId)
-                && idToName.TryGetValue(aliasTargetId, out var aliasName)
-                && !string.IsNullOrWhiteSpace(aliasName))
-            {
-                entries.Add(new InstalledDepsEntry(
-                    row.Ref,
-                    InLibrary: true,
-                    ResolvedVarName: aliasName,
-                    InstalledDepsResolveVia.Alias,
-                    row.Count,
-                    NeedsAlias: false));
-                continue;
-            }
-
-            entries.Add(Missing(row.Ref, row.Count));
+            frontier = next;
         }
+
+        var entries = byRef
+            .Select(kv => kv.Value.ToEntry(kv.Key))
+            .OrderByDescending(e => e.NeededByCount)
+            .ThenBy(e => e.Ref, StringComparer.Ordinal)
+            .ToList();
 
         return new InstalledDepsAnalysis(entries, activePackageIds.Count);
     }
@@ -149,7 +135,8 @@ public sealed class EfInstalledDepsRepair(
                 .ConfigureAwait(false))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        // Exact/Latest/Closest substitutes that aren't already linked — skip Alias (materialized via MissingVarLink on rebuild).
+        // Exact/Latest/Closest substitutes that aren't already linked — skip Alias (MissingVarLink on rebuild).
+        // Deep analyze already listed transitive found packages, so activating them pulls the full tree.
         var toActivate = analysis.Entries
             .Where(e => e.InLibrary
                         && e.Via is not InstalledDepsResolveVia.Alias
@@ -162,7 +149,6 @@ public sealed class EfInstalledDepsRepair(
         if (toActivate.Count > 0)
             return await _activator.ActivateAsync(toActivate, cancellationToken).ConfigureAwait(false);
 
-        // Alias-only hits still need a profile rebuild so ___MissingVarLink___ stays in sync.
         if (analysis.Entries.Any(e => e.Via == InstalledDepsResolveVia.Alias))
             return await _activator.RebuildActiveAsync(cancellationToken).ConfigureAwait(false);
 
@@ -174,8 +160,68 @@ public sealed class EfInstalledDepsRepair(
         CancellationToken cancellationToken = default) =>
         _activator.ActivateAsync(varNames, cancellationToken);
 
-    private static InstalledDepsEntry Missing(string @ref, int count) =>
-        new(@ref, InLibrary: false, ResolvedVarName: null, InstalledDepsResolveVia.None, count, NeedsAlias: true);
+    private static RefAccum ResolveRef(
+        string raw,
+        Dictionary<string, List<AvailableVersion>> familyMap,
+        Dictionary<long, string> idToName,
+        Dictionary<string, long> aliasMap)
+    {
+        var parsed = DependencyRef.Parse(raw);
+        if (parsed.IsFailure)
+            return RefAccum.Missing();
+
+        var available = familyMap.GetValueOrDefault(parsed.Value.FamilyKey) ?? [];
+        var resolution = VersionResolver.Resolve(parsed.Value, available);
+        if (resolution is not null)
+        {
+            var via = MapVia(resolution.Via);
+            if (!idToName.TryGetValue(resolution.PackageId, out var varName) || string.IsNullOrWhiteSpace(varName))
+                return RefAccum.Missing();
+
+            return new RefAccum(
+                InLibrary: true,
+                ResolvedVarName: varName,
+                Via: via,
+                NeedsAlias: via == InstalledDepsResolveVia.Closest,
+                ExpandPackageId: resolution.PackageId);
+        }
+
+        var refKey = IdentityFold.Compute(raw);
+        if (aliasMap.TryGetValue(refKey, out var aliasTargetId)
+            && idToName.TryGetValue(aliasTargetId, out var aliasName)
+            && !string.IsNullOrWhiteSpace(aliasName))
+        {
+            return new RefAccum(
+                InLibrary: true,
+                ResolvedVarName: aliasName,
+                Via: InstalledDepsResolveVia.Alias,
+                NeedsAlias: false,
+                ExpandPackageId: aliasTargetId);
+        }
+
+        return RefAccum.Missing();
+    }
+
+    private sealed class RefAccum(
+        bool InLibrary,
+        string? ResolvedVarName,
+        InstalledDepsResolveVia Via,
+        bool NeedsAlias,
+        long? ExpandPackageId)
+    {
+        public HashSet<long> NeededBy { get; } = [];
+        public bool InLibrary { get; } = InLibrary;
+        public string? ResolvedVarName { get; } = ResolvedVarName;
+        public InstalledDepsResolveVia Via { get; } = Via;
+        public bool NeedsAlias { get; } = NeedsAlias;
+        public long? ExpandPackageId { get; } = ExpandPackageId;
+
+        public static RefAccum Missing() =>
+            new(false, null, InstalledDepsResolveVia.None, NeedsAlias: true, ExpandPackageId: null);
+
+        public InstalledDepsEntry ToEntry(string @ref) =>
+            new(@ref, InLibrary, ResolvedVarName, Via, NeededBy.Count, NeedsAlias);
+    }
 
     private static InstalledDepsResolveVia MapVia(ResolvedVia via) => via switch
     {

@@ -40,6 +40,7 @@
     <DataTemplate DataType="vm:MigrateViewModel"><views:MigrateDialog /></DataTemplate>
     <DataTemplate DataType="vm:FixEncodingViewModel"><views:FixDialog /></DataTemplate>
     <DataTemplate DataType="vm:AliasViewModel"><views:AliasDialog /></DataTemplate>
+    <DataTemplate DataType="vm:ManageAliasesViewModel"><views:ManageAliasesDialog /></DataTemplate>
     <DataTemplate DataType="vm:ConfirmDeleteViewModel"><views:ConfirmDeleteDialog /></DataTemplate>
     <DataTemplate DataType="vm:PresetEditViewModel"><views:PresetEditDialog /></DataTemplate>
     <DataTemplate DataType="vm:DupeReviewViewModel"><views:DupeReviewDialog /></DataTemplate>

@@ -35,6 +35,23 @@ public sealed class ActivationPathsTests
     }
 
     [Fact]
+    public void AliasLinkFileName_keeps_numeric_missing_ref()
+    {
+        var result = ActivationPaths.AliasLinkFileName("Gone.Missing.1", "Owned.Sub.9");
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Gone.Missing.1.var", result.Value);
+    }
+
+    [Fact]
+    public void AliasLinkFileName_rewrites_latest_to_target_version()
+    {
+        // Legacy Createlink: Creator.Pkg.latest + dest Creator.Pkg.7 → Creator.Pkg.7.var
+        var result = ActivationPaths.AliasLinkFileName("Creator.Pkg.latest", "Creator.Pkg.7");
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Creator.Pkg.7.var", result.Value);
+    }
+
+    [Fact]
     public void SourcePath_combines_mount_and_relative()
     {
         var path = ActivationPaths.SourcePath(@"F:\Repo", @"___VarTidied___\Creator\Creator.Package.1.var");

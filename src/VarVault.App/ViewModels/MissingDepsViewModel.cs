@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VarVault.App.Services;
 using VarVault.Sdk.Library;
 using VarVault.Sdk.Paging;
 
@@ -10,12 +11,15 @@ namespace VarVault.App.ViewModels;
 /// dependency repair (legacy Installed Packages / MissingDepends). (Checklist 2.14; QoL.)</summary>
 public sealed partial class MissingDepsViewModel(
     IMissingDepsQuery query,
-    Services.IDialogLauncher? launcher = null,
+    IDialogLauncher? launcher = null,
     IMissingLogResolver? logResolver = null,
     IInstalledDepsRepair? installedRepair = null,
-    Services.InstalledDepsRepairJobRunner? installedJobs = null)
+    InstalledDepsRepairJobRunner? installedJobs = null,
+    IClipboard? clipboard = null)
     : ObservableObject, ILoadableScreen
 {
+    private readonly List<InstalledDepsEntry> _allInstalledLeftovers = [];
+
     public PagedListState<MissingDependency> Pager { get; } =
         new((request, ct) => query.GetPageAsync(request, cancellationToken: ct));
 
@@ -35,27 +39,32 @@ public sealed partial class MissingDepsViewModel(
     public string HeaderSummary => Pager.TotalCount == 0
         ? "No missing dependencies — every referenced package is in your library."
         : $"{Pager.TotalCount} packages are referenced by your library but aren't in it — downloads you still need. "
-          + "VarVault can't create these; use “Export links txt” to fetch them, or “Resolve” to map a ref to a package you do have.";
+          + "VarVault can't create these; use “Export links txt” to fetch them, or “Resolve” / “Manage aliases” to map a ref to a package you do have.";
 
-    /// <summary>Resolve/Edit-alias → alias dialog for the missing ref. (GD-12)</summary>
+    /// <summary>Resolve/Edit-alias → manage-aliases dialog focused on this missing ref.</summary>
     [RelayCommand]
     private void Resolve(MissingDependency dep)
     {
         if (dep is not null)
-            launcher?.OpenAlias(dep.Ref, onSaved: () => _ = RefreshAsync());
+            launcher?.OpenManageAliases(onChanged: () => _ = OnAliasChangedAsync(dep.Ref), focusMissingRef: dep.Ref);
     }
 
-    /// <summary>Resolve a leftover from installed-deps analyze (optional suggested owned var). </summary>
+    /// <summary>Resolve a leftover from installed-deps analyze (optional suggested owned var).</summary>
     [RelayCommand]
     private void ResolveInstalledLeftover(InstalledDepsEntry? entry)
     {
         if (entry is null)
             return;
-        launcher?.OpenAlias(
-            entry.Ref,
-            onSaved: () => _ = RefreshAsync(),
+        launcher?.OpenManageAliases(
+            onChanged: () => _ = OnAliasChangedAsync(entry.Ref),
+            focusMissingRef: entry.Ref,
             suggestedOwnedQuery: entry.ResolvedVarName);
     }
+
+    /// <summary>Open the FormMissingVars-style alias review (list / unlink / add).</summary>
+    [RelayCommand]
+    private void ManageAliases() =>
+        launcher?.OpenManageAliases(onChanged: () => _ = OnAliasChangedAsync(null));
 
     /// <summary>ILoadableScreen: the shell loads this screen by refreshing it. (G-0)</summary>
     Task ILoadableScreen.LoadAsync(CancellationToken cancellationToken) => RefreshAsync(cancellationToken);
@@ -65,6 +74,22 @@ public sealed partial class MissingDepsViewModel(
     {
         await Pager.ResetAndReloadAsync(cancellationToken).ConfigureAwait(true);
         NotifyPager();
+    }
+
+    /// <summary>After alias set/remove: drop leftover row immediately and reload the missing page.</summary>
+    public async Task OnAliasChangedAsync(string? missingRef, CancellationToken cancellationToken = default)
+    {
+        if (!string.IsNullOrWhiteSpace(missingRef))
+            RemoveInstalledLeftover(missingRef);
+        await RefreshAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    [RelayCommand]
+    private async Task CopyRefAsync(string? text, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(text) || clipboard is null)
+            return;
+        await clipboard.SetTextAsync(text.Trim(), cancellationToken).ConfigureAwait(true);
     }
 
     [RelayCommand(CanExecute = nameof(CanPreviousPage))]
@@ -125,9 +150,18 @@ public sealed partial class MissingDepsViewModel(
     [ObservableProperty] private bool _isAnalyzingInstalled;
     [ObservableProperty] private string? _installedStatus;
     [ObservableProperty] private string? _installedActivationStatus;
+    [ObservableProperty] private int _leftoverPageNumber = 1;
+    [ObservableProperty] private int _leftoverPageSize = 50;
 
-    public bool HasInstalledLeftovers => InstalledLeftovers.Count > 0;
+    public bool HasInstalledLeftovers => _allInstalledLeftovers.Count > 0;
     public bool CanAnalyzeInstalled => (installedJobs is not null || installedRepair is not null) && !IsAnalyzingInstalled;
+    public int LeftoverTotalCount => _allInstalledLeftovers.Count;
+    public int LeftoverPageCount => Math.Max(1, (int)Math.Ceiling(LeftoverTotalCount / (double)Math.Max(1, LeftoverPageSize)));
+    public string LeftoverSummaryLabel => LeftoverTotalCount == 0
+        ? "0 leftovers"
+        : $"{LeftoverTotalCount} leftover{(LeftoverTotalCount == 1 ? "" : "s")} · page {LeftoverPageNumber}/{LeftoverPageCount}";
+    public bool CanLeftoverPrevious => LeftoverPageNumber > 1;
+    public bool CanLeftoverNext => LeftoverPageNumber < LeftoverPageCount;
 
     /// <summary>
     /// Analyse deps of active/installed packages → auto-activate found → list leftovers for alias Resolve.
@@ -138,11 +172,12 @@ public sealed partial class MissingDepsViewModel(
         IsAnalyzingInstalled = true;
         InstalledStatus = null;
         InstalledActivationStatus = null;
-        InstalledLeftovers.Clear();
+        _allInstalledLeftovers.Clear();
+        RebuildLeftoverPage();
         NotifyInstalledState();
         try
         {
-            Services.InstalledDepsRepairOutcome outcome;
+            InstalledDepsRepairOutcome outcome;
             if (installedJobs is not null)
             {
                 InstalledStatus = "Queued — watch the jobs panel…";
@@ -154,7 +189,7 @@ public sealed partial class MissingDepsViewModel(
                 // Headless / unit tests without a job runner.
                 var analysis = await installedRepair.AnalyzeAsync().ConfigureAwait(true);
                 var activation = await installedRepair.ActivateFromAnalysisAsync(analysis).ConfigureAwait(true);
-                outcome = new Services.InstalledDepsRepairOutcome(analysis, activation);
+                outcome = new InstalledDepsRepairOutcome(analysis, activation);
             }
             else
                 return;
@@ -170,7 +205,8 @@ public sealed partial class MissingDepsViewModel(
         catch (Exception ex)
         {
             InstalledStatus = $"Analyze failed: {ex.Message}";
-            InstalledLeftovers.Clear();
+            _allInstalledLeftovers.Clear();
+            RebuildLeftoverPage();
         }
         finally
         {
@@ -179,7 +215,7 @@ public sealed partial class MissingDepsViewModel(
         }
     }
 
-    private void ApplyInstalledOutcome(Services.InstalledDepsRepairOutcome outcome)
+    private void ApplyInstalledOutcome(InstalledDepsRepairOutcome outcome)
     {
         var a = outcome.Analysis;
         var act = outcome.Activation;
@@ -206,15 +242,85 @@ public sealed partial class MissingDepsViewModel(
         else if (a.InLibrary > 0)
             InstalledActivationStatus = "Found packages were already on the active preset (or activate was a no-op).";
 
+        _allInstalledLeftovers.Clear();
         foreach (var e in a.Leftovers.OrderByDescending(x => x.NeededByCount).ThenBy(x => x.Ref, StringComparer.Ordinal))
+            _allInstalledLeftovers.Add(e);
+        LeftoverPageNumber = 1;
+        RebuildLeftoverPage();
+    }
+
+    private void RemoveInstalledLeftover(string missingRef)
+    {
+        _allInstalledLeftovers.RemoveAll(e =>
+            string.Equals(e.Ref, missingRef, StringComparison.OrdinalIgnoreCase));
+        if (LeftoverPageNumber > LeftoverPageCount)
+            LeftoverPageNumber = LeftoverPageCount;
+        RebuildLeftoverPage();
+        NotifyInstalledState();
+    }
+
+    private void RebuildLeftoverPage()
+    {
+        InstalledLeftovers.Clear();
+        var size = Math.Max(1, LeftoverPageSize);
+        var page = Math.Clamp(LeftoverPageNumber, 1, LeftoverPageCount);
+        LeftoverPageNumber = page;
+        foreach (var e in _allInstalledLeftovers.Skip((page - 1) * size).Take(size))
             InstalledLeftovers.Add(e);
+        OnPropertyChanged(nameof(LeftoverTotalCount));
+        OnPropertyChanged(nameof(LeftoverPageCount));
+        OnPropertyChanged(nameof(LeftoverSummaryLabel));
+        OnPropertyChanged(nameof(CanLeftoverPrevious));
+        OnPropertyChanged(nameof(CanLeftoverNext));
+        LeftoverPreviousCommand.NotifyCanExecuteChanged();
+        LeftoverNextCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanLeftoverPrevious))]
+    private void LeftoverPrevious()
+    {
+        if (LeftoverPageNumber <= 1)
+            return;
+        LeftoverPageNumber--;
+        RebuildLeftoverPage();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanLeftoverNext))]
+    private void LeftoverNext()
+    {
+        if (LeftoverPageNumber >= LeftoverPageCount)
+            return;
+        LeftoverPageNumber++;
+        RebuildLeftoverPage();
+    }
+
+    [RelayCommand]
+    private void LeftoverGoToPage(int pageNumber)
+    {
+        LeftoverPageNumber = pageNumber;
+        RebuildLeftoverPage();
+    }
+
+    [RelayCommand]
+    private void LeftoverChangePageSize(int pageSize)
+    {
+        LeftoverPageSize = Math.Max(1, pageSize);
+        LeftoverPageNumber = 1;
+        RebuildLeftoverPage();
     }
 
     private void NotifyInstalledState()
     {
         OnPropertyChanged(nameof(HasInstalledLeftovers));
         OnPropertyChanged(nameof(CanAnalyzeInstalled));
+        OnPropertyChanged(nameof(LeftoverTotalCount));
+        OnPropertyChanged(nameof(LeftoverPageCount));
+        OnPropertyChanged(nameof(LeftoverSummaryLabel));
+        OnPropertyChanged(nameof(CanLeftoverPrevious));
+        OnPropertyChanged(nameof(CanLeftoverNext));
         AnalyzeInstalledCommand.NotifyCanExecuteChanged();
+        LeftoverPreviousCommand.NotifyCanExecuteChanged();
+        LeftoverNextCommand.NotifyCanExecuteChanged();
     }
 
     // ── VaM-log repair (QoL) ─────────────────────────────────────────────────────────────────────────────

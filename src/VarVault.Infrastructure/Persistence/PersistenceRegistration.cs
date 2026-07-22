@@ -74,6 +74,7 @@ public static class PersistenceRegistration
         services.AddScoped<Sdk.Import.IArchiveExtractor, Import.ArchiveExtractor>();
         services.AddScoped<Sdk.Import.IImportHistoryStore, Library.EfImportHistoryStore>();
         services.AddScoped<Sdk.Import.IImportService, Library.EfImportService>();
+        services.AddScoped<Sdk.Import.IAddonPackagesLooseVarsLocator, Library.AddonPackagesLooseVarsLocator>();
         services.AddScoped<Sdk.Library.IHealthService, Library.EfHealthService>();
         services.AddScoped<SqliteDatabaseBackup>();
         services.AddScoped<Sdk.Library.ITrashQueryService, Library.EfTrashQueryService>();
