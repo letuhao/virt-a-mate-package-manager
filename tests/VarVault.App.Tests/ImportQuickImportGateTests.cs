@@ -36,7 +36,7 @@ public sealed class ImportQuickImportGateTests
     private sealed class StubImport : IImportService
     {
         public Task<ImportSession> ScanAsync(ImportSpec spec, IProgressSink? progress = null, CancellationToken cancellationToken = default) =>
-            Task.FromResult(new ImportSession(Guid.NewGuid(), Path.GetTempPath(), spec.TargetRepositoryId, false, [], []));
+            Task.FromResult(new ImportSession(Guid.NewGuid(), Path.GetTempPath(), spec.TargetRepositoryId, ImportActivateMode.Off, [], []));
         public Task<ApplyResult> ApplyAsync(ImportSession session, IProgressSink? progress = null, CancellationToken cancellationToken = default) =>
             Task.FromResult(new ApplyResult(0, 0, 0, 0, 0, 0, Guid.NewGuid()));
         public Task<IReadOnlyList<ImportRun>> HistoryAsync(int take = 50, CancellationToken cancellationToken = default) =>

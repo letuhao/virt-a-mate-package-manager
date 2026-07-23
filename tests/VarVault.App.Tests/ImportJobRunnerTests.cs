@@ -109,12 +109,30 @@ public sealed class ImportJobRunnerTests
                 null, "A.B", null, false, null, 0),
             ImportDecision.KeepExisting, "conflict", null, []);
         item.Decision = ImportDecision.KeepIncoming;
-        var session = new ImportSession(Guid.NewGuid(), "/tmp", Guid.NewGuid(), false, [], [item], []);
+        var session = new ImportSession(Guid.NewGuid(), "/tmp", Guid.NewGuid(), ImportActivateMode.Off, [], [item], []);
 
         var frozen = ImportJobRunner.FreezeSession(session, [(item.Id, ImportDecision.Discard)]);
         Assert.Equal(ImportDecision.Discard, frozen.Items[0].Decision);
         Assert.Equal(ImportDecision.KeepIncoming, item.Decision);
         Assert.NotSame(item, frozen.Items[0]);
+    }
+
+    [Fact]
+    public void FreezeSession_overrides_ActivateMode_from_live_UI_choice()
+    {
+        var item = new ImportItem(
+            Guid.NewGuid(), "src", "/src", "A.B.1.var", "/src/A.B.1.var", "A.B.1",
+            ImportLane.New, new ImportSignals(true, "ok", 1, 1, DateTime.UtcNow, false,
+                null, "A.B.1", null, false, null, 0),
+            ImportDecision.Import, "new", null, []);
+        // Scan stamped Off; user flips ComboBox to ActiveSession before Apply.
+        var session = new ImportSession(Guid.NewGuid(), "/tmp", Guid.NewGuid(), ImportActivateMode.Off, [], [item], []);
+
+        var frozen = ImportJobRunner.FreezeSession(
+            session, [(item.Id, ImportDecision.Import)], ImportActivateMode.ActiveSession);
+
+        Assert.Equal(ImportActivateMode.ActiveSession, frozen.ActivateMode);
+        Assert.Equal(ImportActivateMode.Off, session.ActivateMode);
     }
 }
 

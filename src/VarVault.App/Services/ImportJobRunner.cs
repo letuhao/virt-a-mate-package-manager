@@ -64,8 +64,11 @@ public sealed class ImportJobRunner(IJobQueue queue, IServiceScopeFactory scopes
         return new ImportJob<ApplyResult>(handle, tcs.Task);
     }
 
-    /// <summary>Freeze the user's current decisions into an immutable apply snapshot.</summary>
-    public static ImportSession FreezeSession(ImportSession session, IEnumerable<(Guid Id, ImportDecision Decision)> decisions)
+    /// <summary>Freeze the user's current decisions (and optional activate mode) into an immutable apply snapshot.</summary>
+    public static ImportSession FreezeSession(
+        ImportSession session,
+        IEnumerable<(Guid Id, ImportDecision Decision)> decisions,
+        ImportActivateMode? activateMode = null)
     {
         var map = decisions.ToDictionary(d => d.Id, d => d.Decision);
         var frozen = session.Items.Select(item =>
@@ -75,7 +78,8 @@ public sealed class ImportJobRunner(IJobQueue queue, IServiceScopeFactory scopes
             copy.Decision = map.TryGetValue(item.Id, out var dec) ? dec : item.Decision;
             return copy;
         }).ToList();
-        return session with { Items = frozen };
+        var next = session with { Items = frozen };
+        return activateMode is { } mode ? next with { ActivateMode = mode } : next;
     }
 }
 

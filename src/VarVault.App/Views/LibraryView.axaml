@@ -268,6 +268,7 @@
           <StackPanel Orientation="Horizontal" Spacing="6">
             <Button Content="★ Favorite" Command="{Binding ToggleFavoriteCommand}" Padding="8,3" FontSize="11" />
             <Button Content="⌖ Locate" Command="{Binding LocateCommand}" Padding="8,3" FontSize="11" />
+            <Button Content="Edit meta…" Command="{Binding EditMetaCommand}" Padding="8,3" FontSize="11" />
           </StackPanel>
           <StackPanel DataContext="{Binding SelectedDetail}" x:DataType="lib:PackageDetail" Spacing="2"
                       IsVisible="{Binding ., Converter={x:Static ObjectConverters.IsNotNull}}">

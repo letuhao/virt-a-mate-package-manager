@@ -82,6 +82,7 @@ public static class PersistenceRegistration
         services.AddScoped<Sdk.Library.IProfilePackageLinkService, Library.EfProfilePackageLinkService>();
         services.AddScoped<Sdk.Library.IProposalService, Library.EfProposalService>();
         services.AddScoped<Sdk.Library.IPackageDetailQuery, Library.EfPackageDetailQuery>();
+        services.AddScoped<Sdk.Library.IVarMetaEditService, Library.EfVarMetaEditService>();
         services.AddScoped<Sdk.Library.ILibraryActionService, Library.EfLibraryActionService>();
         services.AddScoped<Sdk.Library.IAliasService, Library.EfAliasService>();
         services.AddScoped<Sdk.Library.ITagService, Library.EfTagService>();

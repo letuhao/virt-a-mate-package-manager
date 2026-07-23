@@ -31,6 +31,7 @@ public sealed class FakeDialogLauncher : IDialogLauncher
     public void OpenFix(long varFileId, string? codepage) => Opened.Add($"fix:{codepage}");
     public void OpenDupeReview(DuplicateGroup group) => Opened.Add($"dupe:{group.IdentityKey}");
     public void OpenPresetEdit(long presetId, string name) => Opened.Add($"preset:{presetId}");
+    public void OpenEditMeta(long packageId, Action? onSaved = null) => Opened.Add($"edit-meta:{packageId}");
 }
 
 // Shared, reusable public test doubles for the gap screen/tab units (18-gap G-C/G-D).

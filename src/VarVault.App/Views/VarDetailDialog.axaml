@@ -5,138 +5,139 @@
              xmlns:lib="clr-namespace:VarVault.Sdk.Library;assembly=VarVault.Sdk"
              xmlns:views="clr-namespace:VarVault.App.Views"
              x:Class="VarVault.App.Views.VarDetailDialog"
-             x:DataType="vm:VarDetailViewModel">
-  <StackPanel Spacing="10" MinWidth="520" x:CompileBindings="False">
-    <TextBlock Text="{Binding Detail.VarName}" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
-    <c:Tabs ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" />
+             x:DataType="vm:VarDetailViewModel"
+             MinWidth="560" MinHeight="420" Width="720" Height="560">
+  <DockPanel Margin="4" x:CompileBindings="False">
+    <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="{Binding Detail.VarName}" FontSize="16" FontWeight="SemiBold"
+                   Foreground="{DynamicResource TextHiBrush}" TextWrapping="Wrap" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Content="Edit meta…" Command="{Binding EditMetaCommand}"
+                Padding="10,4" VerticalAlignment="Center"
+                IsVisible="{Binding IsOverviewTab}" />
+      </Grid>
+      <c:Tabs ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" />
+    </StackPanel>
 
-    <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" DataContext="{Binding Detail}"
-          IsVisible="{Binding $parent[UserControl].((vm:VarDetailViewModel)DataContext).IsOverviewTab}">
-      <TextBlock Grid.Row="0" Grid.Column="0" Text="Identity" Opacity="0.7" Margin="0,0,0,4" />
-      <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding IdentityKey}" Margin="0,0,0,4" />
-      <TextBlock Grid.Row="1" Grid.Column="0" Text="License" Opacity="0.7" Margin="0,0,0,4" />
-      <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding License}" Margin="0,0,0,4" />
-      <TextBlock Grid.Row="2" Grid.Column="0" Text="Size" Opacity="0.7" Margin="0,0,0,4" />
-      <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding TotalSize}" Margin="0,0,0,4" />
-      <TextBlock Grid.Row="3" Grid.Column="0" Text="Depended on by" Opacity="0.7" Margin="0,0,0,4" />
-      <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding DependedOnByCount}" Margin="0,0,0,4" />
-      <TextBlock Grid.Row="4" Grid.Column="0" Text="Class" Opacity="0.7" />
-      <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding StorageClass}" />
-    </Grid>
+    <!-- Fixed body with scroll — avoids StackPanel growth that clips large meta/deps. -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+      <Panel MinHeight="320">
+        <!-- Overview -->
+        <StackPanel Spacing="10" IsVisible="{Binding IsOverviewTab}">
+          <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" DataContext="{Binding Detail}">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="Identity" Opacity="0.7" Margin="0,0,0,6" />
+            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding IdentityKey}" Margin="0,0,0,6" FontFamily="{DynamicResource MonoFont}" />
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="License" Opacity="0.7" Margin="0,0,0,6" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding License}" Margin="0,0,0,6" />
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="Size" Opacity="0.7" Margin="0,0,0,6" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding TotalSize}" Margin="0,0,0,6" />
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="Depended on by" Opacity="0.7" Margin="0,0,0,6" />
+            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding DependedOnByCount}" Margin="0,0,0,6" />
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="Class" Opacity="0.7" />
+            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding StorageClass}" />
+          </Grid>
+        </StackPanel>
 
-    <StackPanel IsVisible="{Binding IsDependenciesTab}" Spacing="12">
-      <TextBlock Text="Direct dependencies" FontWeight="SemiBold" />
-      <ItemsControl ItemsSource="{Binding DirectDependencyCards}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="vm:DependencyCardViewModel">
-            <Border Padding="8" Margin="0,0,0,6" BorderBrush="#22808080" BorderThickness="1" CornerRadius="4"
-                    AttachedToVisualTree="OnDependencyCardAttached">
-              <StackPanel Spacing="4">
-                <TextBlock Text="{Binding RequestedRefRaw}" FontFamily="{DynamicResource MonoFont}" FontSize="12"
-                           IsVisible="{Binding ResolvedPackage, Converter={x:Static ObjectConverters.IsNull}}" />
-                <Button Background="Transparent" BorderThickness="0" HorizontalContentAlignment="Left" Padding="0"
-                        Command="{Binding ((vm:VarDetailViewModel)DataContext).OpenDependencyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                        CommandParameter="{Binding Edge}"
-                        IsVisible="{Binding ResolvedPackage, Converter={x:Static ObjectConverters.IsNotNull}}">
-                  <Grid ColumnDefinitions="64,*">
-                    <Border Width="58" Height="44" CornerRadius="3" Background="#18808080" ClipToBounds="True">
-                      <Panel>
-                        <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" IsVisible="{Binding HasThumbnail}" />
-                        <TextBlock Text="{Binding ResolvedPackage.PrimaryType}" FontSize="9" Opacity="0.6"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !HasThumbnail}" />
-                      </Panel>
-                    </Border>
-                    <StackPanel Grid.Column="1" Margin="6,0,0,0">
-                      <TextBlock Text="{Binding ResolvedPackage.VarName}" FontWeight="SemiBold" />
-                      <TextBlock Text="{Binding ResolvedPackage.PrimaryType}" Opacity="0.7" FontSize="11" />
-                      <TextBlock Text="{Binding ResolvedPackage.StorageClass}" Opacity="0.65" FontSize="10" />
-                    </StackPanel>
-                  </Grid>
-                </Button>
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <c:Tag Content="{Binding State}" />
-                  <Button Content="Copy" Padding="4,1" FontSize="10"
-                          Command="{Binding ((vm:VarDetailViewModel)DataContext).CopyRefCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                          CommandParameter="{Binding Edge}" />
-                  <Button Content="Resolve alias" Padding="4,1" FontSize="10"
-                          IsVisible="{Binding ResolvedPackage, Converter={x:Static ObjectConverters.IsNull}}"
-                          Command="{Binding ((vm:VarDetailViewModel)DataContext).ResolveAliasCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                          CommandParameter="{Binding Edge}" />
-                </StackPanel>
-              </StackPanel>
+        <!-- Dependencies: one section at a time via sub-tabs -->
+        <DockPanel IsVisible="{Binding IsDependenciesTab}">
+          <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
+            <c:Tabs ItemsSource="{Binding DepsSections}" SelectedIndex="{Binding SelectedDepsSectionIndex}" />
+          </StackPanel>
+          <DockPanel>
+            <c:PaginationBar DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                             PageNumber="{Binding ActiveDepsPageNumber}" PageCount="{Binding ActiveDepsPageCount}"
+                             PageSize="{Binding ActiveDepsPageSize}" TotalCount="{Binding ActiveDepsTotalCount}"
+                             SummaryLabel="{Binding ActiveDepsSummary}"
+                             PreviousCommand="{Binding ActiveDepsPreviousPageCommand}"
+                             NextCommand="{Binding ActiveDepsNextPageCommand}"
+                             GoToPageCommand="{Binding ActiveDepsGoToPageCommand}"
+                             PageSizeChangedCommand="{Binding ActiveDepsChangePageSizeCommand}" />
+
+            <Border BorderBrush="#22808080" BorderThickness="1" CornerRadius="4" Padding="6" MinHeight="280">
+              <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <Panel>
+                  <ItemsControl ItemsSource="{Binding DirectDepsPager.Items}" IsVisible="{Binding IsDirectDepsSection}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="lib:DependencyEdgeDto">
+                        <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,2" MinHeight="28">
+                          <Button Background="Transparent" BorderThickness="0" HorizontalContentAlignment="Left" Padding="0"
+                                  Command="{Binding ((vm:VarDetailViewModel)DataContext).OpenDependencyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                  CommandParameter="{Binding}"
+                                  ToolTip.Tip="{Binding ResolvedPackage.VarName}">
+                            <TextBlock Text="{Binding RequestedRefRaw}" FontFamily="{DynamicResource MonoFont}"
+                                       FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                          </Button>
+                          <c:Tag Grid.Column="1" Content="{Binding State}" Margin="6,0,0,0" VerticalAlignment="Center" />
+                          <Button Grid.Column="2" Content="Copy" Padding="6,2" FontSize="11" Margin="6,0,0,0"
+                                  Command="{Binding ((vm:VarDetailViewModel)DataContext).CopyRefCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                  CommandParameter="{Binding}" />
+                          <Button Grid.Column="3" Content="Alias" Padding="6,2" FontSize="11" Margin="4,0,0,0"
+                                  IsVisible="{Binding ResolvedPackage, Converter={x:Static ObjectConverters.IsNull}}"
+                                  Command="{Binding ((vm:VarDetailViewModel)DataContext).ResolveAliasCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                  CommandParameter="{Binding}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+
+                  <ItemsControl ItemsSource="{Binding ReverseDepsPager.Items}" IsVisible="{Binding IsReverseDepsSection}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="lib:ReverseDependentDto">
+                        <TextBlock Text="{Binding VarName}" FontSize="12" Margin="0,3" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+
+                  <ItemsControl ItemsSource="{Binding SaveDepsPager.Items}" IsVisible="{Binding IsSaveDepsSection}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="lib:DependencyEdgeDto">
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,3">
+                          <TextBlock Text="{Binding RequestedRefRaw}" FontFamily="{DynamicResource MonoFont}" FontSize="11"
+                                     TextTrimming="CharacterEllipsis" />
+                          <c:Tag Grid.Column="1" Content="{Binding State}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </Panel>
+              </ScrollViewer>
             </Border>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-      <c:PaginationBar PageNumber="{Binding DirectDepsPager.PageNumber}" PageCount="{Binding DirectDepsPager.PageCount}"
-                       PageSize="{Binding DirectDepsPager.PageSize}" TotalCount="{Binding DirectDepsPager.TotalCount}"
-                       SummaryLabel="{Binding DirectDepsPager.SummaryLabel}"
-                       PreviousCommand="{Binding DirectDepsPreviousPageCommand}"
-                       NextCommand="{Binding DirectDepsNextPageCommand}"
-                       GoToPageCommand="{Binding DirectDepsGoToPageCommand}"
-                       PageSizeChangedCommand="{Binding DirectDepsChangePageSizeCommand}" />
+          </DockPanel>
+        </DockPanel>
 
-      <TextBlock Text="Reverse dependents" FontWeight="SemiBold" Margin="0,8,0,0" />
-      <ItemsControl ItemsSource="{Binding ReverseDepsPager.Items}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="lib:ReverseDependentDto">
-            <TextBlock Text="{Binding VarName}" FontSize="12" />
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-      <c:PaginationBar PageNumber="{Binding ReverseDepsPager.PageNumber}" PageCount="{Binding ReverseDepsPager.PageCount}"
-                       PageSize="{Binding ReverseDepsPager.PageSize}" TotalCount="{Binding ReverseDepsPager.TotalCount}"
-                       SummaryLabel="{Binding ReverseDepsPager.SummaryLabel}"
-                       PreviousCommand="{Binding ReverseDepsPreviousPageCommand}"
-                       NextCommand="{Binding ReverseDepsNextPageCommand}"
-                       GoToPageCommand="{Binding ReverseDepsGoToPageCommand}"
-                       PageSizeChangedCommand="{Binding ReverseDepsChangePageSizeCommand}" />
+        <Panel IsVisible="{Binding IsContentTab}" MinHeight="360">
+          <views:PackageGalleryView DataContext="{Binding PackageGallery}" />
+        </Panel>
 
-      <TextBlock Text="References from user saves" FontWeight="SemiBold" Margin="0,8,0,0" />
-      <ItemsControl ItemsSource="{Binding SaveDepsPager.Items}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="lib:DependencyEdgeDto">
-            <Grid ColumnDefinitions="*,Auto" Margin="0,2">
-              <TextBlock Text="{Binding RequestedRefRaw}" FontFamily="{DynamicResource MonoFont}" FontSize="11" />
-              <c:Tag Grid.Column="1" Content="{Binding State}" />
-            </Grid>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-      <c:PaginationBar PageNumber="{Binding SaveDepsPager.PageNumber}" PageCount="{Binding SaveDepsPager.PageCount}"
-                       PageSize="{Binding SaveDepsPager.PageSize}" TotalCount="{Binding SaveDepsPager.TotalCount}"
-                       SummaryLabel="{Binding SaveDepsPager.SummaryLabel}"
-                       PreviousCommand="{Binding SaveDepsPreviousPageCommand}"
-                       NextCommand="{Binding SaveDepsNextPageCommand}"
-                       GoToPageCommand="{Binding SaveDepsGoToPageCommand}"
-                       PageSizeChangedCommand="{Binding SaveDepsChangePageSizeCommand}" />
-    </StackPanel>
-
-    <Panel IsVisible="{Binding IsContentTab}" MinHeight="360">
-      <views:PackageGalleryView DataContext="{Binding PackageGallery}" />
-    </Panel>
-
-    <StackPanel IsVisible="{Binding IsCopiesTab}">
-      <ItemsControl ItemsSource="{Binding CopiesPager.Items}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="lib:CopyDto">
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-              <c:Tag Grid.Column="0" Content="{Binding Tier, StringFormat='T{0}'}" />
-              <TextBlock Grid.Column="1" Text="{Binding Path}" FontFamily="{DynamicResource MonoFont}" FontSize="11" Margin="6,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-              <c:Tag Grid.Column="2" Content="fixed" Kind="Good" Margin="0,0,6,0"
-                     IsVisible="{Binding FixedFromVarFileId, Converter={x:Static ObjectConverters.IsNotNull}}" />
-              <c:StatePill Grid.Column="3" State="Ok" Text="online" IsVisible="{Binding IsOnline}" />
-            </Grid>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-      <c:PaginationBar PageNumber="{Binding CopiesPager.PageNumber}" PageCount="{Binding CopiesPager.PageCount}"
-                       PageSize="{Binding CopiesPager.PageSize}" TotalCount="{Binding CopiesPager.TotalCount}"
-                       SummaryLabel="{Binding CopiesPager.SummaryLabel}"
-                       PreviousCommand="{Binding CopiesPreviousPageCommand}"
-                       NextCommand="{Binding CopiesNextPageCommand}"
-                       GoToPageCommand="{Binding CopiesGoToPageCommand}"
-                       PageSizeChangedCommand="{Binding CopiesChangePageSizeCommand}" />
-    </StackPanel>
-  </StackPanel>
+        <DockPanel IsVisible="{Binding IsCopiesTab}">
+          <c:PaginationBar DockPanel.Dock="Bottom" Margin="0,8,0,0"
+                           PageNumber="{Binding CopiesPager.PageNumber}" PageCount="{Binding CopiesPager.PageCount}"
+                           PageSize="{Binding CopiesPager.PageSize}" TotalCount="{Binding CopiesPager.TotalCount}"
+                           SummaryLabel="{Binding CopiesPager.SummaryLabel}"
+                           PreviousCommand="{Binding CopiesPreviousPageCommand}"
+                           NextCommand="{Binding CopiesNextPageCommand}"
+                           GoToPageCommand="{Binding CopiesGoToPageCommand}"
+                           PageSizeChangedCommand="{Binding CopiesChangePageSizeCommand}" />
+          <Border BorderBrush="#22808080" BorderThickness="1" CornerRadius="4" Padding="6" MinHeight="280">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <ItemsControl ItemsSource="{Binding CopiesPager.Items}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="lib:CopyDto">
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,3">
+                      <c:Tag Grid.Column="0" Content="{Binding Tier, StringFormat='T{0}'}" />
+                      <TextBlock Grid.Column="1" Text="{Binding Path}" FontFamily="{DynamicResource MonoFont}" FontSize="11"
+                                 Margin="6,0" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                      <c:Tag Grid.Column="2" Content="fixed" Kind="Good" Margin="0,0,6,0"
+                             IsVisible="{Binding FixedFromVarFileId, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                      <c:StatePill Grid.Column="3" State="Ok" Text="online" IsVisible="{Binding IsOnline}" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </Border>
+        </DockPanel>
+      </Panel>
+    </ScrollViewer>
+  </DockPanel>
 </UserControl>

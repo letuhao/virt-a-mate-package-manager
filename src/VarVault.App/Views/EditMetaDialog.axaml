@@ -1,0 +1,103 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:VarVault.App.ViewModels"
+             x:Class="VarVault.App.Views.EditMetaDialog"
+             x:DataType="vm:EditMetaViewModel"
+             MinWidth="640" MinHeight="480" Width="720" Height="560">
+  <Grid RowDefinitions="Auto,*,Auto" Margin="8" x:CompileBindings="False">
+    <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,8">
+      <TextBlock Text="Edit meta" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource TextHiBrush}" />
+      <TextBlock Text="{Binding VarName}" FontFamily="{DynamicResource MonoFont}" FontSize="12" Opacity="0.85" />
+      <TextBlock Text="{Binding AbsolutePath}" FontFamily="{DynamicResource MonoFont}" FontSize="10" Opacity="0.55"
+                 TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding AbsolutePath}" />
+      <ItemsControl ItemsSource="{Binding Warnings}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <TextBlock Text="{Binding}" FontSize="11" Foreground="{DynamicResource WarnBrush}" TextWrapping="Wrap" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </StackPanel>
+
+    <Grid Grid.Row="1" ColumnDefinitions="240,*">
+      <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Margin="0,0,12,0">
+        <StackPanel Spacing="8">
+          <StackPanel Spacing="2">
+            <TextBlock Text="creatorName" Opacity="0.7" FontSize="11" />
+            <TextBox Text="{Binding CreatorName}" />
+          </StackPanel>
+          <StackPanel Spacing="2">
+            <TextBlock Text="packageName" Opacity="0.7" FontSize="11" />
+            <TextBox Text="{Binding PackageName}" />
+          </StackPanel>
+          <StackPanel Spacing="2">
+            <TextBlock Text="licenseType" Opacity="0.7" FontSize="11" />
+            <TextBox Text="{Binding LicenseType}" />
+          </StackPanel>
+          <StackPanel Spacing="2">
+            <TextBlock Text="programVersion" Opacity="0.7" FontSize="11" />
+            <TextBox Text="{Binding ProgramVersion}" />
+          </StackPanel>
+          <StackPanel Spacing="2">
+            <TextBlock Text="description" Opacity="0.7" FontSize="11" />
+            <TextBox Text="{Binding Description}" AcceptsReturn="True" TextWrapping="Wrap" Height="100" />
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+
+      <DockPanel Grid.Column="1">
+        <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,6">
+          <TextBlock Text="dependencies" FontWeight="SemiBold" />
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBox Watermark="Filter refs…" Text="{Binding DepsFilter}" />
+            <TextBlock Grid.Column="1" Text="{Binding DepsSummary}" Margin="8,0,0,0"
+                       Opacity="0.65" FontSize="11" VerticalAlignment="Center" />
+          </Grid>
+          <Grid ColumnDefinitions="*,Auto,Auto">
+            <TextBox Watermark="Creator.Package.1 or .latest" Text="{Binding NewDepRef}"
+                     KeyDown="OnNewDepKeyDown" />
+            <Button Grid.Column="1" Content="Add" Margin="6,0,0,0" Command="{Binding AddDepCommand}" />
+            <Button Grid.Column="2" Content="Remove" Margin="6,0,0,0" Command="{Binding RemoveDepCommand}" />
+          </Grid>
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
+          <Button Content="◀" Command="{Binding DepsPreviousPageCommand}" Padding="8,2" />
+          <TextBlock Text="{Binding DepsPageNumber}" VerticalAlignment="Center" Opacity="0.75" />
+          <Button Content="▶" Command="{Binding DepsNextPageCommand}" Padding="8,2" />
+          <TextBlock Text="{Binding DepsSummary}" VerticalAlignment="Center" Opacity="0.55" FontSize="11" Margin="8,0,0,0" />
+        </StackPanel>
+
+        <Border BorderBrush="#22808080" BorderThickness="1" CornerRadius="4" Padding="4">
+          <ListBox ItemsSource="{Binding VisibleDeps}" SelectedItem="{Binding SelectedDep}"
+                   ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:MetaDepRow">
+                <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                  <TextBox Text="{Binding Ref}" FontFamily="{DynamicResource MonoFont}" FontSize="12" />
+                  <TextBlock Grid.Column="1" Text="{Binding Error}" Foreground="{DynamicResource CritBrush}"
+                             FontSize="10" Margin="6,0,0,0" VerticalAlignment="Center"
+                             IsVisible="{Binding !IsValid}" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </Border>
+      </DockPanel>
+    </Grid>
+
+    <DockPanel Grid.Row="2" Margin="0,10,0,0">
+      <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="8">
+        <Button Content="Save" Command="{Binding SaveCommand}" IsEnabled="{Binding CanSave}"
+                Background="{DynamicResource AccentBrush}" Foreground="White" Padding="14,6" />
+        <Button Content="Cancel" Command="{Binding CancelCommand}" Padding="14,6" />
+      </StackPanel>
+      <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" VerticalAlignment="Center"
+                 Foreground="{DynamicResource CritBrush}"
+                 IsVisible="{Binding IsError}" />
+      <TextBlock Text="{Binding StatusMessage}" TextWrapping="Wrap" VerticalAlignment="Center"
+                 Foreground="{DynamicResource GoodBrush}"
+                 IsVisible="{Binding HasSuccessStatus}" />
+    </DockPanel>
+  </Grid>
+</UserControl>

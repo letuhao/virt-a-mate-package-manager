@@ -70,7 +70,8 @@ public sealed class ImportRealDataRunE2ETests(ITestOutputHelper log)
         using (var scope = host.Host.Services.CreateScope())
         {
             var svc = scope.ServiceProvider.GetRequiredService<IImportService>();
-            var session = await svc.ScanAsync(new ImportSpec([source!], targetId, ActivateAfter: activate), progress: null!);
+            var session = await svc.ScanAsync(new ImportSpec([source!], targetId,
+                ActivateMode: activate ? ImportActivateMode.ImportedCopied : ImportActivateMode.Off), progress: null!);
 
             Assert.True(session.Items.Count > 0, "scan found no vars in the source");
             Assert.DoesNotContain(session.Warnings, w => w.Contains("index")); // target now indexed → no stale warning

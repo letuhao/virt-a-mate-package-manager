@@ -15,10 +15,10 @@ using static VarVault.E2E.Tests.ImportFixtures;
 namespace VarVault.E2E.Tests;
 
 /// <summary>
-/// Slice C follow-ups (doc 31 · 5.7 event/telemetry, 5.9 activate-after): a successful apply publishes
-/// <see cref="VarsImported"/>, records the import metrics, and — when <c>ActivateAfter</c> is set — routes the
-/// just-imported vars through the activation flow (proven here by the durable "Imported" preset it builds; the
-/// on-disk symlink build is exercised env-gated by the app real-run test).
+/// Slice C follow-ups (doc 31 · 5.7 event/telemetry, 5.9 activate modes): a successful apply publishes
+/// <see cref="VarsImported"/>, records the import metrics, and — when <see cref="ImportActivateMode.ImportedCopied"/>
+/// is set — routes just-imported vars through the "Imported" preset; <see cref="ImportActivateMode.ActiveSession"/>
+/// installs every resolvable scan identity into the active loading preset.
 /// </summary>
 [Trait("Category", TestCategories.E2E)]
 public sealed class ImportApplyEffectsTests
@@ -49,13 +49,13 @@ public sealed class ImportApplyEffectsTests
 
         Assert.NotNull(captured);
         Assert.Equal(1, captured!.Copied);
-        Assert.False(captured.ActivatedAfter);          // ActivateAfter was not requested
+        Assert.False(captured.ActivatedAfter);          // mode Off by default
         Assert.True(applied.GetMeasurementSnapshot().Count >= 1, "imports.applied metric should have fired");
         Assert.True(copiedMetric.GetMeasurementSnapshot().Count >= 1, "imports.vars_copied metric should have fired");
     }
 
     [Fact]
-    public async Task Activate_after_import_routes_through_the_activation_flow()
+    public async Task ImportedCopied_mode_routes_copied_vars_through_Imported_preset()
     {
         await using var host = TestHost.Create(withPersistence: true);
         using var targetDir = new TempDirectory();
@@ -67,9 +67,9 @@ public sealed class ImportApplyEffectsTests
         using (var scope = host.Host.Services.CreateScope())
         {
             var svc = scope.ServiceProvider.GetRequiredService<IImportService>();
-            // ActivateAfter set. With no VaM path configured the link build is a safe no-op, but the import
+            // ImportedCopied. With no VaM path configured the link build is a safe no-op, but the import
             // must still route into the durable "Imported" preset — proving 5.9 is wired end-to-end.
-            var session = await svc.ScanAsync(new ImportSpec([importDir.Path], targetId, ActivateAfter: true));
+            var session = await svc.ScanAsync(new ImportSpec([importDir.Path], targetId, ActivateMode: ImportActivateMode.ImportedCopied));
             var result = await svc.ApplyAsync(session);
             Assert.Equal(1, result.Copied);
         }
@@ -85,7 +85,7 @@ public sealed class ImportApplyEffectsTests
     }
 
     [Fact]
-    public async Task Activate_after_is_not_triggered_when_flag_is_off()
+    public async Task Activate_is_not_triggered_when_mode_is_off()
     {
         await using var host = TestHost.Create(withPersistence: true);
         using var targetDir = new TempDirectory();
@@ -97,7 +97,7 @@ public sealed class ImportApplyEffectsTests
         using (var scope = host.Host.Services.CreateScope())
         {
             var svc = scope.ServiceProvider.GetRequiredService<IImportService>();
-            var session = await svc.ScanAsync(new ImportSpec([importDir.Path], targetId, ActivateAfter: false));
+            var session = await svc.ScanAsync(new ImportSpec([importDir.Path], targetId, ActivateMode: ImportActivateMode.Off));
             await svc.ApplyAsync(session);
         }
 
@@ -105,6 +105,81 @@ public sealed class ImportApplyEffectsTests
         {
             var presets = scope.ServiceProvider.GetRequiredService<IPresetService>();
             Assert.DoesNotContain(await presets.ListAsync(), p => p.Name == "Imported");
+        }
+    }
+
+    [Fact]
+    public async Task ActiveSession_mode_installs_New_and_Exact_into_active_preset()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var targetDir = new TempDirectory();
+        using var importDir = new TempDirectory();
+
+        // Seed Exact candidate into the library first.
+        WriteVar(targetDir.Path, "Already.Here.1.var", "Already", "Here", [("Custom/a.vam", "A")]);
+        Guid targetId = await RegisterTargetAsync(host, targetDir.Path);
+
+        // Same bytes → Exact/Skip; plus a New var.
+        WriteVar(importDir.Path, "Already.Here.1.var", "Already", "Here", [("Custom/a.vam", "A")]);
+        WriteVar(importDir.Path, "Fresh.Look.1.var", "Fresh", "Look", [("Custom/n.vam", "N")]);
+
+        // Prefill an active-style loading preset so ActivePresetActivationHelper has a clear target.
+        long activePresetId;
+        using (var scope = host.Host.Services.CreateScope())
+        {
+            var presets = scope.ServiceProvider.GetRequiredService<IPresetService>();
+            activePresetId = (await presets.CreateAsync("Library installs", [])).Value.Id;
+        }
+
+        using (var scope = host.Host.Services.CreateScope())
+        {
+            var svc = scope.ServiceProvider.GetRequiredService<IImportService>();
+            var session = await svc.ScanAsync(new ImportSpec([importDir.Path], targetId, ActivateMode: ImportActivateMode.ActiveSession));
+            Assert.Contains(session.Items, i => i.Lane == ImportLane.Exact);
+            Assert.Contains(session.Items, i => i.Lane == ImportLane.New);
+            var result = await svc.ApplyAsync(session);
+            Assert.Equal(1, result.Copied);
+            Assert.True(result.Skipped >= 1);
+        }
+
+        using (var scope = host.Host.Services.CreateScope())
+        {
+            var presets = scope.ServiceProvider.GetRequiredService<IPresetService>();
+            var members = await presets.MembersAsync(activePresetId);
+            Assert.Contains("Fresh.Look.1", members);
+            Assert.Contains("Already.Here.1", members);
+
+            // ActiveSession must not spill Exact-only into the sealed Imported preset.
+            Assert.DoesNotContain(await presets.ListAsync(), p => p.Name == "Imported");
+        }
+    }
+
+    [Fact]
+    public async Task ImportedCopied_mode_does_not_include_Exact_skips()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var targetDir = new TempDirectory();
+        using var importDir = new TempDirectory();
+
+        WriteVar(targetDir.Path, "Already.Here.1.var", "Already", "Here", [("Custom/a.vam", "A")]);
+        Guid targetId = await RegisterTargetAsync(host, targetDir.Path);
+        WriteVar(importDir.Path, "Already.Here.1.var", "Already", "Here", [("Custom/a.vam", "A")]);
+        WriteVar(importDir.Path, "Fresh.Look.1.var", "Fresh", "Look", [("Custom/n.vam", "N")]);
+
+        using (var scope = host.Host.Services.CreateScope())
+        {
+            var svc = scope.ServiceProvider.GetRequiredService<IImportService>();
+            var session = await svc.ScanAsync(new ImportSpec([importDir.Path], targetId, ActivateMode: ImportActivateMode.ImportedCopied));
+            await svc.ApplyAsync(session);
+        }
+
+        using (var scope = host.Host.Services.CreateScope())
+        {
+            var presets = scope.ServiceProvider.GetRequiredService<IPresetService>();
+            var imported = (await presets.ListAsync()).Single(p => p.Name == "Imported");
+            var members = await presets.MembersAsync(imported.Id);
+            Assert.Contains("Fresh.Look.1", members);
+            Assert.DoesNotContain("Already.Here.1", members);
         }
     }
 

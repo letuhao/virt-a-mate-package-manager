@@ -25,6 +25,7 @@ public interface IDialogLauncher
     void OpenFix(long varFileId, string? codepage);
     void OpenDupeReview(VarVault.Sdk.Library.DuplicateGroup group);
     void OpenPresetEdit(long presetId, string name);
+    void OpenEditMeta(long packageId, Action? onSaved = null);
 }
 
 /// <summary>Default launcher: resolves dialog VMs from the app service provider and shows them. (GD/GE.)</summary>
@@ -153,5 +154,16 @@ public sealed class DialogLauncher(
         _ = vm.LoadMembersAsync();
         _ = vm.RefreshPreviewAsync();
         dialogs.Show(vm);
+    }
+
+    public void OpenEditMeta(long packageId, Action? onSaved = null)
+    {
+        var vm = new EditMetaViewModel(
+            services.GetRequiredService<Sdk.Library.IVarMetaEditService>(),
+            packageId,
+            onSaved,
+            close: () => dialogs.Back());
+        _ = vm.LoadAsync();
+        dialogs.Push(vm);
     }
 }

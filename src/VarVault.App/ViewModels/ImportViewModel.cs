@@ -179,13 +179,15 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
     [ObservableProperty] private string _searchText = "";
     [ObservableProperty] private bool _galleryView;
     [ObservableProperty] private ImportItemViewModel? _selected;
-    [ObservableProperty] private bool _activateAfter;
+    [ObservableProperty] private ImportActivateModeChoice _selectedActivateMode = ImportActivateModeChoice.Off;
     [ObservableProperty] private bool _isScanning;
     [ObservableProperty] private bool _isApplying;
     [ObservableProperty] private bool _historyOpen;
     [ObservableProperty] private string? _statusMessage;
     [ObservableProperty] private double _operationProgress;
     [ObservableProperty] private string? _operationMessage;
+
+    public IReadOnlyList<ImportActivateModeChoice> ActivateModeChoices { get; } = ImportActivateModeChoice.All;
 
     public bool IsOperationRunning => IsScanning || IsApplying;
     public bool CanCancelOperation => _activeJob is { State: JobState.Queued or JobState.Running };
@@ -521,7 +523,8 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
         if (TargetRepo is null || SourcePaths.Count == 0)
             return;
 
-        var spec = new ImportSpec([.. SourcePaths], TargetRepo.Id, ActivateAfter);
+        // Mode is Apply-time only (ComboBox can change after Scan). Spec still carries a default for non-UI callers.
+        var spec = new ImportSpec([.. SourcePaths], TargetRepo.Id, ImportActivateMode.Off);
         var token = CaptureScanToken();
 
         IsScanning = true;
@@ -626,7 +629,8 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
 
         var snapshot = ImportJobRunner.FreezeSession(
             _session,
-            _all.Select(i => (i.Model.Id, i.Decision)));
+            _all.Select(i => (i.Model.Id, i.Decision)),
+            SelectedActivateMode.Mode);
 
         IsApplying = true;
         OperationProgress = 0;
@@ -692,14 +696,13 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
         catch (ObjectDisposedException) { /* job already finished */ }
     }
 
-    private sealed record ScanRequestToken(Guid TargetId, bool ActivateAfter, IReadOnlyList<string> Paths);
+    private sealed record ScanRequestToken(Guid TargetId, IReadOnlyList<string> Paths);
 
     private ScanRequestToken CaptureScanToken() =>
-        new(TargetRepo!.Id, ActivateAfter, SourcePaths.ToList());
+        new(TargetRepo!.Id, SourcePaths.ToList());
 
     private bool IsScanStillValid(ScanRequestToken token) =>
         TargetRepo?.Id == token.TargetId
-        && ActivateAfter == token.ActivateAfter
         && SourcePaths.Count == token.Paths.Count
         && SourcePaths.OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
             .SequenceEqual(token.Paths.OrderBy(p => p, StringComparer.OrdinalIgnoreCase));
@@ -1128,4 +1131,25 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
             page.SafePageNumber,
             page.SafePageSize));
     }
+}
+
+/// <summary>UI choice for post-apply install mode (maps 1:1 to <see cref="ImportActivateMode"/>).</summary>
+public sealed record ImportActivateModeChoice(ImportActivateMode Mode, string Label)
+{
+    public override string ToString() => Label;
+
+    public static ImportActivateModeChoice Off { get; } = new(
+        ImportActivateMode.Off,
+        "Off");
+
+    public static ImportActivateModeChoice ImportedCopied { get; } = new(
+        ImportActivateMode.ImportedCopied,
+        "New copies → “Imported”");
+
+    public static ImportActivateModeChoice ActiveSession { get; } = new(
+        ImportActivateMode.ActiveSession,
+        "All from scan → active preset");
+
+    public static IReadOnlyList<ImportActivateModeChoice> All { get; } =
+        [Off, ImportedCopied, ActiveSession];
 }

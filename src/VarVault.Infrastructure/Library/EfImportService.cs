@@ -17,6 +17,7 @@ using VarVault.Sdk.Activation;
 using VarVault.Sdk.Events;
 using VarVault.Sdk.Import;
 using VarVault.Sdk.Indexer;
+using VarVault.Sdk.Library;
 using VarVault.Sdk.Paging;
 using VarVault.Sdk.Presets;
 using VarVault.Sdk.Settings;
@@ -27,17 +28,19 @@ namespace VarVault.Infrastructure.Library;
 /// Import service (doc 30). <see cref="ScanAsync"/> extracts archives + classifies each incoming var against the
 /// <b>whole library</b> (D1) via the domain <see cref="ImportClassifier"/>, recommends a resolution for conflicts
 /// (<see cref="ConflictRecommender"/>), and builds the per-item diff + gallery preview. <see cref="ApplyAsync"/>
-/// durably copies/fixes/renames approved vars, indexes them, records history, optionally activates the imported set
-/// into VaM (D2), and publishes <see cref="VarsImported"/>. (doc 30/31.)
+/// durably copies/fixes/renames approved vars, indexes them, records history, optionally activates per
+/// <see cref="ImportActivateMode"/> (D2 ImportedCopied / ActiveSession QoL), and publishes <see cref="VarsImported"/>.
+/// (doc 30/31.)
 /// </summary>
 public sealed class EfImportService(
     VarVaultDbContext db, IVarInspector inspector, IArchiveExtractor extractor, ISettingsService settings,
     IDurableFileMover mover, IEncodingFixer fixer, IIndexerClient indexer, IImportHistoryStore history,
-    IPresetService presets, IActivationService activation, IEventBus events)
+    IPresetService presets, IActivationService activation, IProfileService profiles, IEventBus events)
     : IImportService
 {
     private const string TempDirKey = "import.temp_dir";
     private const string ImportedPresetName = "Imported";
+    private readonly ActivePresetActivationHelper _activeActivator = new(db, presets, activation, profiles);
 
     /// <summary>One catalogued var reduced to what dedup + the "existing" ref need. Loaded once per scan.</summary>
     private sealed record CatalogFact(
@@ -158,7 +161,7 @@ public sealed class EfImportService(
         var warnings = await BuildDedupTrustWarningsAsync(spec.TargetRepositoryId, catalog, cancellationToken).ConfigureAwait(false);
 
         return new ImportSession(SessionIdFrom(workspace), workspace.Root, spec.TargetRepositoryId,
-            spec.ActivateAfter, sources, items, warnings);
+            spec.ActivateMode, sources, items, warnings);
     }
 
     /// <summary>
@@ -623,12 +626,9 @@ public sealed class EfImportService(
                     await WaitForIndexAsync(session.TargetRepositoryId, cancellationToken, progress).ConfigureAwait(false);
                 }
 
-                // Optional activate-after (D2/5.9): link the just-imported vars into VaM via the existing preset flow.
-                if (session.ActivateAfter && importedRefs.Count > 0)
-                {
-                    progress?.Report(new ProgressReport(0, 1, "Activating imported vars…"));
-                    activated = await ActivateImportedAsync(importedRefs, cancellationToken).ConfigureAwait(false);
-                }
+                // Post-apply activate modes: ImportedCopied (D2/5.9) or ActiveSession (QoL → active loading preset).
+                activated = await RunActivateModeAsync(session, importedRefs, progress, cancellationToken)
+                    .ConfigureAwait(false);
             }
 
             var failedSources = session.Sources.Where(s => s.Status != ImportSourceStatus.Ok)
@@ -711,6 +711,90 @@ public sealed class EfImportService(
             copiedIncoming.Add(path);
     }
 
+    private async Task<bool> RunActivateModeAsync(
+        ImportSession session,
+        IReadOnlyList<string> copiedRefs,
+        IProgressSink? progress,
+        CancellationToken ct)
+    {
+        switch (session.ActivateMode)
+        {
+            case ImportActivateMode.Off:
+                return false;
+
+            case ImportActivateMode.ImportedCopied:
+            {
+                if (copiedRefs.Count == 0)
+                    return false;
+                progress?.Report(new ProgressReport(0, 1, "Activating imported vars…"));
+                return await ActivateImportedAsync(copiedRefs, ct).ConfigureAwait(false);
+            }
+
+            case ImportActivateMode.ActiveSession:
+            {
+                var refs = CollectActiveSessionRefs(session, copiedRefs);
+                if (refs.Count == 0)
+                    return false;
+                progress?.Report(new ProgressReport(0, 1, "Installing into active loading preset…"));
+                return await ActivateIntoActivePresetAsync(refs, ct).ConfigureAwait(false);
+            }
+
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
+    /// Union of successfully copied refs plus Exact/Skip/KeepExisting identities that already resolve in the library.
+    /// </summary>
+    private static List<string> CollectActiveSessionRefs(ImportSession session, IReadOnlyList<string> copiedRefs)
+    {
+        var refs = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        void Add(string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name) || !seen.Add(name))
+                return;
+            refs.Add(name);
+        }
+
+        foreach (var r in copiedRefs)
+            Add(r);
+
+        foreach (var item in session.Items)
+        {
+            if (item.Decision is ImportDecision.Discard or ImportDecision.None)
+                continue;
+            if (IsCopyDecision(item.Decision))
+                continue; // successes already in copiedRefs; failures stay out
+            if (item.Decision is not (ImportDecision.Skip or ImportDecision.KeepExisting))
+                continue;
+            if (item.Existing is null)
+                continue; // not in library — cannot install a real link
+            Add(ResolveLibraryRef(item));
+        }
+
+        return refs;
+    }
+
+    /// <summary>Package identity to install for an already-catalogued item (Exact / KeepExisting / Skip).</summary>
+    private static string? ResolveLibraryRef(ImportItem item)
+    {
+        if (item.Existing is { } ex)
+        {
+            var fromPath = Path.GetFileNameWithoutExtension(ex.Path);
+            if (!string.IsNullOrWhiteSpace(fromPath))
+                return fromPath;
+            if (!string.IsNullOrWhiteSpace(ex.Signals.FilenameIdentity))
+                return ex.Signals.FilenameIdentity;
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.Signals.FilenameIdentity))
+            return item.Signals.FilenameIdentity;
+        var name = Path.GetFileNameWithoutExtension(item.FileName);
+        return string.IsNullOrWhiteSpace(name) ? null : name;
+    }
+
     /// <summary>
     /// Activate the just-imported vars into VaM by accumulating them into a durable "Imported" loading preset and
     /// building its profile links. Idempotent + additive (already-present members aren't re-added); a no-op when the
@@ -723,6 +807,13 @@ public sealed class EfImportService(
             return false;
         var r = await activation.BuildProfileLinksAsync(id, ct).ConfigureAwait(false);
         return r.PrivilegeFailures == 0;
+    }
+
+    private async Task<bool> ActivateIntoActivePresetAsync(IReadOnlyList<string> refs, CancellationToken ct)
+    {
+        var r = await _activeActivator.ActivateAsync(refs, ct).ConfigureAwait(false);
+        // MembersAdded proves the active-preset path ran; link build may be a no-op without VaM path.
+        return r.MembersActivated > 0 || r.LinksCreated > 0;
     }
 
     private async Task<long?> EnsureImportedPresetAsync(IReadOnlyList<string> refs, CancellationToken ct)

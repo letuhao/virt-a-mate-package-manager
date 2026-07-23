@@ -64,19 +64,42 @@ public sealed record ImportSource(
     int VarCount,
     string? FailReason);
 
+/// <summary>
+/// Post-apply install mode for Import &amp; Review. Off by default.
+/// <see cref="ImportedCopied"/> is the sealed D2 path; <see cref="ActiveSession"/> is the QoL that installs
+/// every resolvable identity from the scan into the active loading preset.
+/// </summary>
+public enum ImportActivateMode
+{
+    /// <summary>Do not install anything after Apply.</summary>
+    Off = 0,
+
+    /// <summary>Only successfully copied/renamed vars → durable "Imported" loading preset + build links (D2/5.9).</summary>
+    ImportedCopied = 1,
+
+    /// <summary>
+    /// Copied vars plus Exact/Skip/KeepExisting identities already in the library → active loading preset
+    /// (same destination as installed-deps repair). Does not switch AddonPackages.
+    /// </summary>
+    ActiveSession = 2,
+}
+
 /// <summary>What to import and where. Target = a repository (its tier is the repo's). (doc 30 §5.)</summary>
-public sealed record ImportSpec(IReadOnlyList<string> Paths, Guid TargetRepositoryId, bool ActivateAfter = false);
+public sealed record ImportSpec(
+    IReadOnlyList<string> Paths,
+    Guid TargetRepositoryId,
+    ImportActivateMode ActivateMode = ImportActivateMode.Off);
 
 /// <summary>A scanned, not-yet-applied import session (decisions mutate in place before Apply). (doc 30 §5.)</summary>
 public sealed record ImportSession(
-    Guid Id, string TempRoot, Guid TargetRepositoryId, bool ActivateAfter,
+    Guid Id, string TempRoot, Guid TargetRepositoryId, ImportActivateMode ActivateMode,
     IReadOnlyList<ImportSource> Sources, IReadOnlyList<ImportItem> Items,
     IReadOnlyList<string> Warnings)   // D1 dedup-trust warnings (offline / unindexed target repo). (doc 30 §3/D1.)
 {
     /// <summary>Back-compat / test convenience: a session with no dedup-trust warnings.</summary>
-    public ImportSession(Guid id, string tempRoot, Guid targetRepositoryId, bool activateAfter,
+    public ImportSession(Guid id, string tempRoot, Guid targetRepositoryId, ImportActivateMode activateMode,
         IReadOnlyList<ImportSource> sources, IReadOnlyList<ImportItem> items)
-        : this(id, tempRoot, targetRepositoryId, activateAfter, sources, items, []) { }
+        : this(id, tempRoot, targetRepositoryId, activateMode, sources, items, []) { }
 }
 
 /// <summary>Result of applying a session. (doc 30 §5.)</summary>

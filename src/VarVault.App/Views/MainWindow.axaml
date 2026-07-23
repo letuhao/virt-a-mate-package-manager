@@ -46,6 +46,7 @@
     <DataTemplate DataType="vm:DupeReviewViewModel"><views:DupeReviewDialog /></DataTemplate>
     <DataTemplate DataType="vm:RescueViewModel"><views:RescueDialog /></DataTemplate>
     <DataTemplate DataType="vm:VarDetailViewModel"><views:VarDetailDialog /></DataTemplate>
+    <DataTemplate DataType="vm:EditMetaViewModel"><views:EditMetaDialog /></DataTemplate>
   </Window.DataTemplates>
 
   <Panel>

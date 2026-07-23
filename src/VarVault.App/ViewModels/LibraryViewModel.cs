@@ -496,6 +496,20 @@ public sealed partial class LibraryViewModel(
             reveal?.Reveal(path);
     }
 
+    /// <summary>Detail-panel Edit meta… — rewrite meta.json for the selected package.</summary>
+    [RelayCommand]
+    public void EditMeta()
+    {
+        if (SelectedEntry is null)
+            return;
+        var entry = SelectedEntry;
+        launcher?.OpenEditMeta(entry.PackageId, onSaved: () =>
+        {
+            _detailGeneration++;
+            _ = LoadSelectedDetailAsync(entry, _detailGeneration);
+        });
+    }
+
     /// <summary>
     /// True while a keystroke is pending settle: the displayed <see cref="TotalCount"/> is the last exact
     /// value (approximate for the in-flight query) until the debounced refresh recomputes it. (1.41)
