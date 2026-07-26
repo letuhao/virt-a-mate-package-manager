@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using VarVault.Common;
 
 namespace VarVault.Domain.Analyzer;
 
@@ -15,14 +14,24 @@ public sealed class FreeSpaceLedger
     /// <summary>Try to reserve <paramref name="bytes"/> on a repo; returns false if it would breach MinFree.</summary>
     public bool TryReserve(Guid repositoryId, long bytes, long freeBytes, long minFreeBytes)
     {
-        Guard.Positive((int)Math.Min(bytes, int.MaxValue)); // bytes must be > 0
+        if (bytes <= 0)
+            return false;
         while (true)
         {
             var current = _reserved.GetValueOrDefault(repositoryId);
             if (freeBytes - current - bytes < minFreeBytes)
                 return false;
 
-            var updated = current + bytes;
+            long updated;
+            try
+            {
+                updated = checked(current + bytes);
+            }
+            catch (OverflowException)
+            {
+                return false;
+            }
+
             if (_reserved.TryUpdate(repositoryId, updated, current))
                 return true;
             if (current == 0 && _reserved.TryAdd(repositoryId, updated))
@@ -34,6 +43,8 @@ public sealed class FreeSpaceLedger
     /// <summary>Release a prior reservation (on completion or failure).</summary>
     public void Release(Guid repositoryId, long bytes)
     {
+        if (bytes <= 0)
+            return;
         while (true)
         {
             var current = _reserved.GetValueOrDefault(repositoryId);

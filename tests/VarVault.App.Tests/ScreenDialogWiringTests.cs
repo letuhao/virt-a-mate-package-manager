@@ -71,15 +71,15 @@ public class ScreenDialogWiringTests
     }
 
     [Fact]
-    public void Presets_new_edit_deactivate_open_dialogs()
+    public async Task Presets_new_edit_deactivate_open_dialogs()
     {
         var l = new FakeDialogLauncher();
         var vm = new PresetsViewModel(new StubPresetsMin(), launcher: l) { Selected = new Sdk.Presets.PresetInfo(7, "Cinematic", 241) };
-        vm.NewPresetCommand.Execute(null);
         vm.EditCommand.Execute(null);
+        await vm.NewPresetCommand.ExecuteAsync(null);
         vm.DeactivateAllCommand.Execute(null);
-        Assert.Contains("preset:0", l.Opened);
         Assert.Contains("preset:7", l.Opened);
+        Assert.Contains("preset:100", l.Opened); // CreateAsync returns id 100 from StubPresetsMin
         Assert.Contains("rescue", l.Opened);
     }
 

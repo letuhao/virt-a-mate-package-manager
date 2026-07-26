@@ -128,7 +128,7 @@ public class FullAppWalkthroughE2ETests
             await presetsVm.LoadCommand.ExecuteAsync(null);
             UiE2E.Pump();
             Assert.NotEmpty(presetsVm.Presets);
-            presetsVm.NewPresetCommand.Execute(null);
+            await presetsVm.NewPresetCommand.ExecuteAsync(null);
             Assert.IsType<PresetEditViewModel>(shell.Dialogs.Current); // DIALOG: preset-edit
             shell.Dialogs.Close();
             UiE2E.Screenshot(window, "walk-05-presets");

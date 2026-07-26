@@ -7,6 +7,7 @@ using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using VarVault.Sdk.Library;
+using VarVault.App.Services;
 using VarVault.App.ViewModels;
 
 namespace VarVault.App.Views;
@@ -29,6 +30,7 @@ public partial class LibraryView : UserControl
         AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel);
         AddHandler(ScrollViewer.ScrollChangedEvent, OnScrollChanged, RoutingStrategies.Bubble);
         DataContextChanged += OnDataContextChanged;
+        AttachedToVisualTree += (_, _) => WirePickers();
     }
 
     protected override async void OnLoaded(RoutedEventArgs e)
@@ -67,6 +69,14 @@ public partial class LibraryView : UserControl
     {
         ApplyDetailWidthFromVm();
         SubscribeViewModel(DataContext as LibraryViewModel);
+        WirePickers();
+    }
+
+    private void WirePickers()
+    {
+        if (DataContext is not LibraryViewModel vm)
+            return;
+        vm.SaveTxtPicker = name => UiStoragePickers.SaveTxtAsync(this, name, "Export package list");
     }
 
     private void SubscribeViewModel(LibraryViewModel? vm)

@@ -45,6 +45,18 @@ public class WindowedUsageTests
         Assert.Null(w.LastUsedAt);
         Assert.Equal(0, w.Use90d);
     }
+
+    [Fact]
+    public void Custom_primary_window_changes_Use30d_counts()
+    {
+        var events = new[] { DaysAgo(5), DaysAgo(20), DaysAgo(45) };
+        var narrow = WindowedUsage.Compute(events, Now, primaryWindowDays: 7, secondaryWindowDays: 21);
+        Assert.Equal(1, narrow.Use30d); // only day-5
+        Assert.Equal(2, narrow.Use90d); // 5 + 20
+
+        var wide = WindowedUsage.Compute(events, Now, primaryWindowDays: 90, secondaryWindowDays: 270);
+        Assert.Equal(3, wide.Use30d);
+    }
 }
 
 [Trait("Category", TestCategories.Unit)]

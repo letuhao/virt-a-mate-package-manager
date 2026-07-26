@@ -16,10 +16,9 @@
     <ItemsControl ItemsSource="{Binding Members}" MaxHeight="220">
       <ItemsControl.ItemTemplate>
         <DataTemplate>
-          <Grid ColumnDefinitions="Auto,*,Auto" Height="24">
-            <CheckBox Grid.Column="0" MinWidth="0" ToolTip.Tip="pin this version" />
-            <TextBlock Grid.Column="1" Text="{Binding}" FontFamily="{DynamicResource MonoFont}" FontSize="12" VerticalAlignment="Center" Margin="4,0" />
-            <Button Grid.Column="2" Content="✕" Padding="4,0" FontSize="10"
+          <Grid ColumnDefinitions="*,Auto" Height="24">
+            <TextBlock Grid.Column="0" Text="{Binding}" FontFamily="{DynamicResource MonoFont}" FontSize="12" VerticalAlignment="Center" Margin="4,0" />
+            <Button Grid.Column="1" Content="✕" Padding="4,0" FontSize="10"
                     Command="{Binding ((vm:PresetEditViewModel)DataContext).RemoveMemberCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                     CommandParameter="{Binding}" />
           </Grid>

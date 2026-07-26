@@ -19,4 +19,6 @@ public static class SettingKeys
     public const string VamPath = "vam.path";
     public const string AutoMigrate = "policy.auto_migrate";
     public const string FixOnImport = "policy.fix_on_import";
+    public const string HotThresholdDays = "tiers.hot_threshold_days";
+    public const string AutoRebalance = "automation.auto_rebalance";
 }

@@ -69,7 +69,7 @@ public class DialogInternalsE2ETests
         Assert.Equal(2, vm.Members.Count);                 // AC-25: real member table
         await vm.RemoveMemberCommand.ExecuteAsync("Creator.A.1");
         Assert.Single(vm.Members);
-        vm.ExportCommand.Execute(null);
+        await vm.ExportCommand.ExecuteAsync(null);
         Assert.Contains("Creator.B.1", vm.LastExportText);
         UiE2E.Screenshot(window, "ac25-presetedit");
     }

@@ -164,7 +164,9 @@ public sealed class StubLibraryQuery(LibraryPage? page = null) : ILibraryQuerySe
 
 public sealed class StubPresetsMin : VarVault.Sdk.Presets.IPresetService
 {
-    public Task<Result<VarVault.Sdk.Presets.PresetInfo>> CreateAsync(string name, IEnumerable<string> refs, CancellationToken ct = default) => throw new NotSupportedException();
+    private long _nextId = 100;
+    public Task<Result<VarVault.Sdk.Presets.PresetInfo>> CreateAsync(string name, IEnumerable<string> refs, CancellationToken ct = default) =>
+        Task.FromResult(Result.Success(new VarVault.Sdk.Presets.PresetInfo(_nextId++, name, refs.Count())));
     public Task<IReadOnlyList<VarVault.Sdk.Presets.PresetInfo>> ListAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<VarVault.Sdk.Presets.PresetInfo>>([]);
     public Task<bool> DeleteAsync(long id, CancellationToken ct = default) => Task.FromResult(true);
     public Task<Result<VarVault.Sdk.Presets.PresetInfo>> AddMemberAsync(long id, string r, CancellationToken ct = default) => throw new NotSupportedException();

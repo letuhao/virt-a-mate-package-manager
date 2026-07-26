@@ -57,6 +57,26 @@ public static partial class VamLogParser
         return refs;
     }
 
+    /// <summary>
+    /// Distinct refs useful as usage signals: every identity-shaped token on each line (including
+    /// dependers on "Missing addon package X that Y depends on" lines). Missing-deps repair should
+    /// keep using <see cref="ExtractRefs"/> instead.
+    /// </summary>
+    public static IReadOnlyList<DependencyRef> ExtractUsageRefs(string? logText)
+    {
+        if (string.IsNullOrWhiteSpace(logText))
+            return [];
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var refs = new List<DependencyRef>();
+        foreach (var line in logText.Split('\n'))
+        {
+            foreach (Match m in CandidateRegex().Matches(line))
+                TryAdd(m.Value, seen, refs);
+        }
+        return refs;
+    }
+
     private static void TryAdd(string token, HashSet<string> seen, List<DependencyRef> refs)
     {
         token = token.Trim();

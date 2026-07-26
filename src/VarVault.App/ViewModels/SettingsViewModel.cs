@@ -3,12 +3,13 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VarVault.App.Composition;
 using VarVault.Domain.Activation;
+using VarVault.Sdk.Library;
 using VarVault.Sdk.Settings;
 
 namespace VarVault.App.ViewModels;
 
 /// <summary>SCR-13 · Settings: VaM path (browse + validate), fix-on-import policy, etc. (16-checklist SCR-13; checklist 22 · T6.3a/b.)</summary>
-public sealed partial class SettingsViewModel(ISettingsService settings) : ObservableObject, ILoadableScreen
+public sealed partial class SettingsViewModel(ISettingsService settings, IVamLogUsageImporter? vamLogUsage = null) : ObservableObject, ILoadableScreen
 {
     /// <summary>Sub-navigation tabs (GC-2).</summary>
     public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =
@@ -137,17 +138,79 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
     }
 
     // Additional per-tab settings (AC-21).
-    [ObservableProperty] private string? _hotThresholdDays;       // Tiers & policy
-    [ObservableProperty] private bool _autoRebalance;            // Automation
+    [ObservableProperty] private string? _hotThresholdDays;       // Tiers — primary usage window days
+    [ObservableProperty] private bool _autoRebalance;            // Automation — idle tier rebalance
     [ObservableProperty] private string? _importTempDir;          // Import — archive extraction scratch (5.11)
     [ObservableProperty] private string? _importHistoryKeep;      // Import — how many runs History keeps (5.11)
     [ObservableProperty] private string? _sevenZipPath;           // Import — optional external 7-Zip for hard archives
+    [ObservableProperty] private string? _vamLogText;             // Tiers — paste for usage import
+    [ObservableProperty] private string? _vamLogStatus;
 
     /// <summary>Folder-picker hook for the archive temp folder (set by the view).</summary>
     public Func<Task<string?>>? ImportTempFolderPicker { get; set; }
 
     /// <summary>File-picker hook for the 7-Zip executable (set by the view).</summary>
     public Func<Task<string?>>? SevenZipFilePicker { get; set; }
+
+    /// <summary>Optional file-picker for VaM <c>output_log.txt</c> (set by the view).</summary>
+    public Func<Task<string?>>? VamLogFilePicker { get; set; }
+
+    [RelayCommand]
+    public async Task BrowseVamLogAsync()
+    {
+        if (VamLogFilePicker is null)
+            return;
+        var picked = await VamLogFilePicker().ConfigureAwait(true);
+        if (string.IsNullOrWhiteSpace(picked) || !File.Exists(picked))
+            return;
+        try
+        {
+            VamLogText = await File.ReadAllTextAsync(picked).ConfigureAwait(true);
+            VamLogStatus = $"Loaded {Path.GetFileName(picked)} ({VamLogText.Length:N0} chars).";
+        }
+        catch (Exception ex)
+        {
+            VamLogStatus = $"Couldn't read log: {ex.Message}";
+        }
+    }
+
+    [RelayCommand]
+    public async Task PreviewVamLogUsageAsync(CancellationToken cancellationToken = default)
+    {
+        if (vamLogUsage is null)
+        {
+            VamLogStatus = "Usage import is unavailable.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(VamLogText))
+        {
+            VamLogStatus = "Paste or browse a VaM output_log.txt first.";
+            return;
+        }
+        var preview = await vamLogUsage.PreviewAsync(VamLogText, cancellationToken).ConfigureAwait(true);
+        VamLogStatus = $"Parsed {preview.Parsed}: {preview.MatchedInLibrary} in library, {preview.Unmatched} skipped."
+            + (preview.SampleMatchedVarNames.Count > 0
+                ? " Samples: " + string.Join(", ", preview.SampleMatchedVarNames.Take(5))
+                : string.Empty);
+    }
+
+    [RelayCommand]
+    public async Task ImportVamLogUsageAsync(CancellationToken cancellationToken = default)
+    {
+        if (vamLogUsage is null)
+        {
+            VamLogStatus = "Usage import is unavailable.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(VamLogText))
+        {
+            VamLogStatus = "Paste or browse a VaM output_log.txt first.";
+            return;
+        }
+        var result = await vamLogUsage.ImportAsync(VamLogText, cancellationToken).ConfigureAwait(true);
+        VamLogStatus =
+            $"Imported {result.EventsRecorded} usage event(s), recomputed {result.PackagesRecomputed}, skipped {result.SkippedNotInLibrary}.";
+    }
 
     // Per-tab visibility so each tab shows its own content (AC-21).
     public bool IsGeneralTab => SelectedTabIndex == 0;
@@ -171,8 +234,6 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
     // NOTE: the former "Symlink strategy" dropdown was removed (T6.3b) — it was written to `symlink.type`
     // but never read. Activation always uses both mechanisms: profile-directory switch + per-var links.
 
-    private const string HotDaysKey = "tiers.hot_threshold_days";
-    private const string AutoRebalanceKey = "automation.auto_rebalance";
     private const string ImportTempDirKey = "import.temp_dir";
     private const string ImportHistoryKeepKey = "import.history_keep";
     private const string SevenZipKey = "import.sevenzip_path";
@@ -183,8 +244,8 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
         VamPath = await settings.GetAsync(SettingKeys.VamPath, cancellationToken).ConfigureAwait(true);
         FixOnImport = await settings.GetAsync(SettingKeys.FixOnImport, cancellationToken).ConfigureAwait(true) ?? "Flag only";
         RefreshDataLocation();
-        HotThresholdDays = await settings.GetAsync(HotDaysKey, cancellationToken).ConfigureAwait(true) ?? "30";
-        AutoRebalance = await settings.GetBoolAsync(AutoRebalanceKey, false, cancellationToken).ConfigureAwait(true);
+        HotThresholdDays = await settings.GetAsync(SettingKeys.HotThresholdDays, cancellationToken).ConfigureAwait(true) ?? "30";
+        AutoRebalance = await settings.GetBoolAsync(SettingKeys.AutoRebalance, false, cancellationToken).ConfigureAwait(true);
         ImportTempDir = await settings.GetAsync(ImportTempDirKey, cancellationToken).ConfigureAwait(true);
         ImportHistoryKeep = await settings.GetAsync(ImportHistoryKeepKey, cancellationToken).ConfigureAwait(true) ?? "200";
         SevenZipPath = await settings.GetAsync(SevenZipKey, cancellationToken).ConfigureAwait(true);
@@ -207,8 +268,8 @@ public sealed partial class SettingsViewModel(ISettingsService settings) : Obser
         // VamPathValidationMessage (red hint); activation is guarded defensively in EfActivationService. (T6.3a)
         await settings.SetAsync(SettingKeys.VamPath, VamPath ?? string.Empty, cancellationToken).ConfigureAwait(true);
         await settings.SetAsync(SettingKeys.FixOnImport, FixOnImport ?? "Flag only", cancellationToken).ConfigureAwait(true);
-        await settings.SetAsync(HotDaysKey, HotThresholdDays ?? "30", cancellationToken).ConfigureAwait(true);
-        await settings.SetBoolAsync(AutoRebalanceKey, AutoRebalance, cancellationToken).ConfigureAwait(true);
+        await settings.SetAsync(SettingKeys.HotThresholdDays, HotThresholdDays ?? "30", cancellationToken).ConfigureAwait(true);
+        await settings.SetBoolAsync(SettingKeys.AutoRebalance, AutoRebalance, cancellationToken).ConfigureAwait(true);
         await settings.SetAsync(ImportTempDirKey, ImportTempDir ?? string.Empty, cancellationToken).ConfigureAwait(true);
         await settings.SetAsync(SevenZipKey, SevenZipPath ?? string.Empty, cancellationToken).ConfigureAwait(true);
         // Keep only a positive integer; blank/invalid falls back to the engine default (200).

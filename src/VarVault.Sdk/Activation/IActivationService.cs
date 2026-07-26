@@ -1,3 +1,5 @@
+using VarVault.Common;
+
 namespace VarVault.Sdk.Activation;
 
 /// <summary>
@@ -38,6 +40,13 @@ public interface IActivationService
 
     /// <summary>Rescue baseline: remove all app-owned links from a profile (deactivate everything). (3.13)</summary>
     Task<int> RescueAsync(long profileId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Rescue the currently active AddonPackages profile (resolve VaM active name → catalog Profile).
+    /// Prefer this from UI; <see cref="RescueAsync"/> remains for tests that already know the id.
+    /// Returns Failure when VaM path / active profile cannot be resolved (rescue did not run).
+    /// </summary>
+    Task<Result<int>> RescueActiveAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Clean up temp activation links after use. (3.14)</summary>
     Task<int> CleanTempLinksAsync(long profileId, CancellationToken cancellationToken = default);

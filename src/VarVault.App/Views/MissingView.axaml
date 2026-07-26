@@ -6,16 +6,18 @@
              x:Class="VarVault.App.Views.MissingView"
              x:DataType="vm:MissingDepsViewModel">
   <DockPanel Margin="18">
-    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,12">
-      <TextBlock Grid.Column="0" Text="Missing dependencies" FontSize="21" FontWeight="SemiBold"
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto,Auto" RowDefinitions="Auto,Auto" Margin="0,0,0,12">
+      <TextBlock Grid.Row="0" Grid.Column="0" Text="Missing dependencies" FontSize="21" FontWeight="SemiBold"
                  Foreground="{DynamicResource TextHiBrush}" VerticalAlignment="Center" />
-      <Button Grid.Column="1" Content="Analyze installed" Command="{Binding AnalyzeInstalledCommand}"
+      <Button Grid.Row="0" Grid.Column="1" Content="Analyze installed" Command="{Binding AnalyzeInstalledCommand}"
               ToolTip.Tip="Analyze dependencies of packages installed on the active profile. Found deps are activated; leftovers need Resolve/alias."
               Margin="0,0,8,0" IsEnabled="{Binding CanAnalyzeInstalled}" />
-      <Button Grid.Column="2" Content="Manage aliases…" Command="{Binding ManageAliasesCommand}"
+      <Button Grid.Row="0" Grid.Column="2" Content="Manage aliases…" Command="{Binding ManageAliasesCommand}"
               ToolTip.Tip="Review, unlink, or add missing→owned aliases (like the old Missing Vars dialog)."
               Margin="0,0,8,0" />
-      <Button Grid.Column="3" Content="Export links txt" Command="{Binding ExportLinksCommand}" />
+      <Button Grid.Row="0" Grid.Column="3" Content="Export links txt" Command="{Binding ExportLinksCommand}" />
+      <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4" Text="{Binding ExportStatus}" Opacity="0.7" FontSize="12"
+                 Margin="0,6,0,0" IsVisible="{Binding ExportStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
     </Grid>
     <!-- Legacy Installed Packages / MissingDepends: active-set deps → activate found → alias leftovers -->
     <c:Card DockPanel.Dock="Top" Header="Repair from installed packages (analyze deps → activate what you have)" Margin="0,0,0,12"
@@ -63,7 +65,7 @@
       </StackPanel>
     </c:Card>
     <!-- QoL · Repair from a VaM error log: paste → resolve (incl. .latest) → activate found + deps -->
-    <c:Card DockPanel.Dock="Top" Header="Repair from a VaM error log (paste log → activate what you have + dependencies)" Margin="0,0,0,12">
+    <c:Card DockPanel.Dock="Top" Header="Repair from a VaM error log (find packages named in the log that are missing from your library)" Margin="0,0,0,12">
       <StackPanel Spacing="8">
         <TextBox Text="{Binding LogText}" AcceptsReturn="True" MinHeight="80" MaxHeight="140"
                  FontFamily="{DynamicResource MonoFont}" FontSize="11.5" TextWrapping="NoWrap"

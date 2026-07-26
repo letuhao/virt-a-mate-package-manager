@@ -566,14 +566,14 @@ public sealed class EfImportService(
                     case ImportDecision.KeepIncoming:
                     {
                         var r = await CopyItemAsync(item, Path.Combine(mount, item.FileName), item.Signals.GbkEntryCount > 0, cancellationToken).ConfigureAwait(false);
-                        if (r.Ok) { copied++; if (r.Fixed) fixedCount++; didImport = true; TrackImported(importedRefs, item, item.FileName); TrackCopiedIncoming(copiedIncoming, session, item); }
+                        if (r.Ok) { copied++; if (r.Fixed) fixedCount++; didImport = true; TrackImported(importedRefs, item, item.FileName); TrackTrashCandidate(copiedIncoming, session, item); }
                         else { failed++; ok = false; reason = "copy failed"; }
                         break;
                     }
                     case ImportDecision.ImportAndFix:
                     {
                         var r = await CopyItemAsync(item, Path.Combine(mount, item.FileName), fix: true, cancellationToken).ConfigureAwait(false);
-                        if (r.Ok) { copied++; if (r.Fixed) fixedCount++; didImport = true; TrackImported(importedRefs, item, item.FileName); TrackCopiedIncoming(copiedIncoming, session, item); }
+                        if (r.Ok) { copied++; if (r.Fixed) fixedCount++; didImport = true; TrackImported(importedRefs, item, item.FileName); TrackTrashCandidate(copiedIncoming, session, item); }
                         else { failed++; ok = false; reason = "copy failed"; }
                         break;
                     }
@@ -581,19 +581,33 @@ public sealed class EfImportService(
                     {
                         var targetName = RenameTarget(item);
                         var r = await CopyItemAsync(item, Uniquify(Path.Combine(mount, targetName)), item.Signals.GbkEntryCount > 0, cancellationToken).ConfigureAwait(false);
-                        if (r.Ok) { renamed++; if (r.Fixed) fixedCount++; didImport = true; TrackImported(importedRefs, item, targetName); reason = "→ " + targetName; TrackCopiedIncoming(copiedIncoming, session, item); }
+                        if (r.Ok) { renamed++; if (r.Fixed) fixedCount++; didImport = true; TrackImported(importedRefs, item, targetName); reason = "→ " + targetName; TrackTrashCandidate(copiedIncoming, session, item); }
                         else { failed++; ok = false; reason = "copy failed"; }
                         break;
                     }
                     case ImportDecision.KeepBoth:
                     {
                         var r = await CopyItemAsync(item, Uniquify(Path.Combine(mount, item.FileName)), item.Signals.GbkEntryCount > 0, cancellationToken).ConfigureAwait(false);
-                        if (r.Ok) { copied++; if (r.Fixed) fixedCount++; didImport = true; TrackImported(importedRefs, item, item.FileName); TrackCopiedIncoming(copiedIncoming, session, item); }
+                        if (r.Ok) { copied++; if (r.Fixed) fixedCount++; didImport = true; TrackImported(importedRefs, item, item.FileName); TrackTrashCandidate(copiedIncoming, session, item); }
                         else { failed++; ok = false; reason = "copy failed"; }
                         break;
                     }
                     case ImportDecision.Discard: discarded++; reason = "discarded"; break;
-                    default: skipped++; reason = "skipped"; break; // Skip / KeepExisting / None
+                    case ImportDecision.KeepExisting:
+                        skipped++;
+                        reason = "kept existing";
+                        // Profile tidy: repo copy wins — loose profile original is safe to trash.
+                        TrackTrashCandidate(copiedIncoming, session, item);
+                        break;
+                    case ImportDecision.Skip:
+                    case ImportDecision.None:
+                        skipped++;
+                        reason = "skipped";
+                        // Exact dups already in the library: still tidy the loose profile original.
+                        if (item.Lane == ImportLane.Exact)
+                            TrackTrashCandidate(copiedIncoming, session, item);
+                        break;
+                    default: skipped++; reason = "skipped"; break;
                 }
                 outcomes.Add(new ImportOutcome(item.FileName, item.IdentityKey, item.Lane, item.Decision, ok, reason));
                 done++;
@@ -690,10 +704,11 @@ public sealed class EfImportService(
     }
 
     /// <summary>
-    /// Remember loose source paths that were successfully copied (for Trash originals). Skips archive extracts
-    /// under the session temp root and anything under a link-farm directory.
+    /// Remember loose source paths eligible for Trash originals: successful copies, Exact skips
+    /// (already in library), and KeepExisting. Skips archive extracts under the session temp root
+    /// and anything under a link-farm directory.
     /// </summary>
-    private static void TrackCopiedIncoming(List<string> copiedIncoming, ImportSession session, ImportItem item)
+    private static void TrackTrashCandidate(List<string> copiedIncoming, ImportSession session, ImportItem item)
     {
         var path = item.IncomingPath;
         if (string.IsNullOrWhiteSpace(path))

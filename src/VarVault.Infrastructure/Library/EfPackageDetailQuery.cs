@@ -19,6 +19,7 @@ public sealed class EfPackageDetailQuery(VarVaultDbContext db) : IPackageDetailQ
         if (package is null)
             return null;
         var item = await db.PackageListItems.AsNoTracking().FirstOrDefaultAsync(x => x.PackageId == packageId, cancellationToken).ConfigureAwait(false);
+        var stat = await db.UsageStats.AsNoTracking().FirstOrDefaultAsync(s => s.PackageId == packageId, cancellationToken).ConfigureAwait(false);
         return new PackageDetailOverview(
             package.Id,
             package.VarName,
@@ -26,7 +27,9 @@ public sealed class EfPackageDetailQuery(VarVaultDbContext db) : IPackageDetailQ
             package.LicenseType,
             item?.TotalSize ?? 0,
             (item?.Class ?? ContentClass.Cold).ToString(),
-            package.ReverseDependentCount);
+            package.ReverseDependentCount,
+            stat?.IsPinnedHot ?? false,
+            stat?.IsForcedCold ?? false);
     }
 
     public async Task<PageResult<DependencyEdgeDto>> GetDirectDependenciesPageAsync(long packageId, PageRequest request, CancellationToken cancellationToken = default)
@@ -194,7 +197,9 @@ public sealed class EfPackageDetailQuery(VarVaultDbContext db) : IPackageDetailQ
             overview.TotalSize,
             overview.StorageClass,
             overview.DependedOnByCount,
-            copies.Items);
+            copies.Items,
+            overview.IsPinnedHot,
+            overview.IsForcedCold);
     }
 
     private async Task<long?> CanonicalVarFileIdAsync(long packageId, CancellationToken cancellationToken) =>

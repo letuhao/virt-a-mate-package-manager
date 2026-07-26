@@ -85,7 +85,7 @@ public class DupesHealthMissingE2ETests
         UiE2E.Pump();
 
         Assert.NotEmpty(missing.Items); // AC-17: the missing ref shows (scope column renders "global")
-        missing.ExportLinksCommand.Execute(null);
+        await missing.ExportLinksCommand.ExecuteAsync(null);
         Assert.Contains("Some.Missing.1", missing.LastExportText);
         UiE2E.Screenshot(window, "ac17-missing");
     }

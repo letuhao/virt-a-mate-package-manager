@@ -127,4 +127,26 @@ public static class LooseVarEnumerator
         }
         return false;
     }
+
+    /// <summary>
+    /// True when <paramref name="directoryName"/> is a per-profile symlink farm
+    /// (<c>___VarsLink___</c> / <c>___MissingVarLink___</c> / <c>___TempVarLink___</c>).
+    /// Does <b>not</b> include <c>___AddonPacksSwitch ___</c> — profile roots live under that dir
+    /// and loose originals there are valid tidy targets.
+    /// </summary>
+    public static bool IsSymlinkFarmDirectory(string directoryName) =>
+        directoryName.StartsWith("___VarsLink___", StringComparison.OrdinalIgnoreCase)
+        || directoryName.StartsWith("___MissingVarLink___", StringComparison.OrdinalIgnoreCase)
+        || directoryName.StartsWith("___TempVarLink___", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>True when any path segment is a symlink-farm directory (not AddonPacksSwitch).</summary>
+    public static bool PathContainsSymlinkFarm(string path)
+    {
+        foreach (var segment in path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+        {
+            if (IsSymlinkFarmDirectory(segment))
+                return true;
+        }
+        return false;
+    }
 }

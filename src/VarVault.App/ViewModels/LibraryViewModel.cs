@@ -785,7 +785,7 @@ public sealed partial class LibraryViewModel(
     /// <summary>Last ops-bar action result message (shown transiently). (SCR-2e)</summary>
     [ObservableProperty] private string? _lastActionMessage;
 
-    /// <summary>Export the selected packages to a txt list via the action service. (SCR-2e / BE-N10)</summary>
+    /// <summary>Export the selected packages to a txt file via the action service. (SCR-2e / BE-N10)</summary>
     [RelayCommand]
     public async Task ExportSelectedAsync(CancellationToken cancellationToken = default)
     {
@@ -796,11 +796,14 @@ public sealed partial class LibraryViewModel(
         }
         var ids = _selectedPackageIds.ToList();
         var txt = await actions.ExportTxtAsync(ids, cancellationToken).ConfigureAwait(true);
-        LastExportText = txt;
-        LastActionMessage = $"Exported {ids.Count} packages";
+        LastActionMessage = await Services.TxtFileIo.ExportAsync(
+            SaveTxtPicker, "varvault-export.txt", txt, t => LastExportText = t, cancellationToken).ConfigureAwait(true);
     }
 
-    /// <summary>The most recent export text (for save-to-file by the view). (SCR-2e)</summary>
+    /// <summary>Save-file picker hook (set by the view).</summary>
+    public Func<string, Task<string?>>? SaveTxtPicker { get; set; }
+
+    /// <summary>The most recent export text (for tests / clipboard). (SCR-2e)</summary>
     public string? LastExportText { get; private set; }
 
     /// <summary>Rail saved-view: toggle a favorites-only filter and refresh. (SCR-2a)</summary>

@@ -77,6 +77,47 @@ public sealed class ImportProfileTidyE2ETests
         Assert.False(File.Exists(loose));
     }
 
+    [Fact]
+    public async Task Apply_reports_exact_skip_paths_for_profile_tidy()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        using var profile = new TempDirectory();
+        WriteMinimalVar(Path.Combine(profile.Path, "Fresh.Look.1.var"), "Fresh", "Look");
+
+        Guid repoId;
+        using (var scope = host.Host.Services.CreateScope())
+        {
+            var repo = await scope.ServiceProvider.GetRequiredService<IRepositoryService>()
+                .RegisterAsync(new RegisterRepositoryRequest("hot", repoDir.Path));
+            Assert.True(repo.IsSuccess);
+            repoId = repo.Value.Id;
+
+            // Seed the library with the same content so scan classifies Exact.
+            var import = scope.ServiceProvider.GetRequiredService<IImportService>();
+            var seed = await import.ScanAsync(new ImportSpec([profile.Path], repoId));
+            Assert.Single(seed.Items);
+            seed.Items[0].Decision = ImportDecision.Import;
+            var seeded = await import.ApplyAsync(seed);
+            Assert.Equal(1, seeded.Copied);
+        }
+
+        // Re-drop a loose Exact duplicate into the profile and Apply with Skip.
+        WriteMinimalVar(Path.Combine(profile.Path, "Fresh.Look.1.var"), "Fresh", "Look");
+        using var applyScope = host.Host.Services.CreateScope();
+        var svc = applyScope.ServiceProvider.GetRequiredService<IImportService>();
+        var session = await svc.ScanAsync(new ImportSpec([profile.Path], repoId));
+        Assert.Single(session.Items);
+        Assert.Equal(ImportLane.Exact, session.Items[0].Lane);
+        session.Items[0].Decision = ImportDecision.Skip;
+
+        var result = await svc.ApplyAsync(session);
+        Assert.Equal(0, result.Copied);
+        Assert.Equal(1, result.Skipped);
+        Assert.NotNull(result.CopiedIncomingPaths);
+        Assert.Contains(result.CopiedIncomingPaths!, p => p.EndsWith("Fresh.Look.1.var", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static void WriteMinimalVar(string path, string creator, string package)
     {
         using var fs = new FileStream(path, FileMode.Create, FileAccess.Write);

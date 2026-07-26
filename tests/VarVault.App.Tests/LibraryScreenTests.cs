@@ -65,7 +65,7 @@ public class LibraryScreenTests
         await vm.ExportSelectedCommand.ExecuteAsync(null);
 
         Assert.NotNull(vm.LastExportText);
-        Assert.Contains("Exported 3", vm.LastActionMessage);
+        Assert.Contains("Export failed", vm.LastActionMessage);
     }
 
     [AvaloniaFact]

@@ -1,3 +1,4 @@
+using System.IO;
 using Avalonia.Headless.XUnit;
 using Microsoft.Extensions.DependencyInjection;
 using VarVault.App.Composition;
@@ -41,13 +42,21 @@ public class PresetsSettingsTrashE2ETests
         presetsVm.Selected = presetsVm.Presets.First();
         for (var i = 0; i < 5 && presetsVm.Members.Count == 0; i++) { UiE2E.Pump(); await Task.Delay(20); }
 
-        presetsVm.ExportCommand.Execute(null);
+        var exportPath = Path.Combine(Path.GetTempPath(), $"varvault-export-{Guid.NewGuid():N}.txt");
+        presetsVm.SaveTxtPicker = _ => Task.FromResult<string?>(exportPath);
+        await presetsVm.ExportCommand.ExecuteAsync(null);
         Assert.Contains("Creator.Member.1", presetsVm.LastExportText); // AC-20
+        Assert.True(File.Exists(exportPath));
+        File.Delete(exportPath);
 
-        presetsVm.ImportTxtCommand.Execute(null);
+        var importPath = Path.Combine(Path.GetTempPath(), $"varvault-import-{Guid.NewGuid():N}.txt");
+        await File.WriteAllTextAsync(importPath, "Creator.Imported.1\n");
+        presetsVm.OpenTxtPicker = () => Task.FromResult<string?>(importPath);
+        await presetsVm.ImportTxtCommand.ExecuteAsync(null);
         UiE2E.Pump();
         Assert.True(shell.Dialogs.IsOpen);
         Assert.IsType<PresetEditViewModel>(shell.Dialogs.Current);
+        File.Delete(importPath);
         UiE2E.Screenshot(window, "ac20-presets");
     }
 

@@ -14,7 +14,10 @@ namespace VarVault.Infrastructure.Library;
 /// plan built from per-copy candidates via <see cref="MigrationPlanner"/> (single-copy/offline/unsafe
 /// targets excluded). (16-checklist BE-N2.)
 /// </summary>
-public sealed class EfTieringService(VarVaultDbContext db, IRepositoryService repositories) : ITieringService
+public sealed class EfTieringService(
+    VarVaultDbContext db,
+    IRepositoryService repositories,
+    FreeSpaceLedger? ledger = null) : ITieringService
 {
     public async Task<TierClassCounts> ClassCountsAsync(CancellationToken cancellationToken = default)
     {
@@ -84,15 +87,17 @@ public sealed class EfTieringService(VarVaultDbContext db, IRepositoryService re
 
         var rows = await db.VarFiles
             .Where(v => v.PackageId != null)
-            .Select(v => new { VarFileId = v.Id, v.RepositoryId, PackageId = v.PackageId!.Value })
+            .Select(v => new { VarFileId = v.Id, v.RepositoryId, PackageId = v.PackageId!.Value, v.SizeBytes })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
         // Join per-copy facts: repo tier/online + package class + single-copy.
         var listByPkg = await db.PackageListItems.ToDictionaryAsync(x => x.PackageId, cancellationToken).ConfigureAwait(false);
         var candidates = new List<MigrationCandidate>();
+        var sizeByVar = new Dictionary<long, long>();
         foreach (var r in rows)
         {
+            sizeByVar[r.VarFileId] = r.SizeBytes;
             if (!repoById.TryGetValue(r.RepositoryId, out var repo) || !listByPkg.TryGetValue(r.PackageId, out var item))
                 continue;
             candidates.Add(new MigrationCandidate(
@@ -104,9 +109,39 @@ public sealed class EfTieringService(VarVaultDbContext db, IRepositoryService re
         }
 
         var plan = MigrationPlanner.Plan(candidates, tier => safeTiers.Contains(tier));
-        return new TierMigrationPlan(
-            plan.Proposals.Select(p => new TierMoveProposal(p.VarFileId, p.FromTier, p.ToTier)).ToList(),
-            plan.Excluded.Count);
+
+        // Soft capacity filter: skip proposals that won't fit the best online dest on ToTier.
+        var entityRepos = await db.Repositories.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        var proposals = new List<TierMoveProposal>();
+        var capacityExcluded = 0;
+        foreach (var p in plan.Proposals)
+        {
+            var size = sizeByVar.GetValueOrDefault(p.VarFileId);
+            var dest = entityRepos
+                .Where(r => r.Tier == p.ToTier && r.IsOnline && r.IsEnabled
+                            && r.MediaType is not MediaType.Removable and not MediaType.Network)
+                .OrderByDescending(r => r.FreeBytes ?? 0)
+                .FirstOrDefault();
+            if (dest is null)
+            {
+                capacityExcluded++;
+                continue;
+            }
+            // Soft: only exclude when free space is known and insufficient (after in-flight ledger).
+            // Unknown FreeBytes → keep proposal; runner prefers live DriveInfo at execute time.
+            if (dest.FreeBytes is { } free)
+            {
+                var effective = free - (ledger?.Reserved(dest.Id) ?? 0);
+                if (!PlacementCapacity.HasRoom(effective, dest.MinFreeBytes, Math.Max(1, size)))
+                {
+                    capacityExcluded++;
+                    continue;
+                }
+            }
+            proposals.Add(new TierMoveProposal(p.VarFileId, p.FromTier, p.ToTier));
+        }
+
+        return new TierMigrationPlan(proposals, plan.Excluded.Count + capacityExcluded);
     }
 
     public Task<TierPolicy> PolicyAsync(CancellationToken cancellationToken = default) =>

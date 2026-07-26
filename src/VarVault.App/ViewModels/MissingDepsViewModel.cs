@@ -132,16 +132,24 @@ public sealed partial class MissingDepsViewModel(
         NextPageCommand.NotifyCanExecuteChanged();
     }
 
+    /// <summary>Save-file picker hook (set by the view).</summary>
+    public Func<string, Task<string?>>? SaveTxtPicker { get; set; }
+
+    /// <summary>Status from the last Export links txt action.</summary>
+    [ObservableProperty] private string? _exportStatus;
+
     /// <summary>The most recent export text (missing refs, one per line) for save-to-file. Always the FULL set. (AC-17)</summary>
     [ObservableProperty] private string? _lastExportText;
 
-    /// <summary>Screen-head "Export links txt": export ALL the missing refs as a txt list (not just the shown page). (AC-17)</summary>
+    /// <summary>Screen-head "Export links txt": export ALL the missing refs as a txt file. (AC-17)</summary>
     [RelayCommand]
     public async Task ExportLinksAsync(CancellationToken cancellationToken = default)
     {
         var all = await query.GetMissingAsync(cancellationToken).ConfigureAwait(true);
-        LastExportText = string.Join(System.Environment.NewLine,
+        var text = string.Join(System.Environment.NewLine,
             all.OrderByDescending(i => i.NeededByCount).ThenBy(i => i.Ref, StringComparer.Ordinal).Select(i => i.Ref));
+        ExportStatus = await Services.TxtFileIo.ExportAsync(
+            SaveTxtPicker, "missing-links.txt", text, t => LastExportText = t, cancellationToken).ConfigureAwait(true);
     }
 
     // ── Installed Packages repair (legacy MissingDepends) ───────────────────────────────────────────────
@@ -390,7 +398,7 @@ public sealed partial class MissingDepsViewModel(
                 : r.PathUnavailable > 0
                     ? "Nothing activated — set VaM path (Settings), activate a loading preset once, then retry."
                     : $"Added {r.MembersActivated} packages to the active loading preset (+ dependencies, {r.LinksCreated} links). " +
-                      $"{r.StillMissing} offline/unavailable · {r.UnresolvedDependencies} unresolved dependency branches (need import / Hub).";
+                      $"{r.StillMissing} offline/unavailable · {r.UnresolvedDependencies} unresolved dependency branches (need import).";
         }
         catch (Exception ex)
         {

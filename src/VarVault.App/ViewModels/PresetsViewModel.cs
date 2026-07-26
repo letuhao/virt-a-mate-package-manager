@@ -116,8 +116,22 @@ public sealed partial class PresetsViewModel : ObservableObject, ILoadableScreen
             : $"{verb}: {r.LinksCreated} linked · {r.MissingPackages} offline · {r.UnresolvedDependencies} unresolved · {r.LinksRemoved} removed";
     }
 
-    /// <summary>Screen-head "+ New preset" → preset-edit dialog on a fresh preset. (GD-8)</summary>
-    [RelayCommand] private void NewPreset() => _launcher?.OpenPresetEdit(0, "New preset");
+    /// <summary>Screen-head "+ New preset" → create then open edit on the real id. (GD-8)</summary>
+    [RelayCommand]
+    private async Task NewPresetAsync(CancellationToken cancellationToken = default)
+    {
+        var name = await UniquePresetNameAsync("New preset", cancellationToken).ConfigureAwait(true);
+        var created = await _presets.CreateAsync(name, [], cancellationToken).ConfigureAwait(true);
+        if (created.IsFailure)
+        {
+            StatusMessage = created.Error.Message;
+            return;
+        }
+        await LoadAsync(cancellationToken).ConfigureAwait(true);
+        Selected = Presets.FirstOrDefault(p => p.Id == created.Value.Id) ?? created.Value;
+        StatusMessage = $"Created '{created.Value.Name}'";
+        _launcher?.OpenPresetEdit(created.Value.Id, created.Value.Name);
+    }
 
     /// <summary>"Edit" → preset-edit dialog for the selected preset. (GD-8)</summary>
     [RelayCommand]
@@ -130,18 +144,118 @@ public sealed partial class PresetsViewModel : ObservableObject, ILoadableScreen
     /// <summary>"Deactivate all" → rescue baseline (drop all active links). (GD-8)</summary>
     [RelayCommand] private void DeactivateAll() => _launcher?.OpenRescue();
 
-    /// <summary>Screen-head "Import from txt…" → preset-edit dialog (import tab). (AC-20)</summary>
-    [RelayCommand] private void ImportTxt() => _launcher?.OpenPresetEdit(0, "Import from txt");
+    /// <summary>Open-file picker hook (set by the view) for "Import from txt…".</summary>
+    public Func<Task<string?>>? OpenTxtPicker { get; set; }
+
+    /// <summary>Save-file picker hook (set by the view) for Export.</summary>
+    public Func<string, Task<string?>>? SaveTxtPicker { get; set; }
+
+    /// <summary>Screen-head "Import from txt…" → create preset from member refs. (AC-20)</summary>
+    [RelayCommand]
+    private async Task ImportTxtAsync(CancellationToken cancellationToken = default)
+    {
+        if (OpenTxtPicker is null)
+        {
+            StatusMessage = "Import picker not ready — try again.";
+            return;
+        }
+        var path = await OpenTxtPicker().ConfigureAwait(true);
+        if (path is not null && path.Length == 0)
+        {
+            StatusMessage = "Import failed: window not ready for file picker.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            StatusMessage = "Import cancelled";
+            return;
+        }
+        IReadOnlyList<string> refs;
+        try
+        {
+            refs = await Services.TxtFileIo.ReadRefLinesAsync(path, cancellationToken).ConfigureAwait(true);
+        }
+        catch (System.IO.IOException ex)
+        {
+            StatusMessage = $"Import failed: {ex.Message}";
+            return;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            StatusMessage = $"Import failed: {ex.Message}";
+            return;
+        }
+        var baseName = System.IO.Path.GetFileNameWithoutExtension(path);
+        if (string.IsNullOrWhiteSpace(baseName))
+            baseName = "Imported";
+        var name = await UniquePresetNameAsync(baseName, cancellationToken).ConfigureAwait(true);
+        var created = await _presets.CreateAsync(name, refs, cancellationToken).ConfigureAwait(true);
+        if (created.IsFailure)
+        {
+            StatusMessage = created.Error.Message;
+            return;
+        }
+        await LoadAsync(cancellationToken).ConfigureAwait(true);
+        Selected = Presets.FirstOrDefault(p => p.Id == created.Value.Id) ?? created.Value;
+        StatusMessage = refs.Count == 0
+            ? $"Created empty preset '{created.Value.Name}' (no refs in file)"
+            : created.Value.MemberCount < refs.Count
+                ? $"Imported {created.Value.MemberCount} of {refs.Count} refs → '{created.Value.Name}'"
+                : $"Imported {created.Value.MemberCount} refs → '{created.Value.Name}'";
+        _launcher?.OpenPresetEdit(created.Value.Id, created.Value.Name);
+    }
 
     /// <summary>The most recent export text (member refs, one per line). (AC-20)</summary>
     [ObservableProperty] private string? _lastExportText;
 
-    /// <summary>Detail "Export" → member refs as a txt list. (AC-20)</summary>
+    /// <summary>Detail "Export" → all member refs as a txt file. (AC-20)</summary>
     [RelayCommand]
-    private void Export()
+    private async Task ExportAsync(CancellationToken cancellationToken = default)
     {
-        LastExportText = string.Join(System.Environment.NewLine, Members.Select(m => m.Ref));
-        StatusMessage = $"Exported {Members.Count} members";
+        if (Selected is null)
+        {
+            StatusMessage = "No preset selected";
+            return;
+        }
+        try
+        {
+            var members = await _presets.MembersAsync(Selected.Id, cancellationToken).ConfigureAwait(true);
+            var text = string.Join(System.Environment.NewLine, members);
+            var name = $"{SanitizeFileName(Selected.Name)}.txt";
+            StatusMessage = await Services.TxtFileIo.ExportAsync(
+                SaveTxtPicker, name, text, t => LastExportText = t, cancellationToken).ConfigureAwait(true);
+        }
+        catch (System.IO.IOException ex)
+        {
+            StatusMessage = $"Export failed: {ex.Message}";
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            StatusMessage = $"Export failed: {ex.Message}";
+        }
+    }
+
+    private async Task<string> UniquePresetNameAsync(string preferred, CancellationToken cancellationToken)
+    {
+        var existing = (await _presets.ListAsync(cancellationToken).ConfigureAwait(true))
+            .Select(p => p.Name)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!existing.Contains(preferred))
+            return preferred;
+        for (var i = 2; i < 1000; i++)
+        {
+            var candidate = $"{preferred} {i}";
+            if (!existing.Contains(candidate))
+                return candidate;
+        }
+        return $"{preferred} {System.Guid.NewGuid():N}";
+    }
+
+    private static string SanitizeFileName(string name)
+    {
+        foreach (var c in System.IO.Path.GetInvalidFileNameChars())
+            name = name.Replace(c, '_');
+        return string.IsNullOrWhiteSpace(name) ? "preset-members" : name;
     }
 
     /// <summary>Detail "Diff" → summarize this preset vs its resolved closure. (AC-20)</summary>
@@ -149,7 +263,7 @@ public sealed partial class PresetsViewModel : ObservableObject, ILoadableScreen
     private void Diff() =>
         StatusMessage = Preview is null
             ? "No preview loaded"
-            : $"{Members.Count} direct → {Preview.TotalWithClosure} with closure, {Preview.MissingRefs.Count} missing";
+            : $"{Preview.DirectResolved} direct → {Preview.TotalWithClosure} with closure, {Preview.MissingRefs.Count} missing";
 
     [RelayCommand]
     public async Task LoadAsync(CancellationToken cancellationToken = default)

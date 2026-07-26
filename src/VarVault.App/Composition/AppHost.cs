@@ -86,7 +86,9 @@ public static class AppHost
             ["proposals"] = new ProposalsViewModel(services.GetRequiredService<IProposalService>(), launcher, encodingJobs),
             ["health"] = new HealthViewModel(services.GetRequiredService<IHealthService>(), launcher),
             ["trash"] = new TrashViewModel(services.GetRequiredService<ITrashQueryService>()),
-            ["settings"] = new SettingsViewModel(services.GetRequiredService<Sdk.Settings.ISettingsService>()),
+            ["settings"] = new SettingsViewModel(
+                services.GetRequiredService<Sdk.Settings.ISettingsService>(),
+                services.GetService<IVamLogUsageImporter>()),
         };
 
         // Placeholders for screens whose full views arrive in SCR slices — keeps the shell complete.
@@ -388,12 +390,14 @@ public static class AppHost
                 services.AddSingleton<ImportJobRunner>();
                 services.AddSingleton<EncodingFixJobRunner>();
                 services.AddSingleton<InstalledDepsRepairJobRunner>();
+                services.AddSingleton<IdleAutoRebalanceService>();
             });
             var scope = host.Services.CreateScope(); // app-lifetime scope backing the shell's read services
             IndexerClientOverride.Current = IndexerProcessHost.ResolveClient(host.Services, dataDir);
             // Keep a worker reachable for the whole session (respawn/reconnect if it dies). (A12 liveness.)
             IndexerClientOverride.Monitor = new IndexerHealthMonitor(host.Services, dataDir);
             IndexerClientOverride.Monitor.Start();
+            host.Services.GetRequiredService<IdleAutoRebalanceService>().Start();
             var shell = CreateShell(scope.ServiceProvider);
             // C1.1 · a zero-repository install (that hasn't dismissed the wizard) opens onboarding on load.
             shell.ShowOnboardingOnLoad = NeedsOnboardingAsync(host.Services).GetAwaiter().GetResult();

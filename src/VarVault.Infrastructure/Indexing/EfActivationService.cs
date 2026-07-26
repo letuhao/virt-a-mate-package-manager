@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using VarVault.Common;
 using VarVault.Common.Threading;
 using VarVault.Domain.Activation;
+using VarVault.Domain.Analyzer;
 using VarVault.Domain.Dependencies;
 using VarVault.Domain.Entities;
 using VarVault.Infrastructure.Persistence;
@@ -33,6 +34,7 @@ public sealed class EfActivationService(
     IWriteQueue writeQueue,
     IProfilePackageLinkService profileLinks,
     IPresetService presets,
+    IUsageAnalyzer usage,
     ILogger<EfActivationService> logger) : IActivationService
 {
     // Serializes filesystem link operations so two concurrent activations can't race on a profile dir. (T7.3)
@@ -41,14 +43,17 @@ public sealed class EfActivationService(
     public async Task<ActivationBuildResult> BuildProfileLinksAsync(long presetId, CancellationToken cancellationToken = default)
     {
         var (members, aliases, unresolvedMembers) = await ResolvedMembersAsync(presetId, cancellationToken).ConfigureAwait(false);
-        return await RecomputeAsync(presetId, members, aliases, unresolvedMembers, cancellationToken).ConfigureAwait(false);
+        return await RecomputeAsync(presetId, members, aliases, unresolvedMembers, recordUsage: true, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async Task<ActivationBuildResult> DeactivateAsync(long presetId, long packageId, CancellationToken cancellationToken = default)
     {
         var (members, aliases, unresolvedMembers) = await ResolvedMembersAsync(presetId, cancellationToken).ConfigureAwait(false);
         members.Remove(packageId); // ref-counting: deps stay if another active member still needs them
-        return await RecomputeAsync(presetId, members, aliases, unresolvedMembers, cancellationToken).ConfigureAwait(false);
+        // Deactivate rebuilds links — must NOT count as usage (G1).
+        return await RecomputeAsync(presetId, members, aliases, unresolvedMembers, recordUsage: false, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async Task<int> RescueAsync(long profileId, CancellationToken cancellationToken = default)
@@ -68,6 +73,46 @@ public sealed class EfActivationService(
         await profileLinks.SyncFromActivationLinksAsync(profileId, cancellationToken).ConfigureAwait(false);
         await profileLinks.RefreshActiveProfileReadModelAsync(cancellationToken).ConfigureAwait(false);
         return owned.Count;
+    }
+
+    public async Task<Result<int>> RescueActiveAsync(CancellationToken cancellationToken = default)
+    {
+        var root = await VamRootAsync(cancellationToken).ConfigureAwait(false);
+        if (root.IsFailure)
+        {
+            logger.LogWarning("Rescue skipped: {Reason}", root.Error.Message);
+            return Result.Failure<int>("rescue.novamroot", "VaM install path is not set — rescue skipped.");
+        }
+        var vamRoot = root.Value;
+        if (!Directory.Exists(vamRoot))
+        {
+            logger.LogWarning("Rescue skipped: VaM path does not exist: {VamRoot}", vamRoot);
+            return Result.Failure<int>("rescue.badpath", "VaM install path does not exist — rescue skipped.");
+        }
+        var activeName = profiles.ActiveProfile(vamRoot);
+        if (string.IsNullOrWhiteSpace(activeName))
+        {
+            logger.LogWarning("Rescue skipped: no active AddonPackages profile under {VamRoot}", vamRoot);
+            return Result.Failure<int>("rescue.noactive", "No active AddonPackages profile — rescue skipped.");
+        }
+        var profile = await db.Profiles
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.Name == activeName, cancellationToken)
+            .ConfigureAwait(false);
+        if (profile is null)
+        {
+            // Case-insensitive fallback (VaM folder names vs catalog).
+            var all = await db.Profiles.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+            profile = all.FirstOrDefault(p => string.Equals(p.Name, activeName, StringComparison.OrdinalIgnoreCase));
+        }
+        if (profile is null)
+        {
+            logger.LogWarning("Rescue skipped: catalog has no Profile row for active '{ActiveName}'", activeName);
+            return Result.Failure<int>("rescue.noprofile",
+                $"Active profile '{activeName}' is not in the catalog — rescue skipped.");
+        }
+        var count = await RescueAsync(profile.Id, cancellationToken).ConfigureAwait(false);
+        return Result.Success(count);
     }
 
     public async Task<int> CleanTempLinksAsync(long profileId, CancellationToken cancellationToken = default)
@@ -174,7 +219,7 @@ public sealed class EfActivationService(
 
     private async Task<ActivationBuildResult> RecomputeAsync(
         long presetId, HashSet<long> memberSet, IReadOnlyList<AliasMapping> aliases,
-        IReadOnlyList<string> unresolvedMembers, CancellationToken cancellationToken)
+        IReadOnlyList<string> unresolvedMembers, bool recordUsage, CancellationToken cancellationToken)
     {
         var preset = await db.LoadingPresets.FirstOrDefaultAsync(p => p.Id == presetId, cancellationToken).ConfigureAwait(false);
         if (preset is null)
@@ -242,7 +287,7 @@ public sealed class EfActivationService(
             var linkPath = Path.Combine(varsLinkDir, fileName.Value);
             var reason = memberSet.Contains(packageId) ? ActivationReason.Explicit : ActivationReason.DependencyOf;
             desired[linkPath] = new DesiredLink(linkPath, ActivationPaths.SourcePath(copy.MountPath, copy.RelativePath),
-                copy.VarFileId, LinkKind.Install, reason, AliasKey: null);
+                copy.VarFileId, packageId, LinkKind.Install, reason, AliasKey: null);
         }
 
         // Desired alias links (named after the still-missing ref) → the owned target's file.
@@ -264,7 +309,7 @@ public sealed class EfActivationService(
             }
             var linkPath = Path.Combine(missingLinkDir, fileName.Value);
             desired[linkPath] = new DesiredLink(linkPath, ActivationPaths.SourcePath(copy.MountPath, copy.RelativePath),
-                copy.VarFileId, LinkKind.Alias, ActivationReason.Explicit, AliasKey: alias.MissingRefKey);
+                copy.VarFileId, alias.TargetPackageId, LinkKind.Alias, ActivationReason.Explicit, AliasKey: alias.MissingRefKey);
         }
 
         var missing = offlinePackages.Count;
@@ -282,6 +327,7 @@ public sealed class EfActivationService(
         {
             var newlyCreated = new List<string>();
             var present = 0;
+            var installedPackageIds = new HashSet<long>();
 
             // Phase A — materialize desired links (creates first, so a privilege denial aborts atomically).
             foreach (var d in desired.Values)
@@ -307,6 +353,8 @@ public sealed class EfActivationService(
                         continue;
                 }
                 present++; // Created, Recreated, or Unchanged — the link is on disk
+                if (d.Kind == LinkKind.Install)
+                    installedPackageIds.Add(d.PackageId);
 
                 // Upsert the row for this present link.
                 if (existingByPath.TryGetValue(d.LinkPath, out var row))
@@ -350,7 +398,28 @@ public sealed class EfActivationService(
             if (profile.IsActive)
                 await profileLinks.RefreshActiveProfileReadModelAsync(cancellationToken).ConfigureAwait(false);
 
+            // G1 · only BuildProfileLinksAsync (Activate) records usage — not Deactivate rebuilds.
+            if (recordUsage && installedPackageIds.Count > 0)
+                await RecordActivateUsageBestEffortAsync(installedPackageIds.ToList(), cancellationToken).ConfigureAwait(false);
+
             return new ActivationBuildResult(present, removed, missing, UnresolvedDependencies: unresolvedRefs.Count);
+        }
+    }
+
+    /// <summary>Best-effort: never fail activation because usage scoring failed. (G1.)</summary>
+    private async Task RecordActivateUsageBestEffortAsync(IReadOnlyList<long> packageIds, CancellationToken cancellationToken)
+    {
+        if (packageIds.Count == 0)
+            return;
+        try
+        {
+            await usage.RecordManyAsync(packageIds, UsageKind.Activate, cancellationToken).ConfigureAwait(false);
+            // Recompute only the packages we just touched — full recompute would scan every historical user.
+            await usage.RecomputePackagesAsync(packageIds, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Usage feed failed after activation ({Count} packages); install links are intact.", packageIds.Count);
         }
     }
 
@@ -390,7 +459,7 @@ public sealed class EfActivationService(
     }
 
     private sealed record DesiredLink(
-        string LinkPath, string SourcePath, long VarFileId, LinkKind Kind, ActivationReason Reason, string? AliasKey);
+        string LinkPath, string SourcePath, long VarFileId, long PackageId, LinkKind Kind, ActivationReason Reason, string? AliasKey);
 
     private sealed record HotCopy(long VarFileId, string VarName, string MountPath, string RelativePath);
 

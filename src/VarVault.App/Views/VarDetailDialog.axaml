@@ -24,7 +24,7 @@
       <Panel MinHeight="320">
         <!-- Overview -->
         <StackPanel Spacing="10" IsVisible="{Binding IsOverviewTab}">
-          <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" DataContext="{Binding Detail}">
+          <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" DataContext="{Binding Detail}">
             <TextBlock Grid.Row="0" Grid.Column="0" Text="Identity" Opacity="0.7" Margin="0,0,0,6" />
             <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding IdentityKey}" Margin="0,0,0,6" FontFamily="{DynamicResource MonoFont}" />
             <TextBlock Grid.Row="1" Grid.Column="0" Text="License" Opacity="0.7" Margin="0,0,0,6" />
@@ -33,9 +33,20 @@
             <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding TotalSize}" Margin="0,0,0,6" />
             <TextBlock Grid.Row="3" Grid.Column="0" Text="Depended on by" Opacity="0.7" Margin="0,0,0,6" />
             <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding DependedOnByCount}" Margin="0,0,0,6" />
-            <TextBlock Grid.Row="4" Grid.Column="0" Text="Class" Opacity="0.7" />
-            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding StorageClass}" />
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="Class" Opacity="0.7" Margin="0,0,0,6" />
+            <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding StorageClass}" Margin="0,0,0,6" />
           </Grid>
+          <StackPanel Spacing="6" IsVisible="{Binding CanEditPlacement}">
+            <TextBlock Text="Placement override" Opacity="0.7" FontSize="12" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="Pin hot" Command="{Binding SetPinHotCommand}" IsEnabled="{Binding !IsPinnedHot}" />
+              <Button Content="Force cold" Command="{Binding SetForceColdCommand}" IsEnabled="{Binding !IsForcedCold}" />
+              <Button Content="Auto" Command="{Binding ClearPlacementOverridesCommand}"
+                      IsEnabled="{Binding HasPlacementOverride}" />
+            </StackPanel>
+            <TextBlock Text="{Binding PlacementStatus}" Opacity="0.75" FontSize="12"
+                       IsVisible="{Binding PlacementStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          </StackPanel>
         </StackPanel>
 
         <!-- Dependencies: one section at a time via sub-tabs -->

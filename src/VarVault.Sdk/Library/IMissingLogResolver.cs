@@ -23,7 +23,7 @@ public sealed record MissingLogAnalysis(IReadOnlyList<MissingLogEntry> Entries)
 public sealed record MissingLogActivation(
     int MembersActivated,     // explicit packages requested that were linked
     int LinksCreated,         // total links made this build (members + pulled-in dependency closure)
-    int StillMissing,         // closure packages with no online copy to link (need importing / Hub)
+    int StillMissing,         // closure packages with no online copy to link (need import)
     int PrivilegeFailures,    // >0 → symlink privilege denied (needs Developer Mode / admin)
     int UnresolvedDependencies = 0, // unresolved members + transitive refs that stopped a branch
     int PathUnavailable = 0); // 1 when VaM path unset/missing

@@ -13,17 +13,20 @@ public sealed partial class VarDetailViewModel : ObservableObject
     private readonly IPackageDetailQuery _detailQuery;
     private readonly IDialogLauncher? _launcher;
     private readonly IClipboard? _clipboard;
+    private readonly IPlacementOverrideService? _placement;
 
     public VarDetailViewModel(
         IPackageDetailQuery detail,
         IDialogLauncher? launcher = null,
         IClipboard? clipboard = null,
         IThumbnailStore? thumbnails = null,
-        IIndexerClient? indexer = null)
+        IIndexerClient? indexer = null,
+        IPlacementOverrideService? placement = null)
     {
         _detailQuery = detail;
         _launcher = launcher;
         _clipboard = clipboard;
+        _placement = placement;
         PackageGallery = new PackageGalleryViewModel(detail, thumbnails, indexer);
         DirectDepsPager = new PagedListState<DependencyEdgeDto>((request, ct) => _detailQuery.GetDirectDependenciesPageAsync(PackageId, request, ct), defaultPageSize: 25);
         ReverseDepsPager = new PagedListState<ReverseDependentDto>((request, ct) => _detailQuery.GetReverseDependentsPageAsync(PackageId, request, ct), defaultPageSize: 25);
@@ -49,8 +52,13 @@ public sealed partial class VarDetailViewModel : ObservableObject
     public PagedListState<CopyDto> CopiesPager { get; }
 
     [ObservableProperty] private PackageDetail? _detail;
+    [ObservableProperty] private bool _isPinnedHot;
+    [ObservableProperty] private bool _isForcedCold;
+    [ObservableProperty] private string? _placementStatus;
 
     public bool HasDetail => Detail is not null;
+    public bool CanEditPlacement => _placement is not null && PackageId > 0;
+    public bool HasPlacementOverride => IsPinnedHot || IsForcedCold;
 
     public bool IsOverviewTab => SelectedTabIndex == 0;
     public bool IsDependenciesTab => SelectedTabIndex == 1;
@@ -95,8 +103,43 @@ public sealed partial class VarDetailViewModel : ObservableObject
         PackageGallery.Clear();
         CopiesPager.Reset();
         Detail = await _detailQuery.GetAsync(packageId, cancellationToken).ConfigureAwait(true);
+        IsPinnedHot = Detail?.IsPinnedHot ?? false;
+        IsForcedCold = Detail?.IsForcedCold ?? false;
+        PlacementStatus = null;
         OnPropertyChanged(nameof(HasDetail));
+        OnPropertyChanged(nameof(CanEditPlacement));
+        OnPropertyChanged(nameof(HasPlacementOverride));
         await EnsureTabLoadedAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    [RelayCommand]
+    private async Task SetPinHotAsync(CancellationToken cancellationToken = default)
+    {
+        if (_placement is null || PackageId <= 0)
+            return;
+        await _placement.SetAsync(PackageId, pinHot: true, forceCold: false, cancellationToken).ConfigureAwait(true);
+        await LoadAsync(PackageId, cancellationToken).ConfigureAwait(true);
+        PlacementStatus = "Pinned hot";
+    }
+
+    [RelayCommand]
+    private async Task SetForceColdAsync(CancellationToken cancellationToken = default)
+    {
+        if (_placement is null || PackageId <= 0)
+            return;
+        await _placement.SetAsync(PackageId, pinHot: false, forceCold: true, cancellationToken).ConfigureAwait(true);
+        await LoadAsync(PackageId, cancellationToken).ConfigureAwait(true);
+        PlacementStatus = "Forced cold";
+    }
+
+    [RelayCommand]
+    private async Task ClearPlacementOverridesAsync(CancellationToken cancellationToken = default)
+    {
+        if (_placement is null || PackageId <= 0)
+            return;
+        await _placement.SetAsync(PackageId, pinHot: false, forceCold: false, cancellationToken).ConfigureAwait(true);
+        await LoadAsync(PackageId, cancellationToken).ConfigureAwait(true);
+        PlacementStatus = "Automatic scoring";
     }
 
     [RelayCommand]

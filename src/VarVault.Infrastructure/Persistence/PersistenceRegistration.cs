@@ -48,6 +48,8 @@ public static class PersistenceRegistration
         services.AddScoped<Domain.Indexing.IPreviewIndexer, Indexing.EfPreviewIndexer>();
         services.AddScoped<IDependencyResolver, EfDependencyResolver>();
         services.AddScoped<Domain.Analyzer.IUsageAnalyzer, EfUsageAnalyzer>();
+        services.AddScoped<Sdk.Library.IPlacementOverrideService, Library.EfPlacementOverrideService>();
+        services.AddScoped<Sdk.Library.IVamLogUsageImporter, Library.EfVamLogUsageImporter>();
         services.AddScoped<IDependencyGraph, EfDependencyGraph>();
         services.AddScoped<IReferenceQuery, EfReferenceQuery>();
         services.AddScoped<UserSaveScanner>();

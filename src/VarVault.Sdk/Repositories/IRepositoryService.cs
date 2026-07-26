@@ -3,7 +3,11 @@ using VarVault.Common;
 namespace VarVault.Sdk.Repositories;
 
 /// <summary>Request to register a repository folder.</summary>
-public sealed record RegisterRepositoryRequest(string Name, string Path);
+public sealed record RegisterRepositoryRequest(
+    string Name,
+    string Path,
+    long? MinFreeBytes = null,
+    int? PreferredTier = null);
 
 /// <summary>A repository as seen across module boundaries (SDK-safe; no EF entities). </summary>
 public sealed record RepositoryInfo(

@@ -56,7 +56,7 @@
       <Button Content="⚑ Batch fix encoding" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding GoCommand}" CommandParameter="health" />
       <Button Content="⧉ Find duplicates" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding GoCommand}" CommandParameter="dupes" />
       <Button Content="↕ Find stale / old" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding GoCommand}" CommandParameter="tiering" />
-      <Button Content="⟳ Rebuild symlinks" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding GoCommand}" CommandParameter="repos" />
+      <Button Content="⟳ Open repositories" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding GoCommand}" CommandParameter="repos" />
     </StackPanel>
 
     <!-- Main -->

@@ -14,4 +14,10 @@ public sealed record MigrationRunResult(int Moved, int Failed);
 public interface IMigrationService
 {
     Task<MigrationRunResult> RunAsync(IReadOnlyList<MigrationRequest> moves, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// After registering a new repository: move multi-copy packages whose class desires the new repo's
+    /// tier onto it (RebalancePlanner). Capacity gated by FreeSpaceLedger in the runner.
+    /// </summary>
+    Task<MigrationRunResult> RebalanceOntoRepositoryAsync(Guid targetRepositoryId, CancellationToken cancellationToken = default);
 }

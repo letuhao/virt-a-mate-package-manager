@@ -50,4 +50,14 @@ public class FreeSpaceLedgerTests
         Assert.True(ledger.TryReserve(a, 900, 1000, 100));
         Assert.True(ledger.TryReserve(b, 900, 1000, 100)); // independent budget
     }
+
+    [Fact]
+    public void Zero_or_negative_bytes_are_rejected()
+    {
+        var ledger = new FreeSpaceLedger();
+        var repo = Guid.NewGuid();
+        Assert.False(ledger.TryReserve(repo, 0, 1000, 100));
+        Assert.False(ledger.TryReserve(repo, -1, 1000, 100));
+        Assert.Equal(0, ledger.Reserved(repo));
+    }
 }

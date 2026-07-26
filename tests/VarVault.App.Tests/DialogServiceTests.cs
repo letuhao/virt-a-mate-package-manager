@@ -24,6 +24,8 @@ public class DialogServiceTests
     private sealed class StubActivation : IActivationService
     {
         public Task<int> RescueAsync(long profileId, CancellationToken ct = default) => Task.FromResult(0);
+        public Task<VarVault.Common.Result<int>> RescueActiveAsync(CancellationToken ct = default) =>
+            Task.FromResult(VarVault.Common.Result.Success(0));
         public Task<ActivationBuildResult> BuildProfileLinksAsync(long id, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ActivationBuildResult> DeactivateAsync(long p, long pkg, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<int> CleanTempLinksAsync(long id, CancellationToken ct = default) => throw new NotSupportedException();

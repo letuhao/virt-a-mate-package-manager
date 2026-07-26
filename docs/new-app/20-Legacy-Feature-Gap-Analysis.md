@@ -16,7 +16,7 @@ The comparison is split into four buckets so intent is never confused with omiss
 3. **Wrong / deviating implementations** — present but behaves differently from legacy in a way that matters.
 4. **New app does it better** — where VarVault is a real upgrade (context for the effort).
 
-**Bottom line up front:** VarVault's *backend engines are real and substantially better-engineered* than legacy — multi-drive tiered storage, content-hash dedup, durable migration, and a stronger CJK fixer are all genuine, wired, and tested. The gaps are concentrated in **(a) the runtime feed that makes tiering actually work, (b) per-var symlink installation to disk, (c) the CLI, and (d) several complete engines that exist but have no trigger/UI ("unwired").** None of the core new-value features are fake; several are inert because nothing calls them.
+**Bottom line up front:** VarVault's *backend engines are real and substantially better-engineered* than legacy — multi-drive tiered storage, content-hash dedup, durable migration, and a stronger CJK fixer are all genuine, wired, and tested. **G1 v1 (2026-07-23):** loading-preset Activate now feeds `UsageEvent` / hot-warm-cold; VaM-log usage import and several UI stubs remain open. Remaining gaps concentrate in **(b) CLI**, **(c) unwired engines**, and **(d) dead/write-only Settings/Export/New-preset UI**.
 
 ---
 
@@ -40,14 +40,26 @@ Per CLAUDE.md ("Out of scope for v1 (sealed): Hub, load-into-VaM, MMD, packaging
 
 Ordered by impact. **G1–G3 are the ones that actually degrade the product today.**
 
-### G1 — Usage feed is missing → tiering is structurally inert ⚠️ **highest impact**
-The headline new-value feature is *usage-driven hot/warm/cold placement across drives*. The scoring engine is real and good (`Domain/Analyzer/UsageScoring.cs` — recency+frequency+centrality, hysteresis, cooldown) and the recompute pass runs (`Infrastructure/Indexing/EfUsageAnalyzer.cs`, called by the orchestrator).
+### G1 — Usage feed → tiering ⚠️ ~~structurally inert~~ → **PARTIAL FIX 2026-07-23 (preset-activate feed)**
 
-**But nothing ever records a usage event.** `IUsageAnalyzer.RecordAsync` has an interface, an impl, and tests — **no production caller** (verified: grep shows only the definition sites). The `UsageSource.VamLogImport` enum value (`Domain/Entities/Enums.cs:73`) is defined but **nothing implements a VaM `output_log.txt` parser**, and the Library rail's "Analyze VaM log" action is not wired.
+The headline new-value feature is *usage-driven hot/warm/cold placement across drives*. The scoring engine is real
+(`Domain/Analyzer/UsageScoring.cs`) and recompute runs from the indexer + after activate.
 
-**Consequence:** `UsageEvents` stays empty → every package scores 0 → everything settles to `ContentClass.Cold` → "misplaced / hot on cold drive / cold on SSD" detection has no signal to work with. The tiering UI renders, but the placement recommendations are effectively meaningless until a feed exists.
+> **✅ v1 feed (2026-07-23):** Successful **loading-preset activation** (`EfActivationService` after materialize)
+> calls `IUsageAnalyzer.RecordManyAsync(..., UsageKind.Activate)` for packages that got Install links present,
+> then `RecomputePackagesAsync` for those ids only. That is the **only** production writer of `UsageEvent` —
+> matching the product reality that Activate is how packages enter VaM. `UseCountTotal` / `Use30d` now grow from
+> real Activate cycles.
+>
+> **✅ Debt paid (2026-07-23):** Pin/force-cold via `IPlacementOverrideService` + VarDetail toggles; Settings
+> `tiers.hot_threshold_days` → `WindowedUsage` primary window + `ScoringConfig.RecencyHorizonDays`;
+> `FreeSpaceLedger` in `MigrationRunner` + soft capacity filter in `BuildPlanAsync`; Add-repo
+> `MinFreeBytes` / preferred tier + `RebalanceExisting` → `RebalancePlanner`; Settings Tiers **Import usage
+> from VaM log** (`IVamLogUsageImporter` → `Load`/`VamLogImport`); Automation **auto-rebalance on idle**
+> (`IdleAutoRebalanceService`). Missing Analyze stays missing-deps only. Temp-link producer remains sealed OUT.
 
-Legacy had no automated usage feed either (it used manual hide/fav sidecars + `LogAnalysis` of `output_log.txt` for *missing-dep* auto-install only), so this is not a *regression* — but it is the gap between "tiering works" and "tiering is a demo." **This should be the #1 build item.** A VaM-log importer is the natural producer and legacy already proves the log format is parseable (`Form1.LogAnalysis`).
+**Historical gap (pre-fix):** `IUsageAnalyzer.RecordAsync` had no production caller → everything stayed Cold.
+Legacy had no automated usage feed either (manual hide/fav + log analysis for missing-deps only).
 
 ### G2 — Preset activation never materializes per-var symlinks on disk ⚠️ ~~**the install feature is non-functional**~~ → **FIXED 2026-07-20**
 *(Re-verified 2026-07-20 against the live install `F:\VaM_1.22.0.3` + full source trace of the activation path.)*

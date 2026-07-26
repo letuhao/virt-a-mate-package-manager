@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using VarVault.Domain.Analyzer;
 using VarVault.Domain.Entities;
 using VarVault.Infrastructure.Indexing;
 using VarVault.Infrastructure.Persistence;
@@ -34,5 +35,51 @@ public sealed class EfMigrationService(VarVaultDbContext db, MigrationRunner run
             if (state == MigrationState.Done) moved++; else failed++;
         }
         return new MigrationRunResult(moved, failed);
+    }
+
+    public async Task<MigrationRunResult> RebalanceOntoRepositoryAsync(Guid targetRepositoryId, CancellationToken cancellationToken = default)
+    {
+        var target = await db.Repositories.AsNoTracking()
+            .FirstOrDefaultAsync(r => r.Id == targetRepositoryId, cancellationToken).ConfigureAwait(false);
+        if (target is null || !target.IsOnline || !target.IsEnabled)
+            return new MigrationRunResult(0, 0);
+
+        var copyCounts = await db.VarFiles.AsNoTracking()
+            .Where(v => v.PackageId != null)
+            .GroupBy(v => v.PackageId!.Value)
+            .Select(g => new { PackageId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.PackageId, x => x.Count, cancellationToken)
+            .ConfigureAwait(false);
+
+        var listByPkg = await db.PackageListItems.AsNoTracking()
+            .ToDictionaryAsync(x => x.PackageId, cancellationToken)
+            .ConfigureAwait(false);
+
+        var rows = await (
+            from v in db.VarFiles.AsNoTracking()
+            join r in db.Repositories.AsNoTracking() on v.RepositoryId equals r.Id
+            where v.RepositoryId != targetRepositoryId && v.PackageId != null
+            select new { v.Id, PackageId = v.PackageId!.Value, CurrentTier = r.Tier, Online = r.IsOnline })
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var candidates = new List<MigrationCandidate>();
+        foreach (var row in rows)
+        {
+            if (!listByPkg.TryGetValue(row.PackageId, out var item))
+                continue;
+            candidates.Add(new MigrationCandidate(
+                row.Id,
+                row.CurrentTier,
+                item.Class,
+                IsOnline: row.Online,
+                IsSingleCopy: copyCounts.GetValueOrDefault(row.PackageId, 1) <= 1));
+        }
+
+        var ids = RebalancePlanner.CandidatesForNewTier(candidates, target.Tier);
+        var moves = ids.Select(id => new MigrationRequest(id, targetRepositoryId)).ToList();
+        return moves.Count == 0
+            ? new MigrationRunResult(0, 0)
+            : await RunAsync(moves, cancellationToken).ConfigureAwait(false);
     }
 }

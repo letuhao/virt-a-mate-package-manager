@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using VarVault.App.Services;
 using VarVault.Sdk.Paging;
 using VarVault.Sdk.Presets;
 
@@ -30,16 +31,21 @@ public sealed partial class PresetEditViewModel : ObservableObject
     /// <summary>Most recent export text (member refs, one per line). (AC-25)</summary>
     [ObservableProperty] private string? _lastExportText;
 
+    /// <summary>Save-file picker hook (set by the view).</summary>
+    public Func<string, Task<string?>>? SaveTxtPicker { get; set; }
+
     /// <summary>Load the member table from the preset service. (AC-25)</summary>
     public async Task LoadMembersAsync(CancellationToken cancellationToken = default)
     {
+        if (PresetId <= 0)
+            return;
         await MembersPager.ResetAndReloadAsync(cancellationToken).ConfigureAwait(true);
     }
 
     [RelayCommand]
     public async Task AddMemberAsync(CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(NewMemberRef))
+        if (PresetId <= 0 || string.IsNullOrWhiteSpace(NewMemberRef))
             return;
         var result = await _presets.AddMemberAsync(PresetId, NewMemberRef!, cancellationToken).ConfigureAwait(true);
         StatusMessage = result.IsSuccess ? "Member added" : result.Error.Message;
@@ -52,20 +58,48 @@ public sealed partial class PresetEditViewModel : ObservableObject
     [RelayCommand]
     public async Task RemoveMemberAsync(string memberRef, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(memberRef))
+        if (PresetId <= 0 || string.IsNullOrWhiteSpace(memberRef))
             return;
         await _presets.RemoveMemberAsync(PresetId, memberRef, cancellationToken).ConfigureAwait(true);
         await LoadMembersAsync(cancellationToken).ConfigureAwait(true);
         await RefreshPreviewAsync(cancellationToken).ConfigureAwait(true);
     }
 
-    /// <summary>"Export" → member refs as a txt list. (AC-25)</summary>
+    /// <summary>"Export" → all member refs as a txt file. (AC-25)</summary>
     [RelayCommand]
-    private void Export() => LastExportText = string.Join(System.Environment.NewLine, Members);
+    private async Task ExportAsync(CancellationToken cancellationToken = default)
+    {
+        if (PresetId <= 0)
+        {
+            StatusMessage = "Preset not loaded";
+            return;
+        }
+        try
+        {
+            var members = await _presets.MembersAsync(PresetId, cancellationToken).ConfigureAwait(true);
+            var text = string.Join(System.Environment.NewLine, members);
+            var fileName = string.IsNullOrWhiteSpace(Name) ? "preset-members.txt" : $"{SanitizeFileName(Name)}.txt";
+            StatusMessage = await TxtFileIo.ExportAsync(
+                SaveTxtPicker, fileName, text, t => LastExportText = t, cancellationToken).ConfigureAwait(true);
+        }
+        catch (System.IO.IOException ex)
+        {
+            StatusMessage = $"Export failed: {ex.Message}";
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            StatusMessage = $"Export failed: {ex.Message}";
+        }
+    }
 
     [RelayCommand]
     public async Task RefreshPreviewAsync(CancellationToken cancellationToken = default)
     {
+        if (PresetId <= 0)
+        {
+            Preview = null;
+            return;
+        }
         Preview = await _presets.PreviewActivationAsync(PresetId, cancellationToken).ConfigureAwait(true);
     }
 
@@ -87,4 +121,11 @@ public sealed partial class PresetEditViewModel : ObservableObject
 
     private bool CanMembersPreviousPage() => MembersPager.HasPreviousPage && !MembersPager.IsLoading;
     private bool CanMembersNextPage() => MembersPager.HasNextPage && !MembersPager.IsLoading;
+
+    private static string SanitizeFileName(string name)
+    {
+        foreach (var c in System.IO.Path.GetInvalidFileNameChars())
+            name = name.Replace(c, '_');
+        return string.IsNullOrWhiteSpace(name) ? "preset-members" : name;
+    }
 }

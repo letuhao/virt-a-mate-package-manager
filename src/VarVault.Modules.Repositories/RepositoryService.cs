@@ -45,9 +45,12 @@ internal sealed class RepositoryService(
             MountPath = System.IO.Path.GetFullPath(request.Path),
             MediaType = profile.MediaType,
             // No benchmark yet (BE-R1) → tier from media type; re-tier after a benchmark later.
-            Tier = _tierPolicy.AssignTier(profile.MediaType, readMBps: null),
+            Tier = request.PreferredTier is >= 1 and <= 3
+                ? request.PreferredTier.Value
+                : _tierPolicy.AssignTier(profile.MediaType, readMBps: null),
             CapacityBytes = profile.CapacityBytes,
             FreeBytes = profile.FreeBytes,
+            MinFreeBytes = request.MinFreeBytes is > 0 ? request.MinFreeBytes.Value : 0,
             VolumeSerial = profile.VolumeSerial,
             IsEnabled = true,
             IsOnline = true,

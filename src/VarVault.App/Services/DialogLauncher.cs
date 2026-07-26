@@ -36,7 +36,11 @@ public sealed class DialogLauncher(
     : IDialogLauncher
 {
     public void OpenAddRepo() =>
-        dialogs.Show(new AddRepoViewModel(services.GetRequiredService<Sdk.Repositories.IRepositoryService>(), afterRepoAdded));
+        dialogs.Show(new AddRepoViewModel(
+            services.GetRequiredService<Sdk.Repositories.IRepositoryService>(),
+            afterRepoAdded,
+            services.GetService<Sdk.Library.IMigrationService>(),
+            services.GetService<Sdk.Threading.IJobQueue>()));
 
     public void OpenEditRepo(Sdk.Repositories.RepositoryInfo repo, System.Action? onSaved = null) =>
         dialogs.Show(new EditRepoViewModel(services.GetRequiredService<Sdk.Repositories.IRepositoryService>(), repo, onSaved));
@@ -45,7 +49,8 @@ public sealed class DialogLauncher(
     {
         var vm = new RescueViewModel(
             services.GetRequiredService<Sdk.Activation.IActivationService>(),
-            services.GetService<Sdk.Presets.IPresetService>());
+            services.GetService<Sdk.Presets.IPresetService>(),
+            services.GetService<Sdk.Library.IProfileService>());
         _ = vm.LoadAsync();
         dialogs.Show(vm);
     }
@@ -72,7 +77,8 @@ public sealed class DialogLauncher(
             this,
             services.GetService<IClipboard>() ?? new AvaloniaClipboard(),
             services.GetService<VarVault.Domain.Indexing.IThumbnailStore>(),
-            VarVault.App.Composition.IndexerClientOverride.Current ?? services.GetService<Sdk.Indexer.IIndexerClient>());
+            VarVault.App.Composition.IndexerClientOverride.Current ?? services.GetService<Sdk.Indexer.IIndexerClient>(),
+            services.GetService<Sdk.Library.IPlacementOverrideService>());
         _ = vm.LoadAsync(packageId);
         if (push)
             dialogs.Push(vm);
@@ -151,9 +157,14 @@ public sealed class DialogLauncher(
             PresetId = presetId,
             Name = name,
         };
-        _ = vm.LoadMembersAsync();
-        _ = vm.RefreshPreviewAsync();
         dialogs.Show(vm);
+        _ = LoadPresetEditAsync(vm);
+    }
+
+    private static async Task LoadPresetEditAsync(PresetEditViewModel vm)
+    {
+        await vm.LoadMembersAsync().ConfigureAwait(true);
+        await vm.RefreshPreviewAsync().ConfigureAwait(true);
     }
 
     public void OpenEditMeta(long packageId, Action? onSaved = null)

@@ -396,6 +396,8 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
             cancellationToken.ThrowIfCancellationRequested();
             if (!IsSafeToTrashOriginal(path))
             {
+                // Drop permanently-unsafe entries so the button doesn't stay "armed" forever.
+                _pendingTrashOriginals.Remove(path);
                 failed++;
                 continue;
             }
@@ -654,8 +656,8 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
             // Don't gate on CanTrashOriginals — that requires !IsApplying, and we are still applying until finally.
             if (TrashOriginalsAfterApply && _trash is not null && _pendingTrashOriginals.Count > 0)
                 await TrashOriginalsAsync().ConfigureAwait(true);
-            else
-                NotifyTrashOriginals();
+            else if (TrashOriginalsAfterApply && _pendingTrashOriginals.Count == 0)
+                StatusMessage += " · no loose originals to trash (symlinks / archive extracts stay).";
             await RefreshQuickImportHintAsync().ConfigureAwait(true);
         }
         catch (OperationCanceledException)
@@ -664,7 +666,6 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
             ResetAfterApply();
             StatusMessage = "Import cancelled — copied items are kept, the rest skipped (logged to History).";
             await RefreshHistoryAsync().ConfigureAwait(true);
-            NotifyTrashOriginals();
         }
         catch (Exception ex)
         {
@@ -686,6 +687,8 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
             OperationMessage = null;
             NotifyCounts();
             NotifyOperationState();
+            // CanTrashOriginals depends on !IsApplying — refresh after the flag clears.
+            NotifyTrashOriginals();
         }
     }
 
@@ -752,8 +755,9 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
     }
 
     /// <summary>
-    /// Remember successfully-copied loose source files (not archive extracts under TempRoot) for Trash originals.
-    /// Unions with any prior pending paths so a second Apply does not drop untidy originals from the first.
+    /// Remember loose profile originals eligible for Trash after Apply: durable copies, Exact skips
+    /// already in the library, and KeepExisting. Unions across Applies so a second run doesn't drop
+    /// untidy paths from the first.
     /// </summary>
     private void CapturePendingTrashOriginals(ApplyResult result)
     {
@@ -775,13 +779,9 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
             && Directory.Exists(sourceFolder)
             && LooseVarEnumerator.IsUnderLinkDirectory(sourceFolder, path))
             return false;
-        // Absolute safety: refuse any path whose segment is a link-farm name.
-        foreach (var segment in path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
-        {
-            if (RepositoryScanRules.IsLinkDirectory(segment))
-                return false;
-        }
-        return true;
+        // Refuse ___VarsLink___ / aliases. Allow ___AddonPacksSwitch ___\profile\… — Quick import
+        // originals live there and RepositoryScanRules.IsLinkDirectory would wrongly block them.
+        return !LooseVarEnumerator.PathContainsSymlinkFarm(path);
     }
 
     private void NotifyQuickImport()

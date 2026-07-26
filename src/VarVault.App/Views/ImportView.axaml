@@ -178,10 +178,10 @@
                         ToolTip.Tip="After Apply: Off — no install. New copies → “Imported” builds the sealed Imported preset from successfully copied vars only. All from scan → active preset installs every resolvable identity from this scan (including Exact/Skip already in the library) into the active loading preset." />
             </StackPanel>
             <CheckBox Content="Trash originals after Apply" IsChecked="{Binding TrashOriginalsAfterApply}" VerticalAlignment="Center"
-                      ToolTip.Tip="After a successful copy, move the loose profile .var originals into VarVault Trash (not symlinks). Default on for Quick import." />
+                      ToolTip.Tip="After Apply, move loose profile .var originals into VarVault Trash — including Exact duplicates already in the library. Never touches symlinks or archive extracts. Default on for Quick import." />
             <Button Content="🗑 Trash originals" Command="{Binding TrashOriginalsCommand}"
                     IsEnabled="{Binding CanTrashOriginals}"
-                    ToolTip.Tip="Move successfully imported loose .var files from the profile into Trash (restorable). Skips symlinks." />
+                    ToolTip.Tip="Move pending loose .var originals (copied or Exact-skipped) from the profile into Trash (restorable). Enabled after Apply when originals remain. Skips symlinks." />
           </StackPanel>
           <Button Grid.Column="4" Content="Apply →" Command="{Binding ApplyCommand}"
                   Background="{DynamicResource AccentBrush}" Foreground="White" FontWeight="SemiBold" />

@@ -53,7 +53,9 @@ public sealed record PackageDetailOverview(
     string? License,
     long TotalSize,
     string StorageClass,
-    int DependedOnByCount);
+    int DependedOnByCount,
+    bool IsPinnedHot = false,
+    bool IsForcedCold = false);
 
 /// <summary>Full detail for one package — the var-detail modal and the library detail panel bind this.</summary>
 public sealed record PackageDetail(
@@ -64,7 +66,9 @@ public sealed record PackageDetail(
     long TotalSize,
     string StorageClass,
     int DependedOnByCount,
-    IReadOnlyList<CopyDto> Copies);
+    IReadOnlyList<CopyDto> Copies,
+    bool IsPinnedHot = false,
+    bool IsForcedCold = false);
 
 /// <summary>
 /// BE-N9 · Per-package detail: identity, license, class, reverse-dependent count, dependency edges,

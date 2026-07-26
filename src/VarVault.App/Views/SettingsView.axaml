@@ -43,13 +43,37 @@
     </c:Card>
 
     <c:Card Header="Tiers &amp; policy" IsVisible="{Binding IsTiersTab}">
-      <Grid ColumnDefinitions="200,*">
-        <TextBlock Grid.Column="0" Text="Hot threshold (days)" VerticalAlignment="Center" Opacity="0.8" />
-        <TextBox Grid.Column="1" Text="{Binding HotThresholdDays}" />
-      </Grid>
+      <StackPanel Spacing="10">
+        <StackPanel Spacing="6">
+          <Grid ColumnDefinitions="200,*">
+            <TextBlock Grid.Column="0" Text="Hot threshold (days)" VerticalAlignment="Center" Opacity="0.8" />
+            <TextBox Grid.Column="1" Text="{Binding HotThresholdDays}" />
+          </Grid>
+          <TextBlock Text="Days of recent use for hot scoring (recency horizon + primary usage window)."
+                     Opacity="0.55" FontSize="11" TextWrapping="Wrap" />
+        </StackPanel>
+        <StackPanel Spacing="6">
+          <TextBlock Text="Import usage from VaM log" FontWeight="SemiBold" Opacity="0.9" />
+          <TextBox Text="{Binding VamLogText}" AcceptsReturn="True" MinHeight="72" MaxHeight="140"
+                   FontFamily="{DynamicResource MonoFont}" FontSize="11.5"
+                   Watermark="Paste output_log.txt (or Browse…)…" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button Content="Browse…" Command="{Binding BrowseVamLogCommand}" />
+            <Button Content="Preview" Command="{Binding PreviewVamLogUsageCommand}" />
+            <Button Content="Import usage" Command="{Binding ImportVamLogUsageCommand}"
+                    Background="{DynamicResource AccentBrush}" Foreground="White" />
+          </StackPanel>
+          <TextBlock Text="{Binding VamLogStatus}" Opacity="0.7" FontSize="12" TextWrapping="Wrap"
+                     IsVisible="{Binding VamLogStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+      </StackPanel>
     </c:Card>
     <c:Card Header="Automation" IsVisible="{Binding IsAutomationTab}">
-      <CheckBox Content="Auto-rebalance tiers on idle" IsChecked="{Binding AutoRebalance}" />
+      <StackPanel Spacing="6">
+        <CheckBox Content="Auto-rebalance tiers on idle" IsChecked="{Binding AutoRebalance}" />
+        <TextBlock Text="When idle, migrate misplaced packages toward their scored tier (capacity-gated)."
+                   Opacity="0.55" FontSize="11" TextWrapping="Wrap" />
+      </StackPanel>
     </c:Card>
     <c:Card Header="Import" IsVisible="{Binding IsImportTab}">
       <StackPanel Spacing="10">

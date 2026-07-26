@@ -22,6 +22,7 @@ public partial class SettingsView : UserControl
             vm.DataFolderPicker ??= () => PickFolderAsync("Select the VarVault data folder");
             vm.ImportTempFolderPicker ??= () => PickFolderAsync("Select the archive temp folder");
             vm.SevenZipFilePicker ??= PickSevenZipAsync;
+            vm.VamLogFilePicker ??= PickVamLogAsync;
         }
     }
 
@@ -36,6 +37,24 @@ public partial class SettingsView : UserControl
             AllowMultiple = false,
         }).ConfigureAwait(true);
         return folders.Count > 0 ? folders[0].Path.LocalPath : null;
+    }
+
+    private async System.Threading.Tasks.Task<string?> PickVamLogAsync()
+    {
+        var top = TopLevel.GetTopLevel(this);
+        if (top is null)
+            return null;
+        var files = await top.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Select VaM output_log.txt",
+            AllowMultiple = false,
+            FileTypeFilter =
+            [
+                new FilePickerFileType("VaM log") { Patterns = ["output_log.txt", "*.txt", "*.log"] },
+                FilePickerFileTypes.All,
+            ],
+        }).ConfigureAwait(true);
+        return files.Count > 0 ? files[0].Path.LocalPath : null;
     }
 
     private async System.Threading.Tasks.Task<string?> PickSevenZipAsync()
