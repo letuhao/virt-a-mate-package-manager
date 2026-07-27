@@ -39,6 +39,7 @@
     <DataTemplate DataType="vm:EditRepoViewModel"><views:EditRepoDialog /></DataTemplate>
     <DataTemplate DataType="vm:MigrateViewModel"><views:MigrateDialog /></DataTemplate>
     <DataTemplate DataType="vm:FixEncodingViewModel"><views:FixDialog /></DataTemplate>
+    <DataTemplate DataType="vm:DedupFixViewModel"><views:DedupFixDialog /></DataTemplate>
     <DataTemplate DataType="vm:AliasViewModel"><views:AliasDialog /></DataTemplate>
     <DataTemplate DataType="vm:ManageAliasesViewModel"><views:ManageAliasesDialog /></DataTemplate>
     <DataTemplate DataType="vm:ConfirmDeleteViewModel"><views:ConfirmDeleteDialog /></DataTemplate>

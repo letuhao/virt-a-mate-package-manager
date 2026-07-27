@@ -56,6 +56,7 @@ public static class PersistenceRegistration
         services.AddScoped<CatalogReconciler>();
         services.AddScoped<MigrationRunner>();
         services.AddScoped<EncodingFixCoordinator>();
+        services.AddScoped<DuplicateEntryFixCoordinator>();
         services.AddSingleton<Domain.Analyzer.FreeSpaceLedger>();
 
         // Trash lives alongside the DB so restore survives DB loss (per-item manifests).

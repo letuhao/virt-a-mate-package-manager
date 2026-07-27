@@ -28,6 +28,8 @@ public enum IntegrityStatus
     CorruptZip = 1,
     MissingMeta = 2,
     BadName = 3,
+    /// <summary>Two+ zip members collapse to the same VaM path key (RegisterPackage dictionary crash).</summary>
+    DuplicateEntries = 4,
 }
 
 /// <summary>Recognized legacy quarantine directories (imported from old varManager).</summary>

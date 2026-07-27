@@ -47,6 +47,8 @@ public sealed class OneHandleVarInspector
             if (entries.Count == 0)
                 return new Result(new VarInspection(IntegrityStatus.CorruptZip, [], null, null, null, null, []), null, null);
 
+            // Fingerprints/classification come from the CD — keep them even if ZipArchive fails
+            // (ArgumentException is often duplicate FullNames, not a dead zip).
             var signatures = ContentSignatureEngine.Compute(entries);
             var classification = ContentClassificationEngine.Classify(entries.Select(e => e.DecodedNameBestEffort));
             var encoding = EncodingHealthEngine.Detect(entries);
@@ -56,10 +58,16 @@ public sealed class OneHandleVarInspector
             var embedded = new List<string>();
             byte[]? thumb = null;
             string? thumbEntry = null;
+            var crcMismatch = false;
 
-            stream.Seek(0, SeekOrigin.Begin);
-            using (var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true))
+            try
             {
+                stream.Seek(0, SeekOrigin.Begin);
+                using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
+
+                if (!ZipCrcSpotChecker.TryVerify(archive, out _))
+                    crcMismatch = true;
+
                 if (hasMeta)
                 {
                     var metaEntry = archive.GetEntry("meta.json")
@@ -113,13 +121,19 @@ public sealed class OneHandleVarInspector
                     }
                 }
             }
+            catch (Exception ex) when (ex is InvalidDataException or IOException or ArgumentException)
+            {
+                // Soft failure after a good CD: do not invent CorruptZip / wipe fingerprints.
+                // ArgumentException is commonly duplicate FullName keys (VaM-load issue, fixable).
+            }
 
-            var integrity = hasMeta ? IntegrityStatus.Ok : IntegrityStatus.MissingMeta;
+            var integrity = VarInspector.DeriveIntegrity(entries, hasMeta, crcMismatch);
             var inspection = new VarInspection(integrity, entries, signatures, classification, encoding, meta, embedded);
             return new Result(inspection, thumb, thumbEntry);
         }
-        catch (Exception ex) when (ex is InvalidDataException or IOException)
+        catch (Exception ex) when (ex is InvalidDataException or IOException or ArgumentException)
         {
+            // File open / unexpected before CD — truly unreadable.
             return new Result(new VarInspection(IntegrityStatus.CorruptZip, [], null, null, null, null, []), null, null);
         }
     }

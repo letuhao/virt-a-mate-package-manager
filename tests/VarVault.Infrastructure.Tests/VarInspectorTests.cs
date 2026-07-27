@@ -49,6 +49,36 @@ public sealed class VarInspectorTests
     }
 
     [Fact]
+    public void Corrupt_payload_crc_is_flagged()
+    {
+        using var dir = new TempDirectory();
+        var path = dir.File("Creator.Package.1.var");
+        WriteVar(path, meta: """{"creatorName":"Creator","packageName":"Package","licenseType":"CC BY"}""",
+        [
+            ("Custom/Clothing/Female/dress.vam", "healthy-payload"),
+        ]);
+
+        // Leave payload intact; flip the CD CRC so spot-check detects mismatch (IDX-10).
+        PatchFirstCentralDirectoryCrc(path, 0xDEADBEEFu);
+
+        var inspection = _sut.Inspect(path).Value;
+        Assert.Equal(IntegrityStatus.CorruptZip, inspection.Integrity);
+    }
+
+    /// <summary>Overwrite CRC-32 of the first central-directory file header (offset +16).</summary>
+    private static void PatchFirstCentralDirectoryCrc(string path, uint newCrc)
+    {
+        var bytes = File.ReadAllBytes(path);
+        // EOCD at end-22 (no comment): CD offset at +16.
+        var eocd = bytes.Length - 22;
+        Assert.True(eocd >= 0 && BitConverter.ToUInt32(bytes, eocd) == 0x06054b50u);
+        var cdOffset = BitConverter.ToInt32(bytes, eocd + 16);
+        Assert.Equal(0x02014b50u, BitConverter.ToUInt32(bytes, cdOffset));
+        BitConverter.TryWriteBytes(bytes.AsSpan(cdOffset + 16, 4), newCrc);
+        File.WriteAllBytes(path, bytes);
+    }
+
+    [Fact]
     public void Corrupt_zip_is_flagged_without_throwing()
     {
         using var dir = new TempDirectory();

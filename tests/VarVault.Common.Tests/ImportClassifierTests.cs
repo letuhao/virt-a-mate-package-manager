@@ -29,6 +29,10 @@ public class ImportClassifierTests
         => Assert.Equal(LaneKind.Corrupt, ImportClassifier.Classify(Cand(integrity: IntegrityStatus.MissingMeta), Repo));
 
     [Fact]
+    public void Duplicate_entries_is_Corrupt()
+        => Assert.Equal(LaneKind.Corrupt, ImportClassifier.Classify(Cand(integrity: IntegrityStatus.DuplicateEntries), Repo));
+
+    [Fact]
     public void Exact_content_anywhere_is_Exact_even_if_misnamed()
     {
         // Same ContentSignature as a repo var but a totally different (garbage) filename -> still Exact (E1/D1).

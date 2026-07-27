@@ -37,22 +37,45 @@ public sealed class VarInspector : IVarInspector
         var encoding = EncodingHealthEngine.Detect(entries);
 
         var hasMeta = entries.Any(e => e.IsRootMetaJson);
-        var (meta, embeddedRefs) = ReadContent(varPath, hasMeta);
-        var integrity = hasMeta ? IntegrityStatus.Ok : IntegrityStatus.MissingMeta;
+        var (meta, embeddedRefs, crcMismatch) = ReadContent(varPath, hasMeta);
+        var integrity = DeriveIntegrity(entries, hasMeta, crcMismatch);
 
         return new VarInspection(integrity, entries, signatures, classification, encoding, meta, embeddedRefs);
     }
 
-    // One archive pass: parse meta.json AND harvest embedded package refs from scene/preset JSON. (2.1)
-    private static (VarMeta? Meta, IReadOnlyList<string> EmbeddedRefs) ReadContent(string varPath, bool hasMeta)
+    /// <summary>
+    /// CorruptZip (CRC spot-check) &gt; MissingMeta &gt; DuplicateEntries &gt; Ok.
+    /// </summary>
+    internal static IntegrityStatus DeriveIntegrity(
+        IReadOnlyList<ZipEntryFacts> entries,
+        bool hasMeta,
+        bool crcMismatch = false)
+    {
+        if (crcMismatch)
+            return IntegrityStatus.CorruptZip;
+        if (!hasMeta)
+            return IntegrityStatus.MissingMeta;
+        var dups = VamLoadDefectDetector.Detect(entries)
+            .Any(d => d.Kind == VamLoadDefectKind.DuplicateEntries);
+        return dups ? IntegrityStatus.DuplicateEntries : IntegrityStatus.Ok;
+    }
+
+    // One archive pass: parse meta.json, harvest embedded refs, CRC spot-check. (2.1 / IDX-10)
+    private static (VarMeta? Meta, IReadOnlyList<string> EmbeddedRefs, bool CrcMismatch) ReadContent(
+        string varPath,
+        bool hasMeta)
     {
         VarMeta? meta = null;
         var embedded = new List<string>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var crcMismatch = false;
 
         try
         {
             using var archive = ZipFile.OpenRead(varPath);
+
+            if (!ZipCrcSpotChecker.TryVerify(archive, out _))
+                crcMismatch = true;
 
             if (hasMeta)
             {
@@ -76,12 +99,13 @@ public sealed class VarInspector : IVarInspector
                 }
             }
         }
-        catch (Exception ex) when (ex is InvalidDataException or IOException)
+        catch (Exception ex) when (ex is InvalidDataException or IOException or ArgumentException)
         {
-            // Content unreadable — return what we have (fingerprints/classification already captured).
+            // Content unreadable — return fingerprints/classification; CRC may be unverified.
+            // Do not invent CorruptZip here (ArgumentException is often duplicate FullNames).
         }
 
-        return (meta, embedded);
+        return (meta, embedded, crcMismatch);
     }
 
     private static bool IsEmbeddedJson(string entryName)

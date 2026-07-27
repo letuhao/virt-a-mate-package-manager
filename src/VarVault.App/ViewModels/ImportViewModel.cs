@@ -39,6 +39,10 @@ public sealed partial class ImportItemViewModel(ImportItem item) : ObservableObj
     public bool IsConflict => Lane == ImportLane.Conflict;
     public bool IsNaming => Lane == ImportLane.Naming;
     public bool IsCorrupt => Lane == ImportLane.Corrupt;
+    public bool IsDuplicateEntries => Model.Signals.HasDuplicateEntries
+        || string.Equals(Model.Signals.IntegrityStatus, "DuplicateEntries", StringComparison.Ordinal);
+    /// <summary>True corrupt (unreadable zip / missing meta) — not the fixable duplicate-path case.</summary>
+    public bool IsHardCorrupt => IsCorrupt && !IsDuplicateEntries;
     public bool IsAuto => !NeedsReview;   // New / Exact / CJK are auto-decided
 
     // Naming lane: filename-derived identity vs the var's own meta.json identity (G2 · D3).
@@ -47,13 +51,16 @@ public sealed partial class ImportItemViewModel(ImportItem item) : ObservableObj
     public bool HasExisting => Existing is not null;
     public string IntegrityStatus => Model.Signals.IntegrityStatus;
     public int EntryCount => Model.Signals.EntryCount;
+    public string? DuplicateDetail => Model.Signals.DuplicateDetail;
 
     /// <summary>Decision-state pill for the list (draft): auto lanes show the lane; review lanes show decided/pending.</summary>
     public string ListPillText => NeedsReview ? (IsResolved ? "✓ " + DecisionLabel : "needs review") : LaneLabel;
     public string LaneLabel => Lane switch
     {
         ImportLane.New => "New", ImportLane.Exact => "Exact", ImportLane.Cjk => "CJK",
-        ImportLane.Conflict => "Conflict", ImportLane.Naming => "Name≠meta", _ => "Corrupt",
+        ImportLane.Conflict => "Conflict", ImportLane.Naming => "Name≠meta",
+        _ when IsDuplicateEntries => "Dup paths",
+        _ => "Corrupt",
     };
 
     /// <summary>Absolute path of the preview image extracted from the incoming var (null → placeholder). (6.3)</summary>

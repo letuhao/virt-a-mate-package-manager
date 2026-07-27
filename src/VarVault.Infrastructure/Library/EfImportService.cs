@@ -34,7 +34,7 @@ namespace VarVault.Infrastructure.Library;
 /// </summary>
 public sealed class EfImportService(
     VarVaultDbContext db, IVarInspector inspector, IArchiveExtractor extractor, ISettingsService settings,
-    IDurableFileMover mover, IEncodingFixer fixer, IIndexerClient indexer, IImportHistoryStore history,
+    IDurableFileMover mover, IEncodingFixer fixer, IDuplicateEntryFixer dedupFixer, IIndexerClient indexer, IImportHistoryStore history,
     IPresetService presets, IActivationService activation, IProfileService profiles, IEventBus events)
     : IImportService
 {
@@ -298,6 +298,13 @@ public sealed class EfImportService(
                 signals.MetaIdentity is { } m ? $"Filename doesn't match meta.json (meta: {m})." : "Filename couldn't be parsed.",
                 null, [], decision: ImportDecision.None, incomingPath: varPath),
 
+            // DuplicateEntries is structural but fixable (keep-larger → .dedup.var), like CJK ImportAndFix.
+            _ when signals.HasDuplicateEntries && insp.Integrity == IntegrityStatus.DuplicateEntries =>
+                Item(fileName, sourcePath, label, signals, ImportLane.Corrupt, ImportDecision.ImportAndFix,
+                    "Duplicate entry paths (VaM RegisterPackage crash) — will import and auto-dedup to .dedup.var."
+                    + (signals.DuplicateDetail is { } dd ? $" {dd}" : ""),
+                    null, [], decision: ImportDecision.ImportAndFix, incomingPath: varPath),
+
             _ /* Corrupt */ => Item(fileName, sourcePath, label, signals, ImportLane.Corrupt, ImportDecision.Discard,
                 $"Corrupt file ({signals.IntegrityStatus}) — recommend discarding.", null, [], decision: ImportDecision.None, incomingPath: varPath),
         };
@@ -399,7 +406,16 @@ public sealed class EfImportService(
             MetaIdentity: metaIdentity,
             MetaDivergent: metaDivergent,
             Codepage: insp.Encoding?.DetectedCodepage,
-            GbkEntryCount: EncodingHealthEngine.CountLegacyEntries(insp.Entries));
+            GbkEntryCount: EncodingHealthEngine.CountLegacyEntries(insp.Entries),
+            HasDuplicateEntries: insp.Integrity == IntegrityStatus.DuplicateEntries
+                || VamLoadDefectDetector.Detect(insp.Entries).Any(d => d.Kind == VamLoadDefectKind.DuplicateEntries),
+            DuplicateDetail: FirstDuplicateDetail(insp.Entries));
+    }
+
+    private static string? FirstDuplicateDetail(IReadOnlyList<ZipEntryFacts> entries)
+    {
+        var d = VamLoadDefectDetector.Detect(entries).FirstOrDefault(x => x.Kind == VamLoadDefectKind.DuplicateEntries);
+        return d?.Detail;
     }
 
     /// <summary>
@@ -477,8 +493,17 @@ public sealed class EfImportService(
     {
         const int cap = 200;
         static string Key(ZipEntryFacts e) => Convert.ToHexString(e.RawNameBytes);
-        var inc = incoming.Entries.Where(e => !e.IsDirectory).ToDictionary(Key, e => e);
-        var exi = existing.Entries.Where(e => !e.IsDirectory).ToDictionary(Key, e => e);
+        // First-wins: duplicate raw names inside one var must not throw (VaM-load defect class).
+        static Dictionary<string, ZipEntryFacts> Index(IEnumerable<ZipEntryFacts> entries)
+        {
+            var map = new Dictionary<string, ZipEntryFacts>(StringComparer.Ordinal);
+            foreach (var e in entries.Where(x => !x.IsDirectory))
+                map.TryAdd(Key(e), e);
+            return map;
+        }
+
+        var inc = Index(incoming.Entries);
+        var exi = Index(existing.Entries);
         var deltas = new List<EntryDelta>();
         foreach (var (k, e) in inc)
         {
@@ -909,24 +934,76 @@ public sealed class EfImportService(
         cancellationToken.ThrowIfCancellationRequested();
     }
 
-    /// <summary>Copy one incoming var into the repo, optionally fixing CJK encoding on the way. Never overwrites. (§7)</summary>
+    /// <summary>Copy one incoming var into the repo, optionally fixing CJK encoding and/or duplicate entries. Never overwrites. (§7)</summary>
     private async Task<(bool Ok, bool Fixed)> CopyItemAsync(ImportItem item, string target, bool fix, CancellationToken ct)
     {
         if (string.IsNullOrEmpty(item.IncomingPath) || !File.Exists(item.IncomingPath) || File.Exists(target))
             return (false, false);
         Directory.CreateDirectory(Path.GetDirectoryName(target)!);
 
-        if (fix && item.Signals.GbkEntryCount > 0 && item.Signals.Codepage is { } cpName
-            && EncodingHealthEngine.CodePageFor(cpName) is int page)
-        {
-            var fixResult = await fixer.FixAsync(item.IncomingPath, page, target, ct).ConfigureAwait(false);
-            if (fixResult.IsSuccess)
-                return (true, true);
-            // fix failed → import the original as-is (§7 · E2)
-        }
+        var working = item.IncomingPath;
+        var didFix = false;
+        string? tempEncoding = null;
+        string? tempDedup = null;
 
-        var copy = await mover.CopyVerifyRenameAsync(item.IncomingPath, target, ct).ConfigureAwait(false);
-        return (copy.IsSuccess, false);
+        try
+        {
+            // Order: encoding fix first (can create new collisions), then dedup.
+            if (fix && item.Signals.GbkEntryCount > 0 && item.Signals.Codepage is { } cpName
+                && EncodingHealthEngine.CodePageFor(cpName) is int page)
+            {
+                tempEncoding = target + ".enc.partial";
+                if (File.Exists(tempEncoding)) File.Delete(tempEncoding);
+                var fixResult = await fixer.FixAsync(working, page, tempEncoding, ct).ConfigureAwait(false);
+                if (fixResult.IsSuccess)
+                {
+                    working = tempEncoding;
+                    didFix = true;
+                }
+            }
+
+            if (fix && item.Signals.HasDuplicateEntries)
+            {
+                tempDedup = target + ".dedup.partial";
+                if (File.Exists(tempDedup)) File.Delete(tempDedup);
+                var dedupResult = await dedupFixer.FixAsync(working, tempDedup, keepByNormalizedKey: null, ct)
+                    .ConfigureAwait(false);
+                if (!dedupResult.IsSuccess)
+                {
+                    // Do not import an encoding-only rewrite that still has VaM-colliding paths.
+                    return (false, false);
+                }
+
+                working = tempDedup;
+                didFix = true;
+            }
+
+            if (didFix && working != item.IncomingPath)
+            {
+                if (!string.Equals(working, target, StringComparison.OrdinalIgnoreCase))
+                    File.Move(working, target, overwrite: false);
+                // Clear the path we moved from so finally does not delete the promoted file.
+                if (string.Equals(working, tempEncoding, StringComparison.OrdinalIgnoreCase))
+                    tempEncoding = null;
+                if (string.Equals(working, tempDedup, StringComparison.OrdinalIgnoreCase))
+                    tempDedup = null;
+                return (true, true);
+            }
+
+            var copy = await mover.CopyVerifyRenameAsync(item.IncomingPath, target, ct).ConfigureAwait(false);
+            return (copy.IsSuccess, false);
+        }
+        finally
+        {
+            TryDeleteTemp(tempEncoding);
+            TryDeleteTemp(tempDedup);
+        }
+    }
+
+    private static void TryDeleteTemp(string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return;
+        try { if (File.Exists(path)) File.Delete(path); } catch { /* best-effort */ }
     }
 
     private static string RenameTarget(ImportItem item)

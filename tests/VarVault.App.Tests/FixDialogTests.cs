@@ -12,15 +12,27 @@ public class FixDialogTests
     private class StubHealth : IHealthService
     {
         public virtual Task<Result<long>> FixAsync(long id, CancellationToken ct = default) => Task.FromResult(Result.Success(99L));
+        public Task<Result<long>> FixDuplicateEntriesAsync(
+            long id,
+            IReadOnlyDictionary<string, string>? keepByNormalizedKey = null,
+            CancellationToken ct = default) => Task.FromResult(Result.Success(99L));
+        public Task<Result<IReadOnlyList<DuplicateEntryCollision>>> GetDuplicateEntryCollisionsAsync(
+            long varFileId, CancellationToken ct = default) =>
+            Task.FromResult(Result.Success<IReadOnlyList<DuplicateEntryCollision>>([]));
         public virtual Task<BulkActionResult> FixGroupAsync(string? codepageFilter, CancellationToken ct = default) =>
             Task.FromResult(new BulkActionResult(3, 0));
         public Task<BulkActionResult> FixGroupAsync(string? codepageFilter, IProgressSink progress, CancellationToken ct = default) =>
             FixGroupAsync(codepageFilter, ct);
         public Task<BulkActionResult> FixManyAsync(IReadOnlyList<long> varFileIds, IProgressSink? progress = null, CancellationToken ct = default) =>
             Task.FromResult(new BulkActionResult(varFileIds.Count, 0));
+        public Task<BulkActionResult> FixDuplicateEntriesManyAsync(IReadOnlyList<long> varFileIds, IProgressSink? progress = null, CancellationToken ct = default) =>
+            Task.FromResult(new BulkActionResult(varFileIds.Count, 0));
         public Task<IReadOnlyList<EncodingGroup>> EncodingGroupsAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<EncodingGroup>>([]);
         public Task<IReadOnlyList<IntegrityIssue>> IntegrityAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<IntegrityIssue>>([]);
         public Task<IReadOnlyList<IntegrityIssue>> MissingMetaAsync(CancellationToken ct = default) => Task.FromResult<IReadOnlyList<IntegrityIssue>>([]);
+        public Task<IReadOnlyList<VamLoadIssue>> ScanVamLoadAsync(
+            VamLoadScanScope scope, IProgressSink? progress = null, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<VamLoadIssue>>([]);
     }
 
     [Fact]

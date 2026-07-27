@@ -50,6 +50,7 @@ public sealed class PagingAllowlistTests
         "IReclaimService.NearDuplicateGroupsAsync",
         "IHealthService.IntegrityAsync",
         "IHealthService.MissingMetaAsync",
+        "IHealthService.ScanVamLoadAsync",
         "ITieringService.MisplacedAsync",
         "ITieringService.StaleVersionsAsync",
         "ITrashQueryService.ListAsync",

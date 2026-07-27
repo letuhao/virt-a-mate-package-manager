@@ -29,7 +29,9 @@ public sealed record ImportSignals(
     string? MetaIdentity,
     bool MetaDivergent,
     string? Codepage,
-    int GbkEntryCount);
+    int GbkEntryCount,
+    bool HasDuplicateEntries = false,
+    string? DuplicateDetail = null);
 
 /// <summary>A repo var an incoming item collides/matches with (Conflict/Exact). (doc 30 §5.)</summary>
 public sealed record ExistingRef(long VarFileId, int Tier, string RepositoryName, string Path, ImportSignals Signals);

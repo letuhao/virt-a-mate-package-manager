@@ -23,6 +23,7 @@ public interface IDialogLauncher
     void OpenManageAliases(Action? onChanged = null, string? focusMissingRef = null, string? suggestedOwnedQuery = null);
     void OpenConfirmDelete(IReadOnlyList<ConfirmItem> items, int reverseDepCount = 0);
     void OpenFix(long varFileId, string? codepage);
+    void OpenDedupFix(long varFileId, string varName, Action? onFixed = null);
     void OpenDupeReview(VarVault.Sdk.Library.DuplicateGroup group);
     void OpenPresetEdit(long presetId, string name);
     void OpenEditMeta(long packageId, Action? onSaved = null);
@@ -141,6 +142,20 @@ public sealed class DialogLauncher(
             Codepage = codepage,
         };
         dialogs.Show(vm);
+    }
+
+    public void OpenDedupFix(long varFileId, string varName, Action? onFixed = null)
+    {
+        var vm = new DedupFixViewModel(
+            services.GetRequiredService<Sdk.Library.IHealthService>(),
+            close: () => dialogs.Close(),
+            onFixed: onFixed)
+        {
+            VarFileId = varFileId,
+            VarName = varName,
+        };
+        dialogs.Show(vm);
+        _ = vm.LoadAsync();
     }
 
     public void OpenDupeReview(Sdk.Library.DuplicateGroup group)

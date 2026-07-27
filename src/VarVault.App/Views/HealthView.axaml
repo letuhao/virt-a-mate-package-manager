@@ -73,9 +73,11 @@
             <ItemsControl ItemsSource="{Binding Integrity}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="lib:IntegrityIssue">
-                <Grid ColumnDefinitions="*,2*" Height="24">
-                  <TextBlock Grid.Column="0" Text="{Binding VarName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                  <TextBlock Grid.Column="1" Text="{Binding RelativePath}" VerticalAlignment="Center" Opacity="0.6" FontSize="11" TextTrimming="CharacterEllipsis" />
+                <Grid ColumnDefinitions="120,*,2*" Height="24">
+                  <TextBlock Grid.Column="0" Text="{Binding Kind}" VerticalAlignment="Center"
+                             Foreground="{DynamicResource CritBrush}" FontSize="11" />
+                  <TextBlock Grid.Column="1" Text="{Binding VarName}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="2" Text="{Binding RelativePath}" VerticalAlignment="Center" Opacity="0.6" FontSize="11" TextTrimming="CharacterEllipsis" />
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -107,6 +109,51 @@
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </c:Card>
+      </DockPanel>
+
+      <!-- VaM load (tab 3) — live reopen for RegisterPackage-breaking defects -->
+      <DockPanel IsVisible="{Binding IsVamLoadTab}">
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
+          <Button Content="Scan installed" Command="{Binding ScanInstalledCommand}"
+                  Background="{DynamicResource AccentBrush}" Foreground="White" />
+          <Button Content="Scan all" Command="{Binding ScanAllCommand}" />
+          <Button Content="Fix all duplicates…" Command="{Binding FixAllDuplicatesCommand}" />
+          <TextBlock Text="{Binding VamLoadStatus}" VerticalAlignment="Center" Opacity="0.75"
+                     TextWrapping="Wrap" MaxWidth="480" />
+        </StackPanel>
+        <TextBlock DockPanel.Dock="Bottom" Text="No VaM-load defects found." Opacity="0.6"
+                   IsVisible="{Binding IsVamLoadEmpty}" Margin="0,8,0,0" />
+        <c:Card Header="VaM load defects (InstalledAt · newest first when scanning installed)">
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding VamLoadIssues}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="lib:VamLoadIssue">
+                  <Grid ColumnDefinitions="110,140,*,2*,Auto,Auto,Auto" MinHeight="28" Margin="0,2">
+                    <TextBlock Grid.Column="0" Text="{Binding InstalledAt, StringFormat=\{0:g\}}"
+                               VerticalAlignment="Center" Opacity="0.7" FontSize="11" />
+                    <TextBlock Grid.Column="1" Text="{Binding Kind}" VerticalAlignment="Center"
+                               Foreground="{DynamicResource CritBrush}" FontSize="12" />
+                    <TextBlock Grid.Column="2" Text="{Binding VarName}" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="3" Text="{Binding Detail}" VerticalAlignment="Center"
+                               Opacity="0.65" FontSize="11" TextTrimming="CharacterEllipsis"
+                               ToolTip.Tip="{Binding Detail}" />
+                    <Button Grid.Column="4" Content="Fix" Margin="4,0,0,0" Padding="8,2"
+                            IsVisible="{Binding CanFixDuplicates}"
+                            Command="{Binding ((vm:HealthViewModel)DataContext).FixDuplicateIssueCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}" />
+                    <Button Grid.Column="5" Content="Reveal" Margin="4,0,0,0" Padding="8,2"
+                            Command="{Binding ((vm:HealthViewModel)DataContext).RevealIssueCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}" />
+                    <Button Grid.Column="6" Content="Detail" Margin="4,0,0,0" Padding="8,2"
+                            Command="{Binding ((vm:HealthViewModel)DataContext).OpenIssueCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
             </ItemsControl>
           </ScrollViewer>
         </c:Card>

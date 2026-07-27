@@ -17,26 +17,19 @@ public sealed record ZipEntryFacts(
 {
     private static readonly byte[] MetaJsonUtf8 = "meta.json"u8.ToArray();
 
-    /// <summary>True if this entry is the root <c>meta.json</c> (ASCII; excluded from the payload signature).</summary>
-    public bool IsRootMetaJson =>
-        RawNameBytes.Length == MetaJsonUtf8.Length && AsciiEqualsIgnoreCase(RawNameBytes, MetaJsonUtf8);
+    /// <summary>
+    /// True if this entry is the root <c>meta.json</c> after path canonicalize
+    /// (<c>\</c>/<c>./</c>/ASCII case-fold) — excluded from the payload signature.
+    /// </summary>
+    public bool IsRootMetaJson
+    {
+        get
+        {
+            var canonical = ContentSignatureEngine.CanonicalizePathBytes(RawNameBytes);
+            return canonical.AsSpan().SequenceEqual(MetaJsonUtf8);
+        }
+    }
 
     /// <summary>Best-effort UTF-8 decode of the name for display/logging only — never for identity.</summary>
     public string DecodedNameBestEffort => Encoding.UTF8.GetString(RawNameBytes);
-
-    private static bool AsciiEqualsIgnoreCase(byte[] a, byte[] b)
-    {
-        if (a.Length != b.Length)
-            return false;
-        for (var i = 0; i < a.Length; i++)
-        {
-            var ca = a[i];
-            var cb = b[i];
-            if (ca is >= (byte)'A' and <= (byte)'Z') ca += 32;
-            if (cb is >= (byte)'A' and <= (byte)'Z') cb += 32;
-            if (ca != cb)
-                return false;
-        }
-        return true;
-    }
 }

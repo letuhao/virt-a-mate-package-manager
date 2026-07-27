@@ -59,6 +59,39 @@ public class ContentSignatureEngineTests
     }
 
     [Fact]
+    public void Dot_slash_prefix_shares_content_signature()
+    {
+        var a = ContentSignatureEngine.Compute([Entry("./Custom/a.vam", 10, 1)]);
+        var b = ContentSignatureEngine.Compute([Entry("Custom/a.vam", 10, 1)]);
+        Assert.Equal(a.ContentSignature, b.ContentSignature);
+    }
+
+    [Fact]
+    public void Slash_and_backslash_share_content_signature()
+    {
+        var a = ContentSignatureEngine.Compute([Entry("Custom\\Cloth\\a.vam", 10, 1)]);
+        var b = ContentSignatureEngine.Compute([Entry("Custom/Cloth/a.vam", 10, 1)]);
+        Assert.Equal(a.ContentSignature, b.ContentSignature);
+    }
+
+    [Fact]
+    public void Ascii_case_fold_shares_content_signature()
+    {
+        var a = ContentSignatureEngine.Compute([Entry("Custom/Cloth/Dress.vam", 10, 1)]);
+        var b = ContentSignatureEngine.Compute([Entry("custom/cloth/dress.vam", 10, 1)]);
+        Assert.Equal(a.ContentSignature, b.ContentSignature);
+    }
+
+    [Fact]
+    public void Multiset_keeps_duplicate_canonical_paths()
+    {
+        // Two entries that canonicalize to the same path still contribute twice (multiset, not set).
+        var once = ContentSignatureEngine.Compute([Entry("a.vam", 10, 1)]);
+        var twice = ContentSignatureEngine.Compute([Entry("a.vam", 10, 1), Entry("A.vam", 10, 1)]);
+        Assert.NotEqual(once.ContentSignature, twice.ContentSignature);
+    }
+
+    [Fact]
     public void Raw_bytes_drive_identity_so_mojibake_is_deterministic()
     {
         // Same raw bytes (whatever codepage) → same signature, with no decoding involved.

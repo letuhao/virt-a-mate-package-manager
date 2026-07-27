@@ -75,8 +75,19 @@ public sealed class EncodingFixJobRunnerTests
             Task.FromResult<IReadOnlyList<IntegrityIssue>>([]);
         public Task<IReadOnlyList<IntegrityIssue>> MissingMetaAsync(CancellationToken ct = default) =>
             Task.FromResult<IReadOnlyList<IntegrityIssue>>([]);
+        public Task<IReadOnlyList<VamLoadIssue>> ScanVamLoadAsync(
+            VamLoadScanScope scope, IProgressSink? progress = null, CancellationToken ct = default) =>
+            Task.FromResult<IReadOnlyList<VamLoadIssue>>([]);
         public Task<Result<long>> FixAsync(long varFileId, CancellationToken ct = default) =>
             Task.FromResult(Result.Success(varFileId));
+        public Task<Result<long>> FixDuplicateEntriesAsync(
+            long varFileId,
+            IReadOnlyDictionary<string, string>? keepByNormalizedKey = null,
+            CancellationToken ct = default) =>
+            Task.FromResult(Result.Success(varFileId));
+        public Task<Result<IReadOnlyList<DuplicateEntryCollision>>> GetDuplicateEntryCollisionsAsync(
+            long varFileId, CancellationToken ct = default) =>
+            Task.FromResult(Result.Success<IReadOnlyList<DuplicateEntryCollision>>([]));
         public Task<BulkActionResult> FixGroupAsync(string? codepageFilter, CancellationToken ct = default) =>
             FixGroupAsync(codepageFilter, IProgressSink.Null, ct);
         public async Task<BulkActionResult> FixGroupAsync(string? codepageFilter, IProgressSink progress, CancellationToken ct = default)
@@ -97,5 +108,7 @@ public sealed class EncodingFixJobRunnerTests
             }
             return new BulkActionResult(varFileIds.Count, 0);
         }
+        public Task<BulkActionResult> FixDuplicateEntriesManyAsync(IReadOnlyList<long> varFileIds, IProgressSink? progress = null, CancellationToken ct = default) =>
+            Task.FromResult(new BulkActionResult(varFileIds.Count, 0));
     }
 }

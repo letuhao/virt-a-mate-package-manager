@@ -84,7 +84,12 @@ public static class AppHost
                 installedJobs,
                 services.GetService<IClipboard>() ?? new AvaloniaClipboard()),
             ["proposals"] = new ProposalsViewModel(services.GetRequiredService<IProposalService>(), launcher, encodingJobs),
-            ["health"] = new HealthViewModel(services.GetRequiredService<IHealthService>(), launcher),
+            ["health"] = new HealthViewModel(
+                services.GetRequiredService<IHealthService>(),
+                launcher,
+                services.GetService<Sdk.Threading.IJobQueue>(),
+                services.GetService<IFileReveal>() ?? new FileReveal(),
+                services.GetService<IServiceScopeFactory>()),
             ["trash"] = new TrashViewModel(services.GetRequiredService<ITrashQueryService>()),
             ["settings"] = new SettingsViewModel(
                 services.GetRequiredService<Sdk.Settings.ISettingsService>(),

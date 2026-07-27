@@ -161,7 +161,7 @@ public static class ZipCentralDirectoryReader
             if (uncompressed == 0xFFFFFFFF && extraLen > 0)
                 uncompressed = ReadZip64Uncompressed(span.Slice(46 + nameLen, extraLen), uncompressed);
 
-            var isDirectory = nameLen > 0 && rawName[^1] == (byte)'/';
+            var isDirectory = nameLen > 0 && (rawName[^1] == (byte)'/' || rawName[^1] == (byte)'\\');
             var nameIsUtf8 = (flags & 0x0800) != 0; // general-purpose bit 11 = UTF-8 filename
             entries.Add(new ZipEntryFacts(rawName, uncompressed, crc, isDirectory, nameIsUtf8));
 

@@ -302,7 +302,13 @@
                 <Button Content="🗑 Discard" Command="{Binding ChooseCommand}" CommandParameter="Discard" Margin="0,0,6,6" />
               </WrapPanel>
               <WrapPanel IsVisible="{Binding IsCorrupt}">
-                <Button Content="🗑 Discard (recommended)" Command="{Binding ChooseCommand}" CommandParameter="Discard" Margin="0,0,6,6" />
+                <Button Content="🔧 Import + fix duplicates" Command="{Binding ChooseCommand}" CommandParameter="ImportAndFix"
+                        Margin="0,0,6,6" IsVisible="{Binding IsDuplicateEntries}"
+                        Background="{DynamicResource AccentBrush}" Foreground="White" />
+                <Button Content="🗑 Discard (recommended)" Command="{Binding ChooseCommand}" CommandParameter="Discard"
+                        Margin="0,0,6,6" IsVisible="{Binding IsHardCorrupt}" />
+                <Button Content="🗑 Discard" Command="{Binding ChooseCommand}" CommandParameter="Discard"
+                        Margin="0,0,6,6" IsVisible="{Binding IsDuplicateEntries}" />
                 <Button Content="⚠ Import anyway" Command="{Binding ChooseCommand}" CommandParameter="Import" Margin="0,0,6,6" />
               </WrapPanel>
               <TextBlock Text="{Binding DecisionLabel, StringFormat='Selected: {0}'}" Foreground="{DynamicResource GoodBrush}"

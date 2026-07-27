@@ -30,10 +30,12 @@ public class TabAdoptionTests
     }
 
     [Fact]
-    public void Health_has_its_three_tabs()
+    public void Health_has_its_four_tabs()
     {
         var vm = new HealthViewModel(new StubHealth());
-        Assert.Equal(new[] { "Encoding", "Integrity / corrupt", "Missing meta" }, vm.Tabs.Select(t => t.Label));
+        Assert.Equal(
+            new[] { "Encoding", "Integrity / corrupt", "Missing meta", "VaM load" },
+            vm.Tabs.Select(t => t.Label));
     }
 
     [Fact]

@@ -128,9 +128,12 @@ public class LibraryOpsE2ETests
         Assert.NotNull(fixButton!.Command); // AC-3: wired (was a no-op)
         await UiE2E.ClickAsync(fixButton);
 
-        // The real command ran end-to-end and reported a result (these healthy vars need no fix → reported).
+        // The real command ran end-to-end and reported a result (queue or inline fix).
         Assert.NotNull(lib.LastActionMessage);
-        Assert.Contains("Fixed", lib.LastActionMessage!, StringComparison.OrdinalIgnoreCase);
+        Assert.True(
+            lib.LastActionMessage!.Contains("Fixed", StringComparison.OrdinalIgnoreCase)
+            || lib.LastActionMessage.Contains("queued", StringComparison.OrdinalIgnoreCase),
+            $"Unexpected message: {lib.LastActionMessage}");
         UiE2E.Screenshot(window, "ac3-fix-encoding-ran");
     }
 }
