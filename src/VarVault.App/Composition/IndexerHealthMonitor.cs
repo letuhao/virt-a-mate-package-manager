@@ -1,5 +1,6 @@
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using VarVault.Sdk.Indexer;
 
 namespace VarVault.App.Composition;
@@ -31,6 +32,15 @@ public sealed class IndexerHealthMonitor(IServiceProvider services, string dataD
                     // Re-resolve: reconnect to a running worker, respawn one, or fall back to in-proc.
                     var resolved = IndexerProcessHost.ResolveClient(services, dataDirectory);
                     IndexerClientOverride.Current = resolved;
+                    try
+                    {
+                        services.GetRequiredService<Infrastructure.Indexing.IndexerClientHub>()
+                            .Redirect(resolved);
+                    }
+                    catch
+                    {
+                        // Hub may be absent in minimal hosts.
+                    }
                 }
             }
             catch (OperationCanceledException)

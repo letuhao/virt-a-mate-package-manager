@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using VarVault.App.Services;
 using VarVault.App.ViewModels;
 using VarVault.Host;
+using VarVault.Infrastructure.Indexing;
 using VarVault.Sdk.Activation;
 using VarVault.Sdk.Library;
 using VarVault.Sdk.Threading;
@@ -399,6 +400,10 @@ public static class AppHost
             });
             var scope = host.Services.CreateScope(); // app-lifetime scope backing the shell's read services
             IndexerClientOverride.Current = IndexerProcessHost.ResolveClient(host.Services, dataDir);
+            // Import / Onboarding resolve IIndexerClient from DI — redirect the hub so they talk to the
+            // same writer (named-pipe worker) as EnqueueIndexAll. Without this, Apply copies files then
+            // indexes in-process against a locked catalog and never catalogs or trashes originals.
+            host.Services.GetRequiredService<IndexerClientHub>().Redirect(IndexerClientOverride.Current);
             // Keep a worker reachable for the whole session (respawn/reconnect if it dies). (A12 liveness.)
             IndexerClientOverride.Monitor = new IndexerHealthMonitor(host.Services, dataDir);
             IndexerClientOverride.Monitor.Start();

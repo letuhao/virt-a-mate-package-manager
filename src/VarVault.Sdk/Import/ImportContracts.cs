@@ -111,6 +111,7 @@ public sealed record ImportSession(
 /// Excludes archive extracts under the session temp root and symlink/link-farm paths.
 /// </param>
 /// <param name="Cancelled">True when the apply stopped early on a graceful cancel (partial copies may still be listed).</param>
+/// <param name="IndexWarning">Non-null when post-copy indexing/activate deferred with an error (copies still landed).</param>
 public sealed record ApplyResult(
     int Copied,
     int Fixed,
@@ -120,7 +121,8 @@ public sealed record ApplyResult(
     int Failed,
     Guid RunId,
     IReadOnlyList<string>? CopiedIncomingPaths = null,
-    bool Cancelled = false);
+    bool Cancelled = false,
+    string? IndexWarning = null);
 
 /// <summary>A failed source recorded in history (password/corrupt/space). (doc 30 §8.)</summary>
 public sealed record ImportFailedSource(string Path, ImportSourceKind Kind, string Reason);

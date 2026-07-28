@@ -657,17 +657,39 @@ public sealed class EfImportService(
             // Index + activate + event only on a complete run; a cancelled run leaves its landed vars for the next
             // index pass (durable copies are already on disk) and doesn't announce a (partial) import.
             var activated = false;
+            string? indexWarning = null;
             if (!cancelled)
             {
                 if (didImport)
                 {
                     progress?.Report(new ProgressReport(0, 1, "Indexing target repository…"));
-                    await WaitForIndexAsync(session.TargetRepositoryId, cancellationToken, progress).ConfigureAwait(false);
+                    try
+                    {
+                        await WaitForIndexAsync(session.TargetRepositoryId, cancellationToken, progress)
+                            .ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        // Copies already landed — still return ApplyResult so trash-originals + history work.
+                        // Manual Index / next startup scan will pick the files up.
+                        indexWarning = ex.Message;
+                        progress?.Report(new ProgressReport(0, 1,
+                            $"Indexing deferred: {ex.Message}"));
+                    }
                 }
 
                 // Post-apply activate modes: ImportedCopied (D2/5.9) or ActiveSession (QoL → active loading preset).
-                activated = await RunActivateModeAsync(session, importedRefs, progress, cancellationToken)
-                    .ConfigureAwait(false);
+                try
+                {
+                    activated = await RunActivateModeAsync(session, importedRefs, progress, cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    indexWarning = string.IsNullOrEmpty(indexWarning)
+                        ? $"Activate deferred: {ex.Message}"
+                        : $"{indexWarning}; activate deferred: {ex.Message}";
+                }
             }
 
             var failedSources = session.Sources.Where(s => s.Status != ImportSourceStatus.Ok)
@@ -690,9 +712,9 @@ public sealed class EfImportService(
                     cancellationToken).ConfigureAwait(false);
 
             if (cancelled)
-                return new ApplyResult(copied, fixedCount, renamed, skipped, discarded, failed, runId, copiedIncoming, Cancelled: true);
+                return new ApplyResult(copied, fixedCount, renamed, skipped, discarded, failed, runId, copiedIncoming, Cancelled: true, IndexWarning: indexWarning);
 
-            return new ApplyResult(copied, fixedCount, renamed, skipped, discarded, failed, runId, copiedIncoming);
+            return new ApplyResult(copied, fixedCount, renamed, skipped, discarded, failed, runId, copiedIncoming, IndexWarning: indexWarning);
         }
         finally
         {
@@ -906,6 +928,11 @@ public sealed class EfImportService(
             Import.TempWorkspace.SweepOrphans(b);
     }
 
+    /// <summary>
+    /// Ask the catalog writer to index the target repo. Soft-fails: copies already landed on disk must
+    /// still produce an ApplyResult (history + trash-originals). A hard throw here used to leave files
+    /// in the repo with no library row and no delete-originals when the wrong indexer client was used.
+    /// </summary>
     private async Task WaitForIndexAsync(Guid repositoryId, CancellationToken cancellationToken, IProgressSink? progress = null)
     {
         var start = await indexer.StartIndexRepositoryAsync(repositoryId, cancellationToken: cancellationToken).ConfigureAwait(false);

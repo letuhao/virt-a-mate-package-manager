@@ -658,6 +658,8 @@ public sealed partial class ImportViewModel : ObservableObject, ILoadableScreen
                 ? $"Import cancelled — kept {r.Copied + r.Renamed} copied · skipped {r.Skipped} (logged to History)."
                 : $"Done: copied {r.Copied} · fixed {r.Fixed} · renamed {r.Renamed} · skipped {r.Skipped} · discarded {r.Discarded}"
                   + (r.Failed > 0 ? $" · failed {r.Failed}" : "");
+            if (!string.IsNullOrWhiteSpace(r.IndexWarning))
+                StatusMessage += $" · indexing deferred ({r.IndexWarning}) — use Index or restart to finish.";
             ResetAfterApply();
             await RefreshHistoryAsync().ConfigureAwait(true);
             // Don't gate on CanTrashOriginals — that requires !IsApplying, and we are still applying until finally.

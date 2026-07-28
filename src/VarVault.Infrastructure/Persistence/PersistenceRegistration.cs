@@ -38,7 +38,12 @@ public static class PersistenceRegistration
         services.AddScoped<IStreamIndexer, StreamIndexer>();
         services.AddSingleton<OneHandleVarInspector>();
         services.AddSingleton<IIndexerWorker, IndexerWorker>();
-        services.AddSingleton<IIndexerClient, InProcessIndexerClient>();
+        // Hub starts as in-process (tests / no worker). AppHost.Redirects it to the named-pipe client
+        // so Import.Apply's WaitForIndexAsync hits the same writer as Library / EnqueueIndexAll. (A12.)
+        services.AddSingleton<InProcessIndexerClient>();
+        services.AddSingleton<IndexerClientHub>(sp =>
+            new IndexerClientHub(sp.GetRequiredService<InProcessIndexerClient>()));
+        services.AddSingleton<IIndexerClient>(sp => sp.GetRequiredService<IndexerClientHub>());
 
         // Staged-index pass-2: preview extraction into a packed, SHARDED thumbnail store (thumbnails/thumb_*.db) so it
         // scales to 700k items / tens of GB — per-shard VACUUM, parallel writes, isolated corruption. (1.23/1.32/1.33)
