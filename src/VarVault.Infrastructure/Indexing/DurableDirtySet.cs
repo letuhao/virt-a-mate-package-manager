@@ -36,20 +36,31 @@ public sealed class DurableDirtySet(VarVaultDbContext db, IClock clock) : IDurab
             await MarkAsync(id, reason, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyList<long>> DrainBatchAsync(int take, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<long>> PeekBatchAsync(int take, CancellationToken cancellationToken = default)
     {
-        var batch = await db.DirtyPackages
+        return await db.DirtyPackages.AsNoTracking()
             .OrderBy(d => d.MarkedAt)
             .Take(take)
             .Select(d => d.PackageId)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
-        if (batch.Count == 0)
-            return batch;
+    }
 
-        await db.DirtyPackages.Where(d => batch.Contains(d.PackageId))
+    public async Task AcknowledgeAsync(IReadOnlyList<long> packageIds, CancellationToken cancellationToken = default)
+    {
+        if (packageIds.Count == 0)
+            return;
+        await db.DirtyPackages.Where(d => packageIds.Contains(d.PackageId))
             .ExecuteDeleteAsync(cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<long>> DrainBatchAsync(int take, CancellationToken cancellationToken = default)
+    {
+        // Legacy: peek+ack. StreamIndexer uses Peek → Refresh → Acknowledge so a crash mid-refresh
+        // leaves the dirty mark and the next run can heal the PackageListItem.
+        var batch = await PeekBatchAsync(take, cancellationToken).ConfigureAwait(false);
+        await AcknowledgeAsync(batch, cancellationToken).ConfigureAwait(false);
         return batch;
     }
 }

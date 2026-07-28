@@ -6,13 +6,14 @@ using VarVault.Infrastructure.Persistence;
 namespace VarVault.Infrastructure.Indexing;
 
 /// <summary>Summary of a filesystem-truth reconcile.</summary>
-public sealed record ReconcileResult(int ReposOnline, int ReposOffline, int VarFilesPruned);
+public sealed record ReconcileResult(int ReposOnline, int ReposOffline, int VarFilesPruned, int ListRowsHealed = 0);
 
 /// <summary>
 /// ⚠ Reconciles the catalog against filesystem truth — repositories are re-marked online/offline by
 /// whether their mount exists, and vanished files in <b>online</b> repos are pruned (offline repos are
-/// left untouched: offline ≠ gone). Run after a DB restore before any pending job/trash action, so
-/// stale rows can't drive a destructive action. (Checklist X.5.)
+/// left untouched: offline ≠ gone). Also heals packages that have VarFiles but never got a Library
+/// <c>PackageListItem</c> (Exact-visible / Library-invisible gap). Run at app launch and after a DB
+/// restore before any pending job/trash action. (Checklist X.5.)
 /// </summary>
 public sealed class CatalogReconciler(VarVaultDbContext db, ICatalogStore store)
 {
@@ -40,22 +41,62 @@ public sealed class CatalogReconciler(VarVaultDbContext db, ICatalogStore store)
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         var pruned = 0;
+        var affectedPackages = new HashSet<long>();
         foreach (var (repoId, mountPath) in onlineRepoIds)
         {
             var varFiles = await db.VarFiles
                 .Where(v => v.RepositoryId == repoId)
-                .Select(v => new { v.Id, v.RelativePath })
+                .Select(v => new { v.Id, v.RelativePath, v.PackageId })
                 .ToListAsync(cancellationToken).ConfigureAwait(false);
 
             var gone = varFiles
-                .Where(v => !File.Exists(Path.Combine(mountPath, v.RelativePath)))
-                .Select(v => v.Id)
+                .Where(v => !FileExistsOnMount(mountPath, v.RelativePath))
                 .ToList();
 
-            if (gone.Count > 0)
-                pruned += await store.RemoveVarFilesAsync(gone, cancellationToken).ConfigureAwait(false);
+            if (gone.Count == 0)
+                continue;
+
+            foreach (var v in gone)
+            {
+                if (v.PackageId is long pkg)
+                    affectedPackages.Add(pkg);
+            }
+
+            pruned += await store.RemoveVarFilesAsync(
+                gone.Select(v => v.Id).ToList(), cancellationToken).ConfigureAwait(false);
         }
 
-        return new ReconcileResult(online, offline, pruned);
+        // Heal Exact-visible / Library-invisible packages: Package+VarFile exist, PackageListItem does not.
+        var orphanListIds = await db.Packages.AsNoTracking()
+            .Where(p => p.VarFiles.Any() && !db.PackageListItems.Any(i => i.PackageId == p.Id))
+            .Select(p => p.Id)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        foreach (var id in orphanListIds)
+            affectedPackages.Add(id);
+
+        var healed = orphanListIds.Count;
+        if (affectedPackages.Count > 0)
+            await store.RefreshReadModelAsync(affectedPackages.ToList(), cancellationToken).ConfigureAwait(false);
+
+        return new ReconcileResult(online, offline, pruned, healed);
+    }
+
+    /// <summary>Resolve RelativePath under the mount the same way the enumerator stores it.</summary>
+    private static bool FileExistsOnMount(string mountPath, string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+            return false;
+        try
+        {
+            var full = Path.IsPathRooted(relativePath)
+                ? relativePath
+                : Path.GetFullPath(Path.Combine(mountPath, relativePath));
+            return File.Exists(full);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 }

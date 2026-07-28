@@ -245,7 +245,27 @@ public sealed class ScanLedger(VarVaultDbContext db, IClock clock) : IScanLedger
             row.SigFileCount ?? 0, row.SigTotalBytes ?? 0, row.SigNewestMtimeTicks ?? 0, row.SigPathsHash ?? 0);
     }
 
-    public Task<bool> HasPendingWorkAsync(Guid repositoryId, CancellationToken cancellationToken = default) =>
-        db.VarFiles.AsNoTracking()
-            .AnyAsync(v => v.RepositoryId == repositoryId && v.IngestState != IngestState.RawStored, cancellationToken);
+    /// <summary>
+    /// True when the repository still needs work before A16 can skip: unfinished ingest,
+    /// pending dirty packages, or Package rows that never got a Library <c>PackageListItem</c>.
+    /// </summary>
+    public async Task<bool> HasPendingWorkAsync(Guid repositoryId, CancellationToken cancellationToken = default)
+    {
+        if (await db.VarFiles.AsNoTracking()
+                .AnyAsync(v => v.RepositoryId == repositoryId && v.IngestState != IngestState.RawStored, cancellationToken)
+                .ConfigureAwait(false))
+            return true;
+
+        if (await db.DirtyPackages.AsNoTracking()
+                .AnyAsync(d => db.VarFiles.Any(v => v.PackageId == d.PackageId && v.RepositoryId == repositoryId), cancellationToken)
+                .ConfigureAwait(false))
+            return true;
+
+        // Exact can see Package+VarFile while Library is empty — treat missing list rows as pending.
+        return await db.VarFiles.AsNoTracking()
+            .AnyAsync(v => v.RepositoryId == repositoryId
+                && v.PackageId != null
+                && !db.PackageListItems.Any(i => i.PackageId == v.PackageId), cancellationToken)
+            .ConfigureAwait(false);
+    }
 }

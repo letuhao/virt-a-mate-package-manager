@@ -42,7 +42,13 @@ public sealed class EfTrashQueryService(VarVaultDbContext db, ITrashService tras
 
     public async Task<IReadOnlyList<TrashItemDto>> ListAsync(CancellationToken cancellationToken = default)
     {
-        return (await ListPageAsync(new PageRequest(1, 100), cancellationToken: cancellationToken).ConfigureAwait(false)).Items;
+        // Full list (not a page) — Select all / selection pruning need every id.
+        var entries = await trash.ListAsync(cancellationToken).ConfigureAwait(false);
+        return entries
+            .OrderByDescending(e => e.TrashedAtUtc)
+            .ThenBy(e => e.Id, StringComparer.Ordinal)
+            .Select(e => new TrashItemDto(e.Id, e.OriginalPath, e.Reason, e.TrashedAtUtc, e.Bytes))
+            .ToList();
     }
 
     public Task<Result> RestoreAsync(string trashId, CancellationToken cancellationToken = default) =>

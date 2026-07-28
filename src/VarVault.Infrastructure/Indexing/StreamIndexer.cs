@@ -57,6 +57,8 @@ public sealed class StreamIndexer(
         // Fast-path: unless forced, a cheap metadata-only walk builds the repository signature; if it
         // matches the last completed scan AND no var is mid-ingest, nothing changed → skip the whole run
         // (no new generation, no per-file re-stamp, no prune). (A16.)
+        // Defense: if the catalog still has more VarFiles than disk reports, a prior run likely crashed
+        // before prune — fall through so orphans are removed.
         if (!forceFull)
         {
             var previous = await ledger.GetLastCompletedSignatureAsync(repositoryId, cancellationToken).ConfigureAwait(false);
@@ -67,14 +69,25 @@ public sealed class StreamIndexer(
                 var hasPending = await ledger.HasPendingWorkAsync(repositoryId, cancellationToken).ConfigureAwait(false);
                 if (!hasPending && current == prevSig)
                 {
-                    total.Stop();
-                    Telemetry.IndexScanDurationMs.Record(total.Elapsed.TotalMilliseconds);
+                    var catalogCount = await db.VarFiles.AsNoTracking()
+                        .CountAsync(v => v.RepositoryId == repositoryId, cancellationToken)
+                        .ConfigureAwait(false);
+                    if (catalogCount <= current.FileCount)
+                    {
+                        total.Stop();
+                        Telemetry.IndexScanDurationMs.Record(total.Elapsed.TotalMilliseconds);
+                        logger.LogInformation(
+                            "Stream index skipped for repository {RepositoryId}: unchanged ({FileCount} files) — " +
+                            "checked in {ElapsedMs} ms",
+                            repositoryId, current.FileCount, total.ElapsedMilliseconds);
+                        progress.Report(new ProgressReport(current.FileCount, Math.Max(1, current.FileCount), "Up to date — no changes"));
+                        return new IndexOutcome(0, (int)current.FileCount, 0, 0, 0);
+                    }
+
                     logger.LogInformation(
-                        "Stream index skipped for repository {RepositoryId}: unchanged ({FileCount} files) — " +
-                        "checked in {ElapsedMs} ms",
-                        repositoryId, current.FileCount, total.ElapsedMilliseconds);
-                    progress.Report(new ProgressReport(current.FileCount, Math.Max(1, current.FileCount), "Up to date — no changes"));
-                    return new IndexOutcome(0, (int)current.FileCount, 0, 0, 0);
+                        "Stream index forcing full scan for repository {RepositoryId}: catalog has {CatalogCount} " +
+                        "rows but disk signature reports {FileCount} files (likely unfinished prune)",
+                        repositoryId, catalogCount, current.FileCount);
                 }
             }
         }
@@ -236,20 +249,49 @@ public sealed class StreamIndexer(
             var gen = run.Generation;
             // Page deletes — never materialize every vanished id for a multi-TB repo.
             const int vanishPage = 500;
-            while (true)
+            try
             {
-                var vanishedIds = await db.VarFiles.AsNoTracking()
-                    .Where(v => v.RepositoryId == repositoryId && v.SeenGeneration != gen)
-                    .OrderBy(v => v.Id)
-                    .Take(vanishPage)
-                    .Select(v => v.Id)
-                    .ToListAsync(cancellationToken)
-                    .ConfigureAwait(false);
-                if (vanishedIds.Count == 0)
-                    break;
-                pruned += await writeQueue.EnqueueAsync(
-                    ct => store.RemoveVarFilesAsync(vanishedIds, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+                while (true)
+                {
+                    var vanishedIds = await db.VarFiles.AsNoTracking()
+                        .Where(v => v.RepositoryId == repositoryId && v.SeenGeneration != gen)
+                        .OrderBy(v => v.Id)
+                        .Take(vanishPage)
+                        .Select(v => v.Id)
+                        .ToListAsync(cancellationToken)
+                        .ConfigureAwait(false);
+                    if (vanishedIds.Count == 0)
+                        break;
+                    pruned += await writeQueue.EnqueueAsync(
+                        ct => store.RemoveVarFilesAsync(vanishedIds, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+                }
             }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Prune must not abort Library refresh — otherwise Exact-visible packages stay invisible.
+                logger.LogError(ex,
+                    "Prune vanished vars failed for repository {RepositoryId} after gen {Generation}; continuing to refresh",
+                    repositoryId, gen);
+            }
+        }
+
+        // Heal Library gaps before refresh: Package+VarFile may exist (Exact finds them) while
+        // PackageListItem was never written (dirty drained before refresh). Re-dirty those packages.
+        var orphanPackageIds = await db.VarFiles.AsNoTracking()
+            .Where(v => v.RepositoryId == repositoryId && v.PackageId != null)
+            .Select(v => v.PackageId!.Value)
+            .Distinct()
+            .Where(pid => !db.PackageListItems.Any(i => i.PackageId == pid))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+        if (orphanPackageIds.Count > 0)
+        {
+            logger.LogInformation(
+                "Healing {Count} packages missing Library rows for repository {RepositoryId}",
+                orphanPackageIds.Count, repositoryId);
+            await writeQueue.EnqueueAsync(
+                ct => dirty.MarkManyAsync(orphanPackageIds, "heal-missing-list", ct),
+                WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
         }
 
         await writeQueue.EnqueueAsync(ct => ledger.SetPhaseAsync(run.Id, ScanPhase.Refreshing, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
@@ -257,12 +299,16 @@ public sealed class StreamIndexer(
         var refreshSw = Stopwatch.StartNew();
         while (true)
         {
+            // Peek → refresh → ack (never delete dirty before refresh commits). A crash between
+            // drain-and-refresh used to leave Exact-visible Package/VarFile with no Library row.
             var dirtyBatch = await writeQueue.EnqueueAsync(
-                ct => dirty.DrainBatchAsync(256, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+                ct => dirty.PeekBatchAsync(256, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
             if (dirtyBatch.Count == 0)
                 break;
             await writeQueue.EnqueueAsync(
                 ct => store.RefreshReadModelAsync(dirtyBatch, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+            await writeQueue.EnqueueAsync(
+                ct => dirty.AcknowledgeAsync(dirtyBatch, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
         }
         refreshSw.Stop();
         Telemetry.IndexRefreshDurationMs.Record(refreshSw.Elapsed.TotalMilliseconds);

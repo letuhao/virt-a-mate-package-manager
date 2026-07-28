@@ -168,23 +168,43 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
         if (varFileIds.Count == 0)
             return 0;
 
+        var ids = varFileIds.Distinct().ToList();
+
         // Packages that may need a new canonical after removal.
         var affectedPackages = await db.VarFiles
-            .Where(v => varFileIds.Contains(v.Id) && v.PackageId != null)
+            .Where(v => ids.Contains(v.Id) && v.PackageId != null)
             .Select(v => v.PackageId!.Value)
             .Distinct()
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var toRemove = await db.VarFiles
-            .Where(v => varFileIds.Contains(v.Id))
-            .ToListAsync(cancellationToken)
+        // FixedFrom / SupersededBy use ON DELETE NO ACTION — clear both directions before delete
+        // or SQLite aborts the whole prune and the indexer job never reaches Library refresh.
+        await db.VarFiles
+            .Where(v => v.FixedFromVarFileId != null && ids.Contains(v.FixedFromVarFileId.Value))
+            .ExecuteUpdateAsync(s => s.SetProperty(v => v.FixedFromVarFileId, (long?)null), cancellationToken)
+            .ConfigureAwait(false);
+        await db.VarFiles
+            .Where(v => v.SupersededByVarFileId != null && ids.Contains(v.SupersededByVarFileId.Value))
+            .ExecuteUpdateAsync(s => s.SetProperty(v => v.SupersededByVarFileId, (long?)null), cancellationToken)
+            .ConfigureAwait(false);
+        await db.VarFiles
+            .Where(v => ids.Contains(v.Id))
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(v => v.FixedFromVarFileId, (long?)null)
+                .SetProperty(v => v.SupersededByVarFileId, (long?)null), cancellationToken)
+            .ConfigureAwait(false);
+        await db.Packages
+            .Where(p => p.CanonicalVarFileId != null && ids.Contains(p.CanonicalVarFileId.Value))
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.CanonicalVarFileId, (long?)null), cancellationToken)
             .ConfigureAwait(false);
 
-        db.VarFiles.RemoveRange(toRemove);
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        var removed = await db.VarFiles
+            .Where(v => ids.Contains(v.Id))
+            .ExecuteDeleteAsync(cancellationToken)
+            .ConfigureAwait(false);
 
-        // Re-elect canonicals for packages whose canonical was removed (FK already nulled the pointer).
+        // Re-elect canonicals for packages whose canonical was cleared.
         foreach (var packageId in affectedPackages)
         {
             var package = await db.Packages.FirstOrDefaultAsync(p => p.Id == packageId, cancellationToken).ConfigureAwait(false);
@@ -203,7 +223,8 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
         }
 
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return toRemove.Count;
+        db.ChangeTracker.Clear();
+        return removed;
     }
 
     public async Task RefreshReadModelAsync(IReadOnlyCollection<long> packageIds, CancellationToken cancellationToken = default)
@@ -325,11 +346,13 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
 
     private async Task ReplaceContentItemsAsync(long varFileId, bool varFileIsNew, IReadOnlyList<UpsertContentItem> items, CancellationToken cancellationToken)
     {
-        if (!varFileIsNew) // a brand-new varfile has no existing rows — skip the pointless SELECT + delete
+        // ExecuteDelete (not RemoveRange+Add in one SaveChanges) — avoids SQLite unique/FK clashes
+        // when EF orders INSERT before DELETE in the same batch.
+        if (!varFileIsNew)
         {
-            var existing = await db.ContentItems.Where(c => c.VarFileId == varFileId).ToListAsync(cancellationToken).ConfigureAwait(false);
-            if (existing.Count > 0)
-                db.ContentItems.RemoveRange(existing);
+            await db.ContentItems.Where(c => c.VarFileId == varFileId)
+                .ExecuteDeleteAsync(cancellationToken)
+                .ConfigureAwait(false);
         }
 
         foreach (var i in items)
@@ -350,12 +373,11 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
 
     private async Task ReplaceDependenciesAsync(long varFileId, bool varFileIsNew, IReadOnlyList<string> metaRefs, IReadOnlyList<string> embeddedRefs, CancellationToken cancellationToken)
     {
-        if (!varFileIsNew) // brand-new varfile → nothing to replace
-        {
-            var existing = await db.Dependencies.Where(d => d.VarFileId == varFileId).ToListAsync(cancellationToken).ConfigureAwait(false);
-            if (existing.Count > 0)
-                db.Dependencies.RemoveRange(existing);
-        }
+        // Always wipe first via SQL delete. RemoveRange+Add in one SaveChanges races on
+        // UNIQUE(VarFileId, DependsOnRefKey) and aborts ingest for vars with dense dep lists.
+        await db.Dependencies.Where(d => d.VarFileId == varFileId)
+            .ExecuteDeleteAsync(cancellationToken)
+            .ConfigureAwait(false);
 
         // Meta refs first so a ref present in both keeps RefKind.Meta (the UNIQUE key dedups the rest).
         var seen = new HashSet<string>(StringComparer.Ordinal);

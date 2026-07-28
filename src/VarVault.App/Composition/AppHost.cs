@@ -331,6 +331,27 @@ public static class AppHost
         }
     }
 
+    /// <summary>
+    /// Filesystem-truth reconcile at launch (X.5): mark mounts online/offline, prune VarFiles that
+    /// vanished from online repos. Runs synchronously before the startup index so Exact/import never
+    /// trust catalog rows whose files are already gone. Best-effort — never blocks launch on failure.
+    /// </summary>
+    public static ReconcileResult? ReconcileCatalog(IServiceProvider rootServices)
+    {
+        try
+        {
+            using var scope = rootServices.CreateScope();
+            var reconciler = scope.ServiceProvider.GetService<CatalogReconciler>();
+            if (reconciler is null)
+                return null;
+            return reconciler.ReconcileAsync().GetAwaiter().GetResult();
+        }
+        catch (Exception)
+        {
+            return null; // best-effort at startup
+        }
+    }
+
     /// <summary>Sweep import temp-workspace dirs orphaned by a crash, at launch (own scope, best-effort). (§6/E5)</summary>
     private static void SweepImportTemp(IServiceProvider rootServices)
     {
@@ -413,6 +434,9 @@ public static class AppHost
             shell.ShowOnboardingOnLoad = NeedsOnboardingAsync(host.Services).GetAwaiter().GetResult();
             ReconcileProfiles(host.Services); // T3.3: sync Profile rows with on-disk profile dirs (own scope)
             SweepImportTemp(host.Services);   // §6/E5: remove import temp dirs orphaned by a crash (own scope)
+            // X.5: prune vanished-on-disk vars + mark offline mounts BEFORE the background index,
+            // so the catalog never claims a file that the user already deleted.
+            ReconcileCatalog(host.Services);
             EnqueueIndexAll(scope.ServiceProvider); // GA-5: populate the catalog in the background on launch
             return (shell, null);
         }

@@ -118,6 +118,52 @@ public sealed class ImportProfileTidyE2ETests
         Assert.Contains(result.CopiedIncomingPaths!, p => p.EndsWith("Fresh.Look.1.var", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Fact]
+    public async Task Apply_exact_skip_does_not_tidy_when_repo_file_missing_on_disk()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        using var profile = new TempDirectory();
+        WriteMinimalVar(Path.Combine(profile.Path, "Fresh.Look.1.var"), "Fresh", "Look");
+
+        Guid repoId;
+        using (var scope = host.Host.Services.CreateScope())
+        {
+            var repo = await scope.ServiceProvider.GetRequiredService<IRepositoryService>()
+                .RegisterAsync(new RegisterRepositoryRequest("hot", repoDir.Path));
+            Assert.True(repo.IsSuccess);
+            repoId = repo.Value.Id;
+
+            var import = scope.ServiceProvider.GetRequiredService<IImportService>();
+            var seed = await import.ScanAsync(new ImportSpec([profile.Path], repoId));
+            Assert.Single(seed.Items);
+            seed.Items[0].Decision = ImportDecision.Import;
+            var seeded = await import.ApplyAsync(seed);
+            Assert.Equal(1, seeded.Copied);
+        }
+
+        // Catalog still has the row, but the surviving copy is gone from disk.
+        var repoCopy = Path.Combine(repoDir.Path, "Fresh.Look.1.var");
+        Assert.True(File.Exists(repoCopy));
+        File.Delete(repoCopy);
+        Assert.False(File.Exists(repoCopy));
+
+        WriteMinimalVar(Path.Combine(profile.Path, "Fresh.Look.1.var"), "Fresh", "Look");
+        using var applyScope = host.Host.Services.CreateScope();
+        var svc = applyScope.ServiceProvider.GetRequiredService<IImportService>();
+        var session = await svc.ScanAsync(new ImportSpec([profile.Path], repoId));
+        Assert.Single(session.Items);
+        Assert.Equal(ImportLane.Exact, session.Items[0].Lane);
+        session.Items[0].Decision = ImportDecision.Skip;
+
+        var result = await svc.ApplyAsync(session);
+        Assert.Equal(0, result.Copied);
+        Assert.Equal(1, result.Skipped);
+        Assert.True(result.CopiedIncomingPaths is null || result.CopiedIncomingPaths.Count == 0,
+            "Must not tidy the only remaining copy when the repo file is missing on disk");
+        Assert.True(File.Exists(Path.Combine(profile.Path, "Fresh.Look.1.var")));
+    }
+
     private static void WriteMinimalVar(string path, string creator, string package)
     {
         using var fs = new FileStream(path, FileMode.Create, FileAccess.Write);

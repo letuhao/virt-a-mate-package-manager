@@ -2,22 +2,45 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using VarVault.Sdk.Library;
+using VarVault.Sdk.Paging;
 
 namespace VarVault.App.ViewModels;
+
+/// <summary>One trash row with an observable checkbox for bulk select / Select page / Select all.</summary>
+public sealed partial class TrashRowViewModel(TrashItemDto item) : ObservableObject
+{
+    public TrashItemDto Item { get; } = item;
+    public string Id => Item.Id;
+    public string OriginalPath => Item.OriginalPath;
+    public string Reason => Item.Reason;
+    public DateTime TrashedAtUtc => Item.TrashedAtUtc;
+    public long Bytes => Item.Bytes;
+
+    [ObservableProperty] private bool _isSelected;
+}
 
 /// <summary>SCR-11 · Trash &amp; backup: restore/purge trashed items; backups. (16-checklist SCR-11.)</summary>
 public sealed partial class TrashViewModel(ITrashQueryService trash) : ObservableObject, ILoadableScreen
 {
-    private readonly HashSet<string> _selectedIds = [];
-    public PagedListState<TrashItemDto> Pager { get; } =
-        new((request, ct) => trash.ListPageAsync(request, cancellationToken: ct));
+    private readonly HashSet<string> _selectedIds = new(StringComparer.Ordinal);
+
+    public PagedListState<TrashRowViewModel> Pager { get; } =
+        new(async (request, ct) =>
+        {
+            var page = await trash.ListPageAsync(request, cancellationToken: ct).ConfigureAwait(false);
+            return new PageResult<TrashRowViewModel>(
+                page.Items.Select(i => new TrashRowViewModel(i)).ToList(),
+                page.TotalCount,
+                page.PageNumber,
+                page.PageSize);
+        });
 
     /// <summary>Sub-navigation tabs (GC-2).</summary>
     public IReadOnlyList<Controls.TabItemModel> Tabs { get; } =
         [new("Trash (recoverable)"), new("Catalog backups")];
     [ObservableProperty] private int _selectedTabIndex;
 
-    public ObservableCollection<TrashItemDto> Items => Pager.Items;
+    public ObservableCollection<TrashRowViewModel> Items => Pager.Items;
     public ObservableCollection<BackupDto> Backups { get; } = [];
 
     [ObservableProperty] private string? _statusMessage;
@@ -40,24 +63,43 @@ public sealed partial class TrashViewModel(ITrashQueryService trash) : Observabl
         Backups.Clear();
         foreach (var b in await trash.ListBackupsAsync(cancellationToken).ConfigureAwait(true))
             Backups.Add(b);
-        OnPropertyChanged(nameof(IsEmpty));
-        OnPropertyChanged(nameof(TrashSummary));
+        // Drop selection ids that no longer exist after restore/purge.
+        if (_selectedIds.Count > 0)
+        {
+            var stillThere = (await trash.ListAsync(cancellationToken).ConfigureAwait(true))
+                .Select(i => i.Id)
+                .ToHashSet(StringComparer.Ordinal);
+            _selectedIds.RemoveWhere(id => !stillThere.Contains(id));
+        }
+        SyncSelectedItems();
+        NotifyPager();
     }
 
     [RelayCommand]
-    public async Task RestoreAsync(TrashItemDto item, CancellationToken cancellationToken = default)
+    public async Task RestoreAsync(TrashRowViewModel? row, CancellationToken cancellationToken = default)
     {
-        var r = await trash.RestoreAsync(item.Id, cancellationToken).ConfigureAwait(true);
+        if (row is null) return;
+        var r = await trash.RestoreAsync(row.Id, cancellationToken).ConfigureAwait(true);
         StatusMessage = r.IsSuccess ? "Restored" : r.Error.Message;
-        _selectedIds.Remove(item.Id);
+        if (r.IsSuccess)
+        {
+            _selectedIds.Remove(row.Id);
+            Items.Remove(row);
+        }
         await LoadAsync(cancellationToken).ConfigureAwait(true);
     }
 
     [RelayCommand]
-    public async Task PurgeAsync(TrashItemDto item, CancellationToken cancellationToken = default)
+    public async Task PurgeAsync(TrashRowViewModel? row, CancellationToken cancellationToken = default)
     {
-        await trash.PurgeAsync(item.Id, cancellationToken).ConfigureAwait(true);
-        _selectedIds.Remove(item.Id);
+        if (row is null) return;
+        var r = await trash.PurgeAsync(row.Id, cancellationToken).ConfigureAwait(true);
+        StatusMessage = r.IsSuccess ? "Purged" : r.Error.Message;
+        if (r.IsSuccess)
+        {
+            _selectedIds.Remove(row.Id);
+            Items.Remove(row);
+        }
         await LoadAsync(cancellationToken).ConfigureAwait(true);
     }
 
@@ -70,40 +112,115 @@ public sealed partial class TrashViewModel(ITrashQueryService trash) : Observabl
     }
 
     /// <summary>Rows checked for the bulk Restore/Purge actions. (AC-23)</summary>
-    public ObservableCollection<TrashItemDto> SelectedItems { get; } = [];
+    public ObservableCollection<TrashRowViewModel> SelectedItems { get; } = [];
     public int SelectedCount => _selectedIds.Count;
 
     /// <summary>Row checkbox toggle → membership in the bulk selection. (AC-23)</summary>
     [RelayCommand]
-    public void ToggleSelection(TrashItemDto item)
+    public void ToggleSelection(TrashRowViewModel? row)
     {
-        if (item is null) return;
-        if (_selectedIds.Contains(item.Id)) _selectedIds.Remove(item.Id);
-        else _selectedIds.Add(item.Id);
-        SyncSelectedItems();
+        if (row is null) return;
+        if (_selectedIds.Contains(row.Id))
+        {
+            _selectedIds.Remove(row.Id);
+            row.IsSelected = false;
+        }
+        else
+        {
+            _selectedIds.Add(row.Id);
+            row.IsSelected = true;
+        }
+        OnPropertyChanged(nameof(SelectedCount));
+        RebuildSelectedItems();
     }
 
-    /// <summary>Bulk "Restore selected". (AC-23)</summary>
+    /// <summary>Select only the rows on the current page (safe default).</summary>
+    [RelayCommand]
+    public void SelectPage()
+    {
+        _selectedIds.Clear();
+        foreach (var row in Items)
+            _selectedIds.Add(row.Id);
+        SyncSelectedItems();
+        StatusMessage = $"Selected page ({_selectedIds.Count})";
+    }
+
+    /// <summary>Select every trash item across all pages.</summary>
+    [RelayCommand]
+    public async Task SelectAllAsync(CancellationToken cancellationToken = default)
+    {
+        var all = await trash.ListAsync(cancellationToken).ConfigureAwait(true);
+        _selectedIds.Clear();
+        foreach (var item in all)
+            _selectedIds.Add(item.Id);
+        SyncSelectedItems();
+        StatusMessage = $"Selected all {_selectedIds.Count} in trash";
+    }
+
+    /// <summary>Clear the bulk selection.</summary>
+    [RelayCommand]
+    public void ClearSelection()
+    {
+        _selectedIds.Clear();
+        SyncSelectedItems();
+        StatusMessage = "Selection cleared";
+    }
+
+    /// <summary>Bulk "Restore selected" — restores only the id set, never the whole trash by implication.</summary>
     [RelayCommand]
     public async Task RestoreSelectedAsync(CancellationToken cancellationToken = default)
     {
+        // Snapshot once — do not re-query trash or expand to "all".
         var ids = _selectedIds.ToList();
+        if (ids.Count == 0)
+        {
+            StatusMessage = "Nothing selected";
+            return;
+        }
+
         var ok = 0;
+        var fail = 0;
         foreach (var id in ids)
-            if ((await trash.RestoreAsync(id, cancellationToken).ConfigureAwait(true)).IsSuccess) ok++;
-        StatusMessage = $"Restored {ok} of {ids.Count}";
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if ((await trash.RestoreAsync(id, cancellationToken).ConfigureAwait(true)).IsSuccess)
+                ok++;
+            else
+                fail++;
+        }
+
+        StatusMessage = fail == 0
+            ? $"Restored {ok} selected"
+            : $"Restored {ok} of {ids.Count} selected · {fail} failed";
         _selectedIds.Clear();
         await LoadAsync(cancellationToken).ConfigureAwait(true);
     }
 
-    /// <summary>Bulk "Purge selected". (AC-23)</summary>
+    /// <summary>Bulk "Purge selected" — purges only the id set.</summary>
     [RelayCommand]
     public async Task PurgeSelectedAsync(CancellationToken cancellationToken = default)
     {
         var ids = _selectedIds.ToList();
+        if (ids.Count == 0)
+        {
+            StatusMessage = "Nothing selected";
+            return;
+        }
+
+        var ok = 0;
+        var fail = 0;
         foreach (var id in ids)
-            await trash.PurgeAsync(id, cancellationToken).ConfigureAwait(true);
-        StatusMessage = $"Purged {ids.Count}";
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if ((await trash.PurgeAsync(id, cancellationToken).ConfigureAwait(true)).IsSuccess)
+                ok++;
+            else
+                fail++;
+        }
+
+        StatusMessage = fail == 0
+            ? $"Purged {ok} selected"
+            : $"Purged {ok} of {ids.Count} selected · {fail} failed";
         _selectedIds.Clear();
         await LoadAsync(cancellationToken).ConfigureAwait(true);
     }
@@ -140,17 +257,24 @@ public sealed partial class TrashViewModel(ITrashQueryService trash) : Observabl
         NotifyPager();
     }
 
-    public bool IsSelected(TrashItemDto item) => _selectedIds.Contains(item.Id);
+    public bool IsSelected(TrashRowViewModel row) => row is not null && _selectedIds.Contains(row.Id);
 
     private bool CanPreviousPage() => Pager.HasPreviousPage && !Pager.IsLoading;
     private bool CanNextPage() => Pager.HasNextPage && !Pager.IsLoading;
 
     private void SyncSelectedItems()
     {
-        SelectedItems.Clear();
-        foreach (var item in Items.Where(i => _selectedIds.Contains(i.Id)))
-            SelectedItems.Add(item);
+        foreach (var row in Items)
+            row.IsSelected = _selectedIds.Contains(row.Id);
+        RebuildSelectedItems();
         OnPropertyChanged(nameof(SelectedCount));
+    }
+
+    private void RebuildSelectedItems()
+    {
+        SelectedItems.Clear();
+        foreach (var row in Items.Where(r => _selectedIds.Contains(r.Id)))
+            SelectedItems.Add(row);
     }
 
     private void NotifyPager()

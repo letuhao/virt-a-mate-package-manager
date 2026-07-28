@@ -13,8 +13,12 @@
     <c:Tabs DockPanel.Dock="Top" ItemsSource="{Binding Tabs}" SelectedIndex="{Binding SelectedTabIndex}" Margin="0,0,0,12" />
     <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
       <Button Content="Back up now" Command="{Binding BackupNowCommand}" />
+      <Button Content="Select page" Command="{Binding SelectPageCommand}" />
+      <Button Content="Select all" Command="{Binding SelectAllCommand}" ToolTip.Tip="Select every item in trash (all pages), not just this page" />
+      <Button Content="Clear selection" Command="{Binding ClearSelectionCommand}" />
       <Button Content="Restore selected" Command="{Binding RestoreSelectedCommand}" />
       <Button Content="Purge selected" Foreground="{DynamicResource CritBrush}" Command="{Binding PurgeSelectedCommand}" />
+      <TextBlock Text="{Binding SelectedCount, StringFormat={}{0} selected}" Opacity="0.7" VerticalAlignment="Center" />
       <TextBlock Text="{Binding TrashSummary}" Opacity="0.7" VerticalAlignment="Center" />
       <TextBlock Text="{Binding StatusMessage}" Opacity="0.7" VerticalAlignment="Center" />
     </StackPanel>
@@ -35,9 +39,10 @@
         <ScrollViewer>
           <ItemsControl ItemsSource="{Binding Items}">
           <ItemsControl.ItemTemplate>
-            <DataTemplate x:DataType="lib:TrashItemDto">
+            <DataTemplate x:DataType="vm:TrashRowViewModel">
               <Grid ColumnDefinitions="28,*,*,Auto,Auto,Auto,Auto" Height="26">
                 <CheckBox Grid.Column="0" VerticalAlignment="Center" MinWidth="0"
+                          IsChecked="{Binding IsSelected, Mode=OneWay}"
                           Command="{Binding ((vm:TrashViewModel)DataContext).ToggleSelectionCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                           CommandParameter="{Binding}" />
                 <TextBlock Grid.Column="1" Text="{Binding OriginalPath}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />

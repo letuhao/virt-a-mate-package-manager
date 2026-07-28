@@ -26,7 +26,7 @@ public interface IScanLedger
     /// <summary>The fingerprint of the most recent <b>completed</b> scan of a repository, or null. (A16.)</summary>
     Task<RepositorySignature?> GetLastCompletedSignatureAsync(Guid repositoryId, CancellationToken cancellationToken = default);
 
-    /// <summary>True if any var in the repository is not yet fully ingested (not <c>RawStored</c>). (A16.)</summary>
+    /// <summary>True if any var in the repository still needs ingest or Library read-model materialization. (A16.)</summary>
     Task<bool> HasPendingWorkAsync(Guid repositoryId, CancellationToken cancellationToken = default);
 }
 
@@ -35,6 +35,20 @@ public interface IDurableDirtySet
 {
     Task MarkAsync(long packageId, string reason = "ingest", CancellationToken cancellationToken = default);
     Task MarkManyAsync(IEnumerable<long> packageIds, string reason = "ingest", CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Peek the oldest dirty package ids without removing them. Call
+    /// <see cref="AcknowledgeAsync"/> only after <c>RefreshReadModelAsync</c> commits.
+    /// </summary>
+    Task<IReadOnlyList<long>> PeekBatchAsync(int take, CancellationToken cancellationToken = default);
+
+    /// <summary>Drop dirty marks after a successful read-model refresh (crash-safe with Peek).</summary>
+    Task AcknowledgeAsync(IReadOnlyList<long> packageIds, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Peek + acknowledge in one step. Prefer Peek/Acknowledge around refresh so a crash
+    /// between drain and refresh cannot lose the dirty mark permanently.
+    /// </summary>
     Task<IReadOnlyList<long>> DrainBatchAsync(int take, CancellationToken cancellationToken = default);
 }
 

@@ -107,7 +107,8 @@ public sealed record ImportSession(
 /// <summary>Result of applying a session. (doc 30 §5.)</summary>
 /// <param name="CopiedIncomingPaths">
 /// Absolute paths of loose source <c>.var</c> files eligible for profile tidy / Trash originals:
-/// successfully durable-copied files, Exact-skip dups already in the library, and KeepExisting.
+/// successfully durable-copied files, Exact-skip dups already in the library, and KeepExisting —
+/// only when a surviving repo/landed copy exists on disk (catalog alone is not trusted).
 /// Excludes archive extracts under the session temp root and symlink/link-farm paths.
 /// </param>
 /// <param name="Cancelled">True when the apply stopped early on a graceful cancel (partial copies may still be listed).</param>
