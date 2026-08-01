@@ -11,7 +11,7 @@
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <Product>VarVault</Product>
     <Company>VarVault</Company>
-    <Version>0.1.6</Version>
+    <Version>0.1.7</Version>
     <Deterministic>true</Deterministic>
   </PropertyGroup>
 </Project>
