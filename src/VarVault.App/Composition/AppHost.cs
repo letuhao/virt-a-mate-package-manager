@@ -28,7 +28,8 @@ public static class AppHost
         var importJobs = services.GetService<ImportJobRunner>()
             ?? new ImportJobRunner(
                 services.GetRequiredService<Sdk.Threading.IJobQueue>(),
-                services.GetRequiredService<IServiceScopeFactory>());
+                services.GetRequiredService<IServiceScopeFactory>(),
+                services.GetService<IUiDispatcher>());
         var uiDispatcher = services.GetRequiredService<IUiDispatcher>();
         // One shared runner for Library / Proposals / Fix dialog — never resolve a second orphan instance.
         var encodingJobs = services.GetService<EncodingFixJobRunner>()
@@ -121,6 +122,16 @@ public static class AppHost
         {
             if (screens["library"] is LibraryViewModel libraryVm)
                 _ = libraryVm.RefreshAsync();
+        };
+
+        // Spec §219: VarsImported → Library/Dashboard refresh. Apply job name is "Applying import"
+        // (not "Index*"), so the shell's index-finished reload never fires.
+        importJobs.AfterCompleted = () =>
+        {
+            if (screens["library"] is LibraryViewModel libraryVm)
+                _ = libraryVm.RefreshAsync();
+            if (screens["dashboard"] is DashboardViewModel dashVm)
+                _ = dashVm.LoadAsync();
         };
 
         // Import rail badge = the live review-lane count of the Import screen's current session (spec §10).

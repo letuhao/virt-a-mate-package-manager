@@ -28,6 +28,11 @@ public sealed class IndexerWorker(
     private CancellationTokenSource? _jobCts;
     private Task? _running;
     private Guid? _activeJob;
+    /// <summary>
+    /// One deferred start when a second Start* arrives while busy. Dropping those requests made
+    /// Import.Apply "succeed" on a pre-copy IndexAll — files on disk, no PackageListItem.
+    /// </summary>
+    private PendingStart? _pending;
 
     public IndexerStatus Snapshot
     {
@@ -68,7 +73,8 @@ public sealed class IndexerWorker(
             case IndexerCommandKind.Ping:
             case IndexerCommandKind.GetStatus:
             case IndexerCommandKind.RegisterOwner:
-                return Snapshot;
+                lock (_gate)
+                    return _status with { QueueDepth = _pending is null ? 0 : 1 };
 
             case IndexerCommandKind.UnregisterOwner:
                 if (command.OwnerProcessId is { } gone)
@@ -85,6 +91,7 @@ public sealed class IndexerWorker(
                 {
                     try { await _running.ConfigureAwait(false); } catch { /* swallow */ }
                 }
+                lock (_gate) { _pending = null; }
                 Set(_ => Idle());
                 return Snapshot;
 
@@ -188,23 +195,42 @@ public sealed class IndexerWorker(
     {
         lock (_gate)
         {
-            // Coalesce: if already indexing, return the active job id.
-            if (_running is { IsCompleted: false } && _activeJob is { } existing)
-                return _status with { JobId = existing, PhaseMessage = "Coalesced into active job" };
+            // Busy → queue one follow-up (merge scope/force). Return the *follow-up* job id so
+            // Import.WaitForIndex attaches to the post-copy scan, not the already-running one.
+            if (_running is { IsCompleted: false })
+            {
+                _pending = _pending is null
+                    ? new PendingStart(repositoryId, forceFull, Guid.NewGuid())
+                    : _pending.Merge(repositoryId, forceFull);
+                logger.LogInformation(
+                    "Indexer follow-up queued ({Scope}, forceFull={ForceFull}, job {JobId}) behind active {Active}",
+                    _pending.RepositoryId is { } r ? $"repository {r}" : "all repositories",
+                    _pending.ForceFull, _pending.JobId, _activeJob);
+                return new IndexerStatus(
+                    IndexerProtocol.Version, IndexerJobState.Discovering, _pending.JobId,
+                    "Queued follow-up index", 0, 0, Process.GetCurrentProcess().WorkingSet64,
+                    1, 0, _status.CatalogGeneration, null);
+            }
 
-            var jobId = Guid.NewGuid();
-            _activeJob = jobId;
-            // Job lifetime is independent of the pipe/request CT (those end when the command returns).
-            // Cancellation is only via CancelJob / Shutdown.
-            _jobCts?.Dispose();
-            _jobCts = new CancellationTokenSource();
-            var ct = _jobCts.Token;
-            _status = new IndexerStatus(
-                IndexerProtocol.Version, IndexerJobState.Discovering, jobId,
-                "Starting…", 0, 0, Process.GetCurrentProcess().WorkingSet64, 0, 0, 0, null);
-            _running = Task.Run(() => RunJobAsync(jobId, repositoryId, forceFull, ct), CancellationToken.None);
-            return _status;
+            return BeginJob_NoLock(repositoryId, forceFull, Guid.NewGuid());
         }
+    }
+
+    /// <summary>Caller must hold <see cref="_gate"/> and the worker must not be busy.</summary>
+    private IndexerStatus BeginJob_NoLock(Guid? repositoryId, bool forceFull, Guid jobId)
+    {
+        _activeJob = jobId;
+        // Job lifetime is independent of the pipe/request CT (those end when the command returns).
+        // Cancellation is only via CancelJob / Shutdown.
+        _jobCts?.Dispose();
+        _jobCts = new CancellationTokenSource();
+        var ct = _jobCts.Token;
+        _status = new IndexerStatus(
+            IndexerProtocol.Version, IndexerJobState.Discovering, jobId,
+            "Starting…", 0, 0, Process.GetCurrentProcess().WorkingSet64,
+            _pending is null ? 0 : 1, 0, 0, null);
+        _running = Task.Run(() => RunJobAsync(jobId, repositoryId, forceFull, ct), CancellationToken.None);
+        return _status;
     }
 
     private async Task RunJobAsync(Guid jobId, Guid? repositoryId, bool forceFull, CancellationToken cancellationToken)
@@ -290,10 +316,38 @@ public sealed class IndexerWorker(
         }
         finally
         {
+            PendingStart? next;
             lock (_gate)
             {
                 if (_activeJob == jobId)
                     _activeJob = null;
+                // Clear before starting follow-up — we're still inside this Task until finally returns.
+                _running = null;
+                next = _pending;
+                _pending = null;
+            }
+
+            if (next is { } pending)
+            {
+                logger.LogInformation(
+                    "Indexer starting queued follow-up {JobId} ({Scope}, forceFull={ForceFull})",
+                    pending.JobId,
+                    pending.RepositoryId is { } followRepo ? $"repository {followRepo}" : "all repositories",
+                    pending.ForceFull);
+                lock (_gate)
+                {
+                    // Another Start may have raced in after we cleared _running; if so, re-queue.
+                    if (_running is { IsCompleted: false })
+                    {
+                        _pending = _pending is null
+                            ? pending
+                            : _pending.Merge(pending.RepositoryId, pending.ForceFull);
+                    }
+                    else
+                    {
+                        BeginJob_NoLock(pending.RepositoryId, pending.ForceFull, pending.JobId);
+                    }
+                }
             }
         }
     }
@@ -304,7 +358,20 @@ public sealed class IndexerWorker(
         {
             if (jobId is { } id && _activeJob != id)
                 return;
+            _pending = null;
             _jobCts?.Cancel();
+        }
+    }
+
+    private sealed record PendingStart(Guid? RepositoryId, bool ForceFull, Guid JobId)
+    {
+        public PendingStart Merge(Guid? repositoryId, bool forceFull)
+        {
+            // null repositoryId = IndexAll. Different repos → escalate to IndexAll.
+            Guid? scope = RepositoryId is null || repositoryId is null
+                ? null
+                : RepositoryId == repositoryId ? RepositoryId : null;
+            return this with { RepositoryId = scope, ForceFull = ForceFull || forceFull };
         }
     }
 

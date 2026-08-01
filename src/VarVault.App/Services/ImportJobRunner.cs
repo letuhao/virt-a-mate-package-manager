@@ -8,8 +8,11 @@ namespace VarVault.App.Services;
 /// Enqueues import Scan/Apply work on <see cref="IJobQueue"/> with a fresh DI scope per job.
 /// Results are surfaced via <see cref="ImportJob{T}.Result"/>; worker threads never touch UI observables.
 /// </summary>
-public sealed class ImportJobRunner(IJobQueue queue, IServiceScopeFactory scopes)
+public sealed class ImportJobRunner(IJobQueue queue, IServiceScopeFactory scopes, IUiDispatcher? ui = null)
 {
+    /// <summary>Invoked on the UI thread after a non-cancelled Apply completes (Library refresh, etc.).</summary>
+    public Action? AfterCompleted { get; set; }
+
     public ImportJob<ImportSession> StartScan(ImportSpec spec)
     {
         ArgumentNullException.ThrowIfNull(spec);
@@ -49,6 +52,8 @@ public sealed class ImportJobRunner(IJobQueue queue, IServiceScopeFactory scopes
                 var import = scope.ServiceProvider.GetRequiredService<IImportService>();
                 var result = await import.ApplyAsync(session, ctx.Progress, ctx.Cancellation).ConfigureAwait(false);
                 tcs.TrySetResult(result);
+                if (!result.Cancelled)
+                    NotifyCompleted();
             }
             catch (OperationCanceledException ex)
             {
@@ -62,6 +67,15 @@ public sealed class ImportJobRunner(IJobQueue queue, IServiceScopeFactory scopes
             }
         });
         return new ImportJob<ApplyResult>(handle, tcs.Task);
+    }
+
+    private void NotifyCompleted()
+    {
+        void Raise() => AfterCompleted?.Invoke();
+        if (ui is not null)
+            ui.Post(Raise);
+        else
+            Raise();
     }
 
     /// <summary>Freeze the user's current decisions (and optional activate mode) into an immutable apply snapshot.</summary>

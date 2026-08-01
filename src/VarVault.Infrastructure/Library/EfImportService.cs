@@ -12,6 +12,7 @@ using VarVault.Domain.Import;
 using VarVault.Domain.Indexing;
 using VarVault.Domain.Migration;
 using VarVault.Domain.ValueObjects;
+using VarVault.Infrastructure.Indexing;
 using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Activation;
 using VarVault.Sdk.Events;
@@ -942,36 +943,16 @@ public sealed class EfImportService(
     }
 
     /// <summary>
-    /// Ask the catalog writer to index the target repo. Soft-fails: copies already landed on disk must
-    /// still produce an ApplyResult (history + trash-originals). A hard throw here used to leave files
-    /// in the repo with no library row and no delete-originals when the wrong indexer client was used.
+    /// Ask the catalog writer to index the target repo after copies land. Soft-fails: copies already
+    /// on disk must still produce an ApplyResult (history + trash-originals).
+    /// Uses forceFull + a dedicated follow-up job id so we never treat a pre-copy IndexAll coalesce
+    /// as "import indexed" (that left Package/disk without PackageListItem — Library ghosts).
     /// </summary>
     private async Task WaitForIndexAsync(Guid repositoryId, CancellationToken cancellationToken, IProgressSink? progress = null)
     {
-        var start = await indexer.StartIndexRepositoryAsync(repositoryId, cancellationToken: cancellationToken).ConfigureAwait(false);
-        if (start.IsFailure)
-            throw new InvalidOperationException(start.Error.Message);
-
-        while (!cancellationToken.IsCancellationRequested)
-        {
-            var status = await indexer.GetStatusAsync(cancellationToken).ConfigureAwait(false);
-            if (status.IsFailure)
-                throw new InvalidOperationException(status.Error.Message);
-            var s = status.Value;
-            progress?.Report(new ProgressReport(
-                s.Done, Math.Max(1, s.Total),
-                s.PhaseMessage ?? $"Indexing… ({s.State})"));
-            if (s.State is IndexerJobState.Completed or IndexerJobState.Failed
-                or IndexerJobState.Cancelled or IndexerJobState.Idle)
-            {
-                if (s.State == IndexerJobState.Failed)
-                    throw new InvalidOperationException(s.Error ?? "index failed");
-                return;
-            }
-            await Task.Delay(200, cancellationToken).ConfigureAwait(false);
-        }
-
-        cancellationToken.ThrowIfCancellationRequested();
+        await IndexerAwait.WaitForRepositoryIndexAsync(
+                indexer, repositoryId, forceFull: true, progress, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>Copy one incoming var into the repo, optionally fixing CJK encoding and/or duplicate entries. Never overwrites. (§7)</summary>
