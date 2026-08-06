@@ -63,11 +63,12 @@ public static class ConflictRecommender
         if (MateriallyLarger(existing.SizeBytes, incoming.SizeBytes))
             return new(KeepChoice.KeepExisting, "Same entry count but the repo copy is materially larger (the incoming may be truncated) — keep the repo copy.");
 
-        // 5 · mtime — weakest tiebreak only, and explicitly a download date.
+        // 5 · mtime — weakest tiebreak only, and explicitly a download date. Wording is NOT "equivalent"
+        //     (true identity is Exact via ContentSignature); this only means size/entry-count look similar.
         if (incoming.FileMtime > existing.FileMtime)
-            return new(KeepChoice.KeepIncoming, "Contents look equivalent — keep the incoming copy (newer file date; download date, for reference).");
+            return new(KeepChoice.KeepIncoming, "Similar size and entry count — keep the incoming copy (newer file date; download date, for reference).");
         if (existing.FileMtime > incoming.FileMtime)
-            return new(KeepChoice.KeepExisting, "Contents look equivalent — keep the repo copy (newer file date; download date, for reference).");
+            return new(KeepChoice.KeepExisting, "Similar size and entry count — keep the repo copy (newer file date; download date, for reference).");
 
         // 6 · genuinely ambiguous — both valid, both meta-ok, similar size, real content diff → keep both, user decides.
         return new(KeepChoice.KeepBoth, "Both are valid but differ in content — keep both (rename the incoming); you decide.");

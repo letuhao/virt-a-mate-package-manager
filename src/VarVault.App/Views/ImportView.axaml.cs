@@ -1,11 +1,13 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using VarVault.App.ViewModels;
 
@@ -14,11 +16,19 @@ namespace VarVault.App.Views;
 /// <summary>Import &amp; review screen. Handles the review keyboard map (J/K, ] [ \, Del). (doc 31 Phase 6.2/6.6.)</summary>
 public partial class ImportView : UserControl
 {
+    private ListBox? _itemList;
+    private ListBox? _galleryList;
+
     public ImportView()
     {
         AvaloniaXamlLoader.Load(this);
-        // Tunnel so the mapped keys win before the ListBox's type-ahead search / Del handling. (6.6)
+        _itemList = this.FindControl<ListBox>("ItemList");
+        _galleryList = this.FindControl<ListBox>("GalleryList");
+        // Tunnel: J/K + decision keys win before ListBox type-ahead / Del. (6.6)
+        // Note: ListBox.OnKeyDown is a class handler and still runs for ↑/↓ even when Handled —
+        // so arrows are owned by ListBox (native move+scroll); we only block XY-focus escape in bubble.
         AddHandler(KeyDownEvent, OnPreviewKeyDown, RoutingStrategies.Tunnel);
+        AddHandler(KeyDownEvent, OnArrowBubble, RoutingStrategies.Bubble);
         DataContextChanged += (_, _) => WirePickers();
         AttachedToVisualTree += (_, _) => WirePickers();
         // DataContext may already be set by a DataTemplate before our handler was subscribed.
@@ -91,14 +101,13 @@ public partial class ImportView : UserControl
         var top = TopLevel.GetTopLevel(this) ?? this.GetVisualRoot() as TopLevel;
         if (top is not null)
             return top;
-        await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => { }, Avalonia.Threading.DispatcherPriority.Loaded);
+        await Dispatcher.UIThread.InvokeAsync(() => { }, DispatcherPriority.Loaded);
         return TopLevel.GetTopLevel(this) ?? this.GetVisualRoot() as TopLevel;
     }
 
     /// <summary>
-    /// Review shortcuts from the UX draft: J/↓ &amp; K/↑ navigate the list, ] [ \ set the primary/secondary/both
-    /// decision on the selected review item, Del/Backspace discard it. Text-entry controls keep their own keys.
-    /// (6.6.)
+    /// Review shortcuts: J/K navigate (same as ↑/↓), ] [ \ decide, Del discard.
+    /// ↑/↓ are intentionally not moved here — ListBox class handlers ignore Handled and would double-step.
     /// </summary>
     private void OnPreviewKeyDown(object? sender, KeyEventArgs e)
     {
@@ -109,8 +118,14 @@ public partial class ImportView : UserControl
 
         switch (e.Key)
         {
-            case Key.J or Key.Down: vm.MoveSelection(+1); break;
-            case Key.K or Key.Up: vm.MoveSelection(-1); break;
+            case Key.J:
+                vm.MoveSelection(+1);
+                KeepSelectionVisible();
+                break;
+            case Key.K:
+                vm.MoveSelection(-1);
+                KeepSelectionVisible();
+                break;
             case Key.OemCloseBrackets: vm.DecidePrimary(); break;   // ]
             case Key.OemOpenBrackets: vm.DecideSecondary(); break;  // [
             case Key.OemPipe or Key.OemBackslash: vm.DecideBoth(); break; // \
@@ -118,5 +133,70 @@ public partial class ImportView : UserControl
             default: return;
         }
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// After ListBox handles ↑/↓ (or fails at the edge), mark Handled so Window XY-focus cannot jump to
+    /// Details / Pagination, and keep the selected row scrolled + focused inside the list.
+    /// </summary>
+    private void OnArrowBubble(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is not ImportViewModel)
+            return;
+        if (e.Source is TextBox or ComboBox)
+            return;
+        if (e.Key is not (Key.Up or Key.Down))
+            return;
+
+        // If focus isn't in either list, drive selection ourselves (e.g. focus landed on a Details button).
+        if (!IsFocusInsideList() && !e.Handled)
+        {
+            if (DataContext is ImportViewModel vm)
+                vm.MoveSelection(e.Key == Key.Down ? +1 : -1);
+        }
+
+        e.Handled = true;
+        KeepSelectionVisible();
+    }
+
+    private bool IsFocusInsideList()
+    {
+        var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() as Visual;
+        if (focused is null)
+            return false;
+        return (_itemList is not null && _itemList.IsVisualAncestorOf(focused))
+            || (_galleryList is not null && _galleryList.IsVisualAncestorOf(focused))
+            || ReferenceEquals(focused, _itemList)
+            || ReferenceEquals(focused, _galleryList);
+    }
+
+    /// <summary>
+    /// Scroll the selected row into view and reclaim keyboard focus so navigation stays in the list.
+    /// </summary>
+    private void KeepSelectionVisible()
+    {
+        if (DataContext is not ImportViewModel { Selected: { } selected })
+            return;
+
+        var list = ActiveList();
+        if (list is null)
+            return;
+
+        // Defer until after SelectedItem binding + container generation (virtualized panel).
+        Dispatcher.UIThread.Post(() =>
+        {
+            list.ScrollIntoView(selected);
+            if (list.ContainerFromItem(selected) is Control container)
+                container.Focus(NavigationMethod.Directional);
+            else
+                list.Focus(NavigationMethod.Directional);
+        }, DispatcherPriority.Render);
+    }
+
+    private ListBox? ActiveList()
+    {
+        if (DataContext is ImportViewModel { GalleryView: true })
+            return _galleryList is { IsVisible: true } ? _galleryList : _itemList;
+        return _itemList is { IsVisible: true } ? _itemList : _galleryList;
     }
 }

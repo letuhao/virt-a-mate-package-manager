@@ -143,6 +143,53 @@ public sealed class ImportScanFlowTests
             svc.ScanAsync(new ImportSpec([importDir.Path], Guid.NewGuid()), progress: null!, cts.Token));
     }
 
+    /// <summary>
+    /// Catalog ContentSignature null/stale must not force a Conflict when the on-disk copy is byte-identical:
+    /// ConflictItem re-inspects live and reclassifies Exact (D1).
+    /// </summary>
+    [Fact]
+    public async Task Identical_incoming_with_null_catalog_signature_is_Exact_not_Conflict()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        using var importDir = new TempDirectory();
+
+        WriteVar(repoDir.Path, "Creator.Same.1.var", "Creator", "Same",
+            [("Custom/a.vam", "AAA"), ("Custom/b.vam", "BBB")]);
+
+        using (var scope = host.Host.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<IRepositoryService>()
+                .RegisterAsync(new RegisterRepositoryRequest("catalog", repoDir.Path));
+        using (var scope = host.Host.Services.CreateScope())
+            await scope.ServiceProvider.GetRequiredService<IIndexOrchestrator>().IndexAllAsync();
+
+        // Simulate stale/incomplete catalog: wipe signatures so Classify cannot Exact-match via DB.
+        using (var scope = host.Host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+            foreach (var vf in db.VarFiles)
+            {
+                vf.ContentSignature = null;
+                vf.PayloadSignature = null;
+                vf.ContentSignatureNoPath = null;
+            }
+            await db.SaveChangesAsync();
+        }
+
+        WriteVar(importDir.Path, "Creator.Same.1.var", "Creator", "Same",
+            [("Custom/a.vam", "AAA"), ("Custom/b.vam", "BBB")]);
+
+        using var read = host.Host.Services.CreateScope();
+        var session = await read.ServiceProvider.GetRequiredService<IImportService>()
+            .ScanAsync(new ImportSpec([importDir.Path], Guid.NewGuid()), progress: null!);
+
+        var item = Assert.Single(session.Items);
+        Assert.Equal(ImportLane.Exact, item.Lane);
+        Assert.Equal(ImportDecision.Skip, item.Decision);
+        Assert.NotNull(item.Existing);
+        Assert.Empty(item.Diff);
+    }
+
     // ── fixtures ─────────────────────────────────────────────────────────────────────────────────────────
     private static string Meta(string creator, string package) =>
         "{\"creatorName\":\"" + creator + "\",\"packageName\":\"" + package + "\",\"dependencies\":{}}";

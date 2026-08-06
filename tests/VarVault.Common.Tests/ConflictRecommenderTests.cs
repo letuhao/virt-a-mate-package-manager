@@ -59,9 +59,12 @@ public class ConflictRecommenderTests
     public void Mtime_is_only_a_weak_tiebreak()
     {
         // Everything else equal -> newer file wins, but only here at the bottom of the ladder.
+        // Wording must not claim content identity (that is Exact via ContentSignature).
         var r = ConflictRecommender.Recommend(Side(mtime: T2024), Side(mtime: T2023));
         Assert.Equal(KeepChoice.KeepIncoming, r.Choice);
+        Assert.Contains("Similar size and entry count", r.Reason);
         Assert.Contains("reference", r.Reason);
+        Assert.DoesNotContain("equivalent", r.Reason, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

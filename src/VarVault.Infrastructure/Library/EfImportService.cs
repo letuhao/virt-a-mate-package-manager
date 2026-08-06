@@ -341,6 +341,21 @@ public sealed class EfImportService(
             }
         }
 
+        // Catalog ContentSignature may be null/stale → Classify missed Exact. Live re-inspect is authoritative (D1).
+        var incomingSig = incoming.Signatures?.ContentSignature;
+        var existingSig = existingInsp?.Signatures?.ContentSignature;
+        if (match is not null &&
+            !string.IsNullOrEmpty(incomingSig) &&
+            !string.IsNullOrEmpty(existingSig) &&
+            string.Equals(incomingSig, existingSig, StringComparison.Ordinal))
+        {
+            var reason = $"Already in repo '{match.RepositoryName}' (T{match.Tier}) — will be skipped.";
+            var existing = new ExistingRef(match.VarFileId, match.Tier, match.RepositoryName, match.AbsolutePath,
+                existingSignals ?? UnknownSignals(match.AbsolutePath, Path.GetFileName(match.AbsolutePath)));
+            return Item(fileName, sourcePath, label, incomingSignals, ImportLane.Exact, ImportDecision.Skip, reason,
+                existing, [], incomingPath: varPath);
+        }
+
         var rec = ConflictRecommender.Recommend(
             ToSide(incomingSignals, incoming),
             existingSignals is not null && existingInsp is not null
