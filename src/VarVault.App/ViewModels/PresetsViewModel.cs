@@ -64,6 +64,9 @@ public sealed partial class PresetsViewModel : ObservableObject, ILoadableScreen
 
     public bool IsEmpty => Presets.Count == 0;
 
+    /// <summary>Invoked after a successful preset activation so other screens (e.g. Library) can refresh installed cues.</summary>
+    public Action? AfterActivation { get; set; }
+
     private bool CanActivate() => _activation is not null && Selected is not null && VamPathConfigured;
 
     /// <summary>"Activate" → materialize this preset's per-var symlinks under its profile's ___VarsLink___. (T6.1)</summary>
@@ -74,6 +77,8 @@ public sealed partial class PresetsViewModel : ObservableObject, ILoadableScreen
             return;
         var r = await _activation.BuildProfileLinksAsync(Selected.Id, cancellationToken).ConfigureAwait(true);
         StatusMessage = FormatActivationStatus(Selected.Name, r, switched: false);
+        if (r.PathUnavailable == 0 && r.PrivilegeFailures == 0)
+            AfterActivation?.Invoke();
     }
 
     /// <summary>"Activate &amp; switch" → materialize links, then repoint AddonPackages to this profile. (T6.1)</summary>
@@ -96,12 +101,14 @@ public sealed partial class PresetsViewModel : ObservableObject, ILoadableScreen
         if (_profiles is null)
         {
             StatusMessage = FormatActivationStatus(Selected.Name, r, switched: false);
+            AfterActivation?.Invoke();
             return;
         }
         var switched = await _profiles.SwitchToAsync(Selected.Name, cancellationToken).ConfigureAwait(true);
         StatusMessage = switched.IsSuccess
             ? FormatActivationStatus(Selected.Name, r, switched: true)
             : switched.Error.Message;
+        AfterActivation?.Invoke();
     }
 
     private static string FormatActivationStatus(string name, ActivationBuildResult r, bool switched)

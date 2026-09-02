@@ -58,6 +58,9 @@ public static class Telemetry
     public static readonly Histogram<double> ImportApplyDurationMs = Meter.CreateHistogram<double>("varvault.imports.apply.duration", unit: "ms");
     public static readonly Histogram<long> ImportTempBytes = Meter.CreateHistogram<long>("varvault.imports.temp.bytes", unit: "By");
 
+    // Usage feed (preset activate)
+    public static readonly Counter<long> UsageFeedFailed = Meter.CreateCounter<long>("varvault.usage.feed.failed");
+
     /// <summary>Start a traced activity for an operation (no-op if nobody is listening).</summary>
     public static Activity? StartActivity(string name) => ActivitySource.StartActivity(name);
 }

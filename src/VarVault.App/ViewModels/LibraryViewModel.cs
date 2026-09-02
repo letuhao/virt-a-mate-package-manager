@@ -101,6 +101,7 @@ public sealed partial class LibraryViewModel(
             ? "Enable Windows Developer Mode (or run elevated) to create symlinks."
             : $"Installed {count} selected → {r.LinksCreated} linked, {r.MissingPackages} missing";
         ShowToast?.Invoke(LastActionMessage, null);
+        await RefreshLoadedRowsAsync(cancellationToken).ConfigureAwait(true);
     }
 
     /// <summary>Ops-bar "Uninstall": deactivate the selected packages (remove their symlinks). (doc 26 · G-5)</summary>
@@ -118,6 +119,7 @@ public sealed partial class LibraryViewModel(
         var r = await activation.BuildProfileLinksAsync(presetId.Value, cancellationToken).ConfigureAwait(true);
         LastActionMessage = $"Uninstalled {count} selected → {r.LinksRemoved} links removed";
         ShowToast?.Invoke(LastActionMessage, null);
+        await RefreshLoadedRowsAsync(cancellationToken).ConfigureAwait(true);
     }
 
     /// <summary>Presets available as add-to-preset targets (drives the ops-bar "Add to preset…" flyout). (AC-2)</summary>
@@ -559,6 +561,46 @@ public sealed partial class LibraryViewModel(
     {
         await LoadPreferencesAsync(cancellationToken).ConfigureAwait(true);
         await RefreshAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Re-query installed-state columns for already-loaded rows without resetting scroll/selection.
+    /// Call after activation updates <see cref="PackageListEntry.IsActive"/> in the read model.
+    /// </summary>
+    public async Task RefreshLoadedRowsAsync(CancellationToken cancellationToken = default)
+    {
+        if (Items.Count == 0)
+            return;
+
+        var ids = Items.Select(i => i.PackageId).ToList();
+        var fresh = new Dictionary<long, PackageListEntry>(ids.Count);
+        foreach (var batch in ids.Chunk(1_000))
+        {
+            var rows = await library.GetByIdsAsync(batch.ToList(), cancellationToken).ConfigureAwait(true);
+            foreach (var row in rows)
+                fresh[row.PackageId] = row;
+        }
+
+        var selectedEntryId = SelectedEntry?.PackageId;
+        for (var i = 0; i < Items.Count; i++)
+        {
+            if (!fresh.TryGetValue(Items[i].PackageId, out var updated))
+                continue;
+            if (updated.IsActive == Items[i].IsActive && updated.InstalledAt == Items[i].InstalledAt)
+                continue;
+
+            Items[i] = updated;
+            if (i < GalleryItems.Count)
+            {
+                var wasSelected = GalleryItems[i].IsSelected;
+                GalleryItems[i] = new GalleryCardViewModel(updated, _thumbLoader) { IsSelected = wasSelected };
+            }
+        }
+
+        if (selectedEntryId is long sid && fresh.TryGetValue(sid, out var selRow))
+            SelectedEntry = selRow;
+
+        SyncSelectedItemsProjection();
     }
 
     [RelayCommand]

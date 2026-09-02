@@ -93,6 +93,67 @@ public sealed class ProfilePackageLinkTests
         Assert.Equal([1L, 3L, 2L], ids);
     }
 
+    [Fact]
+    public async Task Refresh_active_read_model_at_scale_clears_stale_and_sets_new()
+    {
+        using var fx = new SqliteTestDatabase();
+        var installed = new DateTime(2024, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        var repoId = Guid.NewGuid();
+        using (var db = fx.NewContext())
+        {
+            db.Profiles.Add(new Profile
+            {
+                Id = 1, Name = "Default", DirPath = "x", CreatedAt = installed, UpdatedAt = installed, IsActive = true,
+            });
+            db.Repositories.Add(new Repository
+            {
+                Id = repoId, Name = "r", MountPath = @"C:\r", Tier = 1, MediaType = MediaType.Nvme,
+                IsOnline = true, IsEnabled = true, CreatedAt = installed, UpdatedAt = installed,
+            });
+
+            for (var i = 1; i <= 1000; i++)
+            {
+                db.Packages.Add(new Package
+                {
+                    Id = i, VarName = $"P.Pkg{i}.1", IdentityKey = $"P.PKG{i}.1", Creator = "P", PackageName = $"Pkg{i}",
+                    VersionToken = "1", VersionSort = 1, FirstSeenAt = installed, LastIndexedAt = installed,
+                });
+                db.PackageListItems.Add(new PackageListItem
+                {
+                    PackageId = i, VarName = $"P.Pkg{i}.1", Creator = "P", PackageName = $"Pkg{i}", VersionToken = "1",
+                    AddedAt = installed, IsActive = i <= 50, InstalledAt = i <= 50 ? installed : null,
+                    Class = ContentClass.Cold,
+                });
+            }
+
+            for (var i = 1; i <= 10; i++)
+            {
+                var vfId = 1000 + i;
+                db.VarFiles.Add(new VarFile
+                {
+                    Id = vfId, PackageId = i, RepositoryId = repoId, RelativePath = $"p{i}.var",
+                    SizeBytes = 1, FileMtime = installed, IndexedAt = installed,
+                });
+                db.ActivationLinks.Add(new ActivationLink
+                {
+                    Id = vfId, ProfileId = 1, VarFileId = vfId, LinkPath = $@"C:\link{i}",
+                    LinkKind = LinkKind.Install, LinkType = LinkType.Symlink, Reason = ActivationReason.Explicit,
+                });
+            }
+
+            await db.SaveChangesAsync();
+        }
+
+        using var scope = fx.NewContext();
+        var svc = new EfProfilePackageLinkService(new FakeClock(installed.AddDays(1)), new InlineWriteQueue(scope));
+        await svc.SyncFromActivationLinksAsync(1);
+        await svc.RefreshActiveProfileReadModelAsync();
+
+        Assert.Equal(10, await scope.PackageListItems.CountAsync(x => x.IsActive));
+        Assert.Equal(990, await scope.PackageListItems.CountAsync(x => !x.IsActive));
+        Assert.All(await scope.PackageListItems.Where(x => x.IsActive).ToListAsync(), x => Assert.NotNull(x.InstalledAt));
+    }
+
     private sealed class InlineWriteQueue(VarVaultDbContext db) : VarVault.Sdk.Threading.IWriteQueue
     {
         private static IServiceProvider Provider(VarVaultDbContext context) =>

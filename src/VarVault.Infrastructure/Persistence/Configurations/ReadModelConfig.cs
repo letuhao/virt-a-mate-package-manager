@@ -20,6 +20,7 @@ internal sealed class PackageListItemConfig : IEntityTypeConfiguration<PackageLi
         b.HasIndex(x => x.HasMissingDeps);
         b.HasIndex(x => new { x.AddedAt, x.VarName, x.PackageId });
         b.HasIndex(x => new { x.InstalledAt, x.VarName, x.PackageId });
+        b.HasIndex(x => x.PackageId).HasFilter("IsActive = 1");
 
         b.HasOne(x => x.Package)
             .WithOne()

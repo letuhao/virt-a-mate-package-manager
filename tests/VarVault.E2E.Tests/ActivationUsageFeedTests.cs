@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using VarVault.Domain.Activation;
 using VarVault.Domain.Entities;
+using VarVault.Infrastructure.Indexing;
 using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Activation;
 using VarVault.Sdk.Indexing;
@@ -21,6 +22,15 @@ namespace VarVault.E2E.Tests;
 [Trait("Category", TestCategories.E2E)]
 public sealed class ActivationUsageFeedTests
 {
+    /// <summary>Waits for debounced usage feed then drains bulk write-queue work.</summary>
+    private static async Task DrainUsageFeedAsync(IServiceProvider services, CancellationToken cancellationToken = default)
+    {
+        await Task.Delay(ActivationUsageFeedCoordinator.DebounceWindow + TimeSpan.FromMilliseconds(100), cancellationToken)
+            .ConfigureAwait(false);
+        var writeQueue = services.GetRequiredService<VarVault.Sdk.Threading.IWriteQueue>();
+        await writeQueue.EnqueueScopedAsync((_, ct) => Task.CompletedTask,
+            VarVault.Sdk.Threading.WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+    }
     [Fact]
     public async Task Activate_records_usage_events_for_install_set_and_second_activate_increments()
     {
@@ -51,6 +61,8 @@ public sealed class ActivationUsageFeedTests
         var look = await db.Packages.AsNoTracking().FirstAsync(p => p.VarName == "A.Look.1");
         var baseP = await db.Packages.AsNoTracking().FirstAsync(p => p.VarName == "A.Base.1");
 
+        await DrainUsageFeedAsync(scope.ServiceProvider);
+
         var events1 = await db.UsageEvents.AsNoTracking().ToListAsync();
         Assert.Equal(2, events1.Count);
         Assert.All(events1, e => Assert.Equal(UsageKind.Activate, e.Kind));
@@ -63,6 +75,8 @@ public sealed class ActivationUsageFeedTests
 
         var second = await activation.BuildProfileLinksAsync(preset.Id);
         Assert.Equal(0, second.PrivilegeFailures);
+
+        await DrainUsageFeedAsync(scope.ServiceProvider);
 
         db.ChangeTracker.Clear();
         var events2 = await db.UsageEvents.AsNoTracking().ToListAsync();
@@ -102,20 +116,16 @@ public sealed class ActivationUsageFeedTests
         if (first.PrivilegeFailures > 0)
             return;
 
-        // Second activation enqueues scoped usage writes + background recompute.
+        await DrainUsageFeedAsync(scope.ServiceProvider);
+
+        // Second activation enqueues bulk usage write off the interactive path.
         // Sequential reads on the caller context must stay healthy (no shared-context crash).
         await activation.BuildProfileLinksAsync(preset.Id);
 
-        for (var i = 0; i < 40; i++)
-        {
-            _ = await db.Packages.AsNoTracking().CountAsync();
-            if (await db.UsageEvents.AsNoTracking().CountAsync() >= 4)
-                break;
-            await Task.Delay(50);
-        }
+        await DrainUsageFeedAsync(scope.ServiceProvider);
 
         Assert.True(await db.UsageEvents.AsNoTracking().CountAsync() >= 4);
-        _ = await db.UsageStats.AsNoTracking().CountAsync();
+        Assert.True(await db.UsageStats.AsNoTracking().CountAsync() >= 2);
     }
 
     private static async Task<Guid> Register(TestHost host, string path)

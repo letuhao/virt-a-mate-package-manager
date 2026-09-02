@@ -16,6 +16,8 @@ public sealed class EfProfilePackageLinkService(
     IClock clock,
     IWriteQueue writeQueue) : IProfilePackageLinkService
 {
+    private const int IdChunkSize = 500;
+
     public Task SyncFromActivationLinksAsync(long profileId, CancellationToken cancellationToken = default) =>
         writeQueue.EnqueueScopedAsync(async (sp, ct) =>
         {
@@ -80,24 +82,32 @@ public sealed class EfProfilePackageLinkService(
                     .ToDictionaryAsync(x => x.PackageId, x => x.InstalledAt, ct)
                     .ConfigureAwait(false);
 
-            var activeIds = links.Keys.ToHashSet();
-            var previouslyActive = await db.PackageListItems
+            await db.PackageListItems
                 .Where(x => x.IsActive)
-                .Select(x => x.PackageId)
-                .ToListAsync(ct)
+                .ExecuteUpdateAsync(
+                    s => s.SetProperty(x => x.IsActive, false).SetProperty(x => x.InstalledAt, (DateTime?)null),
+                    ct)
                 .ConfigureAwait(false);
 
-            foreach (var packageId in previouslyActive.Where(id => !activeIds.Contains(id)))
+            if (links.Count == 0)
+                return;
+
+            var activeIds = links.Keys.ToList();
+            var items = new Dictionary<long, PackageListItem>();
+            for (var offset = 0; offset < activeIds.Count; offset += IdChunkSize)
             {
-                var item = await db.PackageListItems.FirstAsync(x => x.PackageId == packageId, ct).ConfigureAwait(false);
-                item.IsActive = false;
-                item.InstalledAt = null;
+                var chunk = activeIds.Skip(offset).Take(IdChunkSize).ToList();
+                var page = await db.PackageListItems
+                    .Where(x => chunk.Contains(x.PackageId))
+                    .ToDictionaryAsync(x => x.PackageId, ct)
+                    .ConfigureAwait(false);
+                foreach (var (key, value) in page)
+                    items[key] = value;
             }
 
             foreach (var (packageId, installedAt) in links)
             {
-                var item = await db.PackageListItems.FirstOrDefaultAsync(x => x.PackageId == packageId, ct).ConfigureAwait(false);
-                if (item is null)
+                if (!items.TryGetValue(packageId, out var item))
                     continue;
                 item.IsActive = true;
                 item.InstalledAt = installedAt;

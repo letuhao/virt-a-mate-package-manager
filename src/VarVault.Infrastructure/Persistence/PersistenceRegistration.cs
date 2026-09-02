@@ -53,6 +53,9 @@ public static class PersistenceRegistration
         services.AddScoped<Domain.Indexing.IPreviewIndexer, Indexing.EfPreviewIndexer>();
         services.AddScoped<IDependencyResolver, EfDependencyResolver>();
         services.AddScoped<Domain.Analyzer.IUsageAnalyzer, EfUsageAnalyzer>();
+        services.AddScoped<Domain.Analyzer.IUsageCatalogWriter>(sp =>
+            (Domain.Analyzer.IUsageCatalogWriter)sp.GetRequiredService<Domain.Analyzer.IUsageAnalyzer>());
+        services.AddSingleton<Indexing.ActivationUsageFeedCoordinator>();
         services.AddScoped<Sdk.Library.IPlacementOverrideService, Library.EfPlacementOverrideService>();
         services.AddScoped<Sdk.Library.IVamLogUsageImporter, Library.EfVamLogUsageImporter>();
         services.AddScoped<IDependencyGraph, EfDependencyGraph>();

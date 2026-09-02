@@ -18,8 +18,11 @@ public sealed class EfUsageAnalyzer(
     VarVaultDbContext db,
     IClock clock,
     IWriteQueue? writeQueue = null,
-    ISettingsService? settings = null) : IUsageAnalyzer
+    ISettingsService? settings = null) : IUsageAnalyzer, IUsageCatalogWriter
 {
+    /// <summary>SQLite IN-list and EF change-tracker budget for bulk usage writes.</summary>
+    public const int UsageChunkSize = 500;
+
     public Task RecordAsync(long packageId, UsageKind kind, CancellationToken cancellationToken = default) =>
         RecordManyAsync([packageId], kind, UsageSource.AppObserved, null, cancellationToken);
 
@@ -65,6 +68,26 @@ public sealed class EfUsageAnalyzer(
         IReadOnlyList<long> packageIds,
         CancellationToken cancellationToken = default) =>
         WriteAsync((ctx, ct) => RecomputePackagesCoreAsync(ctx, packageIds, ct), WritePriority.Normal, cancellationToken);
+
+    public Task RecordManyAndRecomputeAsync(
+        IReadOnlyList<long> packageIds,
+        UsageKind kind,
+        CancellationToken cancellationToken = default) =>
+        WriteAsync((ctx, ct) => RecordManyAndRecomputeInContextAsync(ctx, packageIds, kind, ct),
+            WritePriority.Bulk, cancellationToken);
+
+    internal Task RecordManyAndRecomputeInContextAsync(
+        VarVaultDbContext ctx,
+        IReadOnlyList<long> packageIds,
+        UsageKind kind,
+        CancellationToken cancellationToken) =>
+        RecordManyAndRecomputeInContextCoreAsync(ctx, packageIds, kind, cancellationToken);
+
+    Task IUsageCatalogWriter.RecordManyAndRecomputeAsync(
+        IReadOnlyList<long> packageIds,
+        UsageKind kind,
+        CancellationToken cancellationToken) =>
+        RecordManyAndRecomputeInContextAsync(db, packageIds, kind, cancellationToken);
 
     public Task<int> CompactAsync(int olderThanDays = 90, CancellationToken cancellationToken = default) =>
         WriteAsync((ctx, ct) => CompactCoreAsync(ctx, olderThanDays, ct), WritePriority.Bulk, cancellationToken);
@@ -112,6 +135,23 @@ public sealed class EfUsageAnalyzer(
         await ctx.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    private async Task RecordManyAndRecomputeInContextCoreAsync(
+        VarVaultDbContext ctx,
+        IReadOnlyList<long> packageIds,
+        UsageKind kind,
+        CancellationToken cancellationToken)
+    {
+        var distinct = packageIds.Where(id => id > 0).Distinct().ToList();
+        for (var offset = 0; offset < distinct.Count; offset += UsageChunkSize)
+        {
+            var chunk = distinct.Skip(offset).Take(UsageChunkSize).ToList();
+            await RecordManyCoreAsync(ctx, chunk, kind, UsageSource.AppObserved, null, cancellationToken)
+                .ConfigureAwait(false);
+            await RecomputePackagesCoreAsync(ctx, chunk, cancellationToken).ConfigureAwait(false);
+            ctx.ChangeTracker.Clear();
+        }
+    }
+
     private async Task SetPlacementOverridesCoreAsync(
         VarVaultDbContext ctx,
         long packageId,
@@ -147,30 +187,73 @@ public sealed class EfUsageAnalyzer(
         if (packageIds.Count == 0)
             return 0;
 
+        var distinct = packageIds.Where(id => id > 0).Distinct().ToList();
+        if (distinct.Count == 0)
+            return 0;
+
+        if (distinct.Count <= UsageChunkSize)
+            return await RecomputePackagesChunkCoreAsync(ctx, distinct, cancellationToken).ConfigureAwait(false);
+
+        var total = 0;
+        for (var offset = 0; offset < distinct.Count; offset += UsageChunkSize)
+        {
+            var chunk = distinct.Skip(offset).Take(UsageChunkSize).ToList();
+            total += await RecomputePackagesChunkCoreAsync(ctx, chunk, cancellationToken).ConfigureAwait(false);
+            ctx.ChangeTracker.Clear();
+        }
+
+        return total;
+    }
+
+    private async Task<int> RecomputePackagesChunkCoreAsync(
+        VarVaultDbContext ctx,
+        IReadOnlyList<long> distinct,
+        CancellationToken cancellationToken)
+    {
+        if (distinct.Count == 0)
+            return 0;
+
         var now = clock.UtcNow;
         var config = await LoadScoringConfigAsync(cancellationToken).ConfigureAwait(false);
         var primaryDays = (int)Math.Clamp(config.RecencyHorizonDays, 1, 365);
         var secondaryDays = Math.Min(primaryDays * 3, 365);
-        var distinct = packageIds.Where(id => id > 0).Distinct().ToList();
+
+        var eventRows = await ctx.UsageEvents
+            .Where(e => distinct.Contains(e.PackageId))
+            .Select(e => new { e.PackageId, e.TimestampUnixMs })
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+        var eventsByPackage = eventRows
+            .GroupBy(e => e.PackageId)
+            .ToDictionary(g => g.Key, g => g.Select(e => e.TimestampUnixMs).ToList());
+
+        var centralities = await ctx.Packages
+            .Where(p => distinct.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, p => p.ReverseDependentCount, cancellationToken)
+            .ConfigureAwait(false);
+
+        var stats = await ctx.UsageStats
+            .Where(s => distinct.Contains(s.PackageId))
+            .ToDictionaryAsync(s => s.PackageId, cancellationToken)
+            .ConfigureAwait(false);
+
+        var listItems = await ctx.PackageListItems
+            .Where(x => distinct.Contains(x.PackageId))
+            .ToDictionaryAsync(x => x.PackageId, cancellationToken)
+            .ConfigureAwait(false);
+
         foreach (var packageId in distinct)
         {
-            var events = await ctx.UsageEvents
-                .Where(e => e.PackageId == packageId)
-                .Select(e => e.TimestampUnixMs)
-                .ToListAsync(cancellationToken).ConfigureAwait(false);
-
+            eventsByPackage.TryGetValue(packageId, out var events);
+            events ??= [];
             var windows = WindowedUsage.Compute(events, now, primaryDays, secondaryDays);
 
-            var centrality = await ctx.Packages
-                .Where(p => p.Id == packageId)
-                .Select(p => p.ReverseDependentCount)
-                .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+            centralities.TryGetValue(packageId, out var centrality);
 
-            var stat = await ctx.UsageStats.FirstOrDefaultAsync(s => s.PackageId == packageId, cancellationToken).ConfigureAwait(false);
-            if (stat is null)
+            if (!stats.TryGetValue(packageId, out var stat))
             {
                 stat = new UsageStat { PackageId = packageId, Class = ContentClass.Cold };
                 ctx.UsageStats.Add(stat);
+                stats[packageId] = stat;
             }
 
             var inputs = new UsageInputs(windows.LastUsedAt, windows.Use30d, centrality, stat.IsPinnedHot, stat.IsForcedCold);
@@ -186,8 +269,7 @@ public sealed class EfUsageAnalyzer(
             stat.LastFlipAt = result.LastFlipAt;
             stat.ComputedAt = now.UtcDateTime;
 
-            var item = await ctx.PackageListItems.FirstOrDefaultAsync(x => x.PackageId == packageId, cancellationToken).ConfigureAwait(false);
-            if (item is not null)
+            if (listItems.TryGetValue(packageId, out var item))
             {
                 item.Class = result.Class;
                 item.LastUsedAt = windows.LastUsedAt;

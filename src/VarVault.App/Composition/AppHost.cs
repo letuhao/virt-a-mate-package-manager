@@ -134,6 +134,9 @@ public static class AppHost
                 _ = dashVm.LoadAsync();
         };
 
+        if (screens["library"] is LibraryViewModel libraryScreenVm && screens["presets"] is PresetsViewModel presetsVm)
+            presetsVm.AfterActivation = () => _ = libraryScreenVm.RefreshLoadedRowsAsync();
+
         // Import rail badge = the live review-lane count of the Import screen's current session (spec §10).
         if (screens["import"] is ImportViewModel importVm)
             importVm.PropertyChanged += (_, e) =>

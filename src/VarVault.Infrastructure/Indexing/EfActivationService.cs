@@ -35,12 +35,12 @@ public sealed class EfActivationService(
     IWriteQueue writeQueue,
     IProfilePackageLinkService profileLinks,
     IPresetService presets,
-    IServiceScopeFactory scopeFactory,
-    IJobQueue jobQueue,
+    ActivationUsageFeedCoordinator usageFeed,
     ILogger<EfActivationService> logger) : IActivationService
 {
     // Serializes filesystem link operations so two concurrent activations can't race on a profile dir. (T7.3)
     private static readonly AsyncLock FsLock = new();
+    private const int CopyPickChunkSize = 500;
 
     public async Task<ActivationBuildResult> BuildProfileLinksAsync(long presetId, CancellationToken cancellationToken = default)
     {
@@ -312,10 +312,17 @@ public sealed class EfActivationService(
 
         var desired = new Dictionary<string, DesiredLink>(StringComparer.OrdinalIgnoreCase);
         var offlinePackages = new HashSet<long>();
+        var pickIds = new HashSet<long>(full);
+        foreach (var alias in aliases)
+            pickIds.Add(alias.TargetPackageId);
+        var hottestByPackage = await PickHottestOnlineCopiesAsync(pickIds.ToList(), cancellationToken).ConfigureAwait(false);
         foreach (var packageId in full)
         {
-            var copy = await PickHottestOnlineCopyAsync(packageId, cancellationToken).ConfigureAwait(false);
-            if (copy is null) { offlinePackages.Add(packageId); continue; }
+            if (!hottestByPackage.TryGetValue(packageId, out var copy))
+            {
+                offlinePackages.Add(packageId);
+                continue;
+            }
 
             var fileName = ActivationPaths.LinkFileName(copy.VarName);
             if (fileName.IsFailure)
@@ -332,8 +339,7 @@ public sealed class EfActivationService(
 
         foreach (var alias in aliases)
         {
-            var copy = await PickHottestOnlineCopyAsync(alias.TargetPackageId, cancellationToken).ConfigureAwait(false);
-            if (copy is null)
+            if (!hottestByPackage.TryGetValue(alias.TargetPackageId, out var copy))
             {
                 offlinePackages.Add(alias.TargetPackageId);
                 continue;
@@ -359,13 +365,15 @@ public sealed class EfActivationService(
             .ToListAsync(cancellationToken).ConfigureAwait(false);
         var existingPathSet = existingPaths.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
+        var newlyCreated = new List<string>();
+        var present = 0;
+        var installedPackageIds = new HashSet<long>();
+        var upserts = new List<LinkPersistRow>();
+        var removePaths = new List<string>();
+        var removed = 0;
+
         using (await FsLock.AcquireAsync(cancellationToken).ConfigureAwait(false))
         {
-            var newlyCreated = new List<string>();
-            var present = 0;
-            var installedPackageIds = new HashSet<long>();
-            var upserts = new List<LinkPersistRow>();
-
             foreach (var d in desired.Values)
             {
                 var outcome = EnsureFileLink(d.LinkPath, d.SourcePath);
@@ -393,8 +401,6 @@ public sealed class EfActivationService(
                 upserts.Add(new LinkPersistRow(d.LinkPath, d.VarFileId, d.Kind, d.Reason, d.AliasKey));
             }
 
-            var removePaths = new List<string>();
-            var removed = 0;
             foreach (var path in existingPathSet)
             {
                 if (desired.ContainsKey(path))
@@ -403,20 +409,20 @@ public sealed class EfActivationService(
                 removePaths.Add(path);
                 removed++;
             }
-
-            var profileIsActive = string.Equals(profile.Name, profiles.ActiveProfile(vamRoot), StringComparison.OrdinalIgnoreCase);
-            await PersistActivationLinksAsync(profile.Id, presetId, profileIsActive, upserts, removePaths, cancellationToken)
-                .ConfigureAwait(false);
-
-            await profileLinks.SyncFromActivationLinksAsync(profile.Id, cancellationToken).ConfigureAwait(false);
-            if (profileIsActive)
-                await profileLinks.RefreshActiveProfileReadModelAsync(cancellationToken).ConfigureAwait(false);
-
-            if (recordUsage && installedPackageIds.Count > 0)
-                RecordActivateUsageBestEffort(installedPackageIds.ToList());
-
-            return new ActivationBuildResult(present, removed, missing, UnresolvedDependencies: unresolvedRefs.Count);
         }
+
+        var profileIsActive = string.Equals(profile.Name, profiles.ActiveProfile(vamRoot), StringComparison.OrdinalIgnoreCase);
+        await PersistActivationLinksAsync(profile.Id, presetId, profileIsActive, upserts, removePaths, cancellationToken)
+            .ConfigureAwait(false);
+
+        await profileLinks.SyncFromActivationLinksAsync(profile.Id, cancellationToken).ConfigureAwait(false);
+        if (profileIsActive)
+            await profileLinks.RefreshActiveProfileReadModelAsync(cancellationToken).ConfigureAwait(false);
+
+        if (recordUsage && installedPackageIds.Count > 0)
+            RecordActivateUsageBestEffort(installedPackageIds.ToList());
+
+        return new ActivationBuildResult(present, removed, missing, UnresolvedDependencies: unresolvedRefs.Count);
     }
 
     private async Task PersistActivationLinksAsync(
@@ -478,36 +484,8 @@ public sealed class EfActivationService(
     }
 
     /// <summary>Best-effort: never fail activation because usage scoring failed. (G1.)</summary>
-    private void RecordActivateUsageBestEffort(IReadOnlyList<long> packageIds)
-    {
-        if (packageIds.Count == 0)
-            return;
-        var ids = packageIds.ToList();
-        _ = writeQueue.EnqueueScopedAsync(async (sp, ct) =>
-        {
-            var analyzer = sp.GetRequiredService<IUsageAnalyzer>();
-            await analyzer.RecordManyAsync(ids, UsageKind.Activate, ct).ConfigureAwait(false);
-        }, WritePriority.Interactive, CancellationToken.None).ContinueWith(t =>
-        {
-            if (t.IsFaulted)
-                logger.LogWarning(t.Exception!.GetBaseException(),
-                    "Usage feed failed after activation ({Count} packages); install links are intact.", ids.Count);
-        }, TaskScheduler.Default);
-
-        jobQueue.Enqueue("Activation usage recompute", async ctx =>
-        {
-            using var scope = scopeFactory.CreateScope();
-            var analyzer = scope.ServiceProvider.GetRequiredService<IUsageAnalyzer>();
-            try
-            {
-                await analyzer.RecomputePackagesAsync(ids, ctx.Cancellation).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogWarning(ex, "Usage recompute failed after activation ({Count} packages).", ids.Count);
-            }
-        });
-    }
+    private void RecordActivateUsageBestEffort(IReadOnlyList<long> packageIds) =>
+        usageFeed.Enqueue(packageIds);
 
     private enum LinkOutcome { Created, Unchanged, Recreated, RefusedCollision, Privilege, Failed }
 
@@ -547,18 +525,52 @@ public sealed class EfActivationService(
     private sealed record DesiredLink(
         string LinkPath, string SourcePath, long VarFileId, long PackageId, LinkKind Kind, ActivationReason Reason, string? AliasKey);
 
-    private sealed record HotCopy(long VarFileId, string VarName, string MountPath, string RelativePath);
+    private sealed record HotCopy(long VarFileId, string VarName, string MountPath, string RelativePath, int Tier, int PriorityInTier);
 
-    private async Task<HotCopy?> PickHottestOnlineCopyAsync(long packageId, CancellationToken cancellationToken)
+    private async Task<Dictionary<long, HotCopy>> PickHottestOnlineCopiesAsync(
+        IReadOnlyList<long> packageIds,
+        CancellationToken cancellationToken)
     {
-        return await (
-            from v in db.VarFiles.AsNoTracking()
-            join r in db.Repositories.AsNoTracking() on v.RepositoryId equals r.Id
-            join p in db.Packages.AsNoTracking() on v.PackageId equals p.Id
-            where v.PackageId == packageId && r.IsOnline && r.IsEnabled
-            orderby r.Tier, r.PriorityInTier, v.Id
-            select new HotCopy(v.Id, p.VarName, r.MountPath, v.RelativePath))
-            .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+        var result = new Dictionary<long, HotCopy>();
+        if (packageIds.Count == 0)
+            return result;
+
+        var distinct = packageIds.Where(id => id > 0).Distinct().ToList();
+        for (var offset = 0; offset < distinct.Count; offset += CopyPickChunkSize)
+        {
+            var chunk = distinct.Skip(offset).Take(CopyPickChunkSize).ToList();
+            var rows = await (
+                    from v in db.VarFiles.AsNoTracking()
+                    join r in db.Repositories.AsNoTracking() on v.RepositoryId equals r.Id
+                    join p in db.Packages.AsNoTracking() on v.PackageId equals p.Id
+                    where v.PackageId != null && chunk.Contains(v.PackageId.Value) && r.IsOnline && r.IsEnabled
+                    select new
+                    {
+                        PackageId = v.PackageId!.Value,
+                        v.Id,
+                        p.VarName,
+                        r.MountPath,
+                        v.RelativePath,
+                        r.Tier,
+                        r.PriorityInTier,
+                    })
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            foreach (var row in rows)
+            {
+                var candidate = new HotCopy(row.Id, row.VarName, row.MountPath, row.RelativePath, row.Tier, row.PriorityInTier);
+                if (!result.TryGetValue(row.PackageId, out var existing)
+                    || candidate.Tier < existing.Tier
+                    || (candidate.Tier == existing.Tier && candidate.PriorityInTier < existing.PriorityInTier)
+                    || (candidate.Tier == existing.Tier && candidate.PriorityInTier == existing.PriorityInTier && candidate.VarFileId < existing.VarFileId))
+                {
+                    result[row.PackageId] = candidate;
+                }
+            }
+        }
+
+        return result;
     }
 
     private async Task<ProfileInfo> EnsureProfileAsync(

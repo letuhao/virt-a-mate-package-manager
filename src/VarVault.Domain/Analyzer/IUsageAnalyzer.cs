@@ -34,6 +34,14 @@ public interface IUsageAnalyzer
     Task<int> RecomputePackagesAsync(IReadOnlyList<long> packageIds, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Append usage events and recompute only those packages in one bulk write (preset activation feed).
+    /// </summary>
+    Task RecordManyAndRecomputeAsync(
+        IReadOnlyList<long> packageIds,
+        UsageKind kind,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Compact usage events older than <paramref name="olderThanDays"/> into per-package rollup counts
     /// (preserving <c>UseCountTotal</c>) and delete the raw events. Returns the number compacted.
     /// (5.3, BE-A7.)

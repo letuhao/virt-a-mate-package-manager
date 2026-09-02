@@ -612,6 +612,9 @@ namespace VarVault.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("InstalledAt", "VarName", "PackageId");
 
+                    b.HasIndex("PackageId")
+                        .HasFilter("IsActive = 1");
+
                     b.ToTable("PackageListItem", (string)null);
                 });
 
