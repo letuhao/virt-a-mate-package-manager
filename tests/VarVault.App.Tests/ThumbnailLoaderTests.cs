@@ -21,10 +21,18 @@ public class ThumbnailLoaderTests
             new StubStore(id => [1, 2, 3]),
             bytes => { decodeThread = Environment.CurrentManagedThreadId; return "img"; });
 
-        var image = await loader.LoadAsync(7);
+        // xUnit runs tests on thread-pool workers; Task.Run can reuse the same pool thread.
+        // Invoke from a dedicated long-running thread so decode must happen elsewhere.
+        var image = await Task.Factory.StartNew(
+                () => loader.LoadAsync(7),
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default)
+            .Unwrap()
+            .ConfigureAwait(false);
 
         Assert.Equal("img", image);
-        Assert.NotEqual(callingThread, decodeThread); // decode was pushed to a pool thread
+        Assert.NotEqual(callingThread, decodeThread);
     }
 
     [Fact]

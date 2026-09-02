@@ -50,8 +50,6 @@ public sealed class StreamIndexer(
         using var scope = scopeFactory.CreateScope();
         var ledger = scope.ServiceProvider.GetRequiredService<IScanLedger>();
         var store = scope.ServiceProvider.GetRequiredService<ICatalogStore>();
-        var dirty = scope.ServiceProvider.GetRequiredService<IDurableDirtySet>();
-        var thumbs = scope.ServiceProvider.GetRequiredService<IThumbnailStore>();
         var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
 
         // Fast-path: unless forced, a cheap metadata-only walk builds the repository signature; if it
@@ -92,11 +90,11 @@ public sealed class StreamIndexer(
             }
         }
 
-        var run = await writeQueue.EnqueueAsync(
-            ct => ledger.BeginRunAsync(repositoryId, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+        var run = await writeQueue.EnqueueScopedAsync(
+            (sp, ct) => sp.GetRequiredService<IScanLedger>().BeginRunAsync(repositoryId, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
 
         progress.Report(new ProgressReport(0, 0, "Discovering…"));
-        await writeQueue.EnqueueAsync(ct => ledger.SetPhaseAsync(run.Id, ScanPhase.Discovering, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+        await writeQueue.EnqueueScopedAsync((sp, ct) => sp.GetRequiredService<IScanLedger>().SetPhaseAsync(run.Id, ScanPhase.Discovering, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
 
         var discoverySw = Stopwatch.StartNew();
         long discovered = 0;
@@ -113,8 +111,8 @@ public sealed class StreamIndexer(
             if (discoveryBatch.Count >= IngestLimits.DiscoveryBatchSize ||
                 discoveryBatchBytes >= IngestLimits.MaxDiscoveryBatchBytes)
             {
-                await writeQueue.EnqueueAsync(
-                    ct => ledger.UpsertDiscoveryBatchAsync(run.Id, repositoryId, discoveryBatch, ct),
+                await writeQueue.EnqueueScopedAsync(
+                    (sp, ct) => sp.GetRequiredService<IScanLedger>().UpsertDiscoveryBatchAsync(run.Id, repositoryId, discoveryBatch, ct),
                     WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
                 discoveryBatch.Clear();
                 discoveryBatchBytes = 0;
@@ -124,21 +122,21 @@ public sealed class StreamIndexer(
         }
         if (discoveryBatch.Count > 0)
         {
-            await writeQueue.EnqueueAsync(
-                ct => ledger.UpsertDiscoveryBatchAsync(run.Id, repositoryId, discoveryBatch, ct),
+            await writeQueue.EnqueueScopedAsync(
+                (sp, ct) => sp.GetRequiredService<IScanLedger>().UpsertDiscoveryBatchAsync(run.Id, repositoryId, discoveryBatch, ct),
                 WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
         }
         discoverySw.Stop();
         Telemetry.IndexDiscoveryDurationMs.Record(discoverySw.Elapsed.TotalMilliseconds);
         // Record the fingerprint now (trusted only once the run completes) so the next auto-index can
         // skip an unchanged repository. (A16.)
-        await writeQueue.EnqueueAsync(
-            ct => ledger.SetSignatureAsync(run.Id, signature, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+        await writeQueue.EnqueueScopedAsync(
+            (sp, ct) => sp.GetRequiredService<IScanLedger>().SetSignatureAsync(run.Id, signature, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
         logger.LogInformation(
             "Discovery for run {RunId} (gen {Generation}) found {Discovered} files in {ElapsedMs} ms",
             run.Id, run.Generation, discovered, discoverySw.ElapsedMilliseconds);
 
-        await writeQueue.EnqueueAsync(ct => ledger.SetPhaseAsync(run.Id, ScanPhase.Ingesting, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+        await writeQueue.EnqueueScopedAsync((sp, ct) => sp.GetRequiredService<IScanLedger>().SetPhaseAsync(run.Id, ScanPhase.Ingesting, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
         progress.Report(new ProgressReport(0, discovered, "Ingesting…"));
         var ingestSw = Stopwatch.StartNew();
 
@@ -163,8 +161,8 @@ public sealed class StreamIndexer(
             {
                 while (!cancellationToken.IsCancellationRequested)
                 {
-                    var batch = await writeQueue.EnqueueAsync(
-                        ct => ledger.ClaimWorkAsync(run.Id, repositoryId, leaseOwner, IngestLimits.PersistBatchSize, ct),
+                    var batch = await writeQueue.EnqueueScopedAsync(
+                        (sp, ct) => sp.GetRequiredService<IScanLedger>().ClaimWorkAsync(run.Id, repositoryId, leaseOwner, IngestLimits.PersistBatchSize, ct),
                         WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
                     if (batch.Count == 0)
                         break;
@@ -190,10 +188,8 @@ public sealed class StreamIndexer(
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     logger.LogWarning(ex, "Inspect failed for VarFile {Id}", varFileId);
-                    using var failScope = scopeFactory.CreateScope();
-                    var failLedger = failScope.ServiceProvider.GetRequiredService<IScanLedger>();
-                    await writeQueue.EnqueueAsync(
-                        ct => failLedger.MarkFailedAsync(varFileId, ex.Message, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+                    await writeQueue.EnqueueScopedAsync(
+                        (sp, ct) => sp.GetRequiredService<IScanLedger>().MarkFailedAsync(varFileId, ex.Message, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
                     Interlocked.Increment(ref corrupt);
                 }
             }
@@ -262,8 +258,8 @@ public sealed class StreamIndexer(
                         .ConfigureAwait(false);
                     if (vanishedIds.Count == 0)
                         break;
-                    pruned += await writeQueue.EnqueueAsync(
-                        ct => store.RemoveVarFilesAsync(vanishedIds, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+                    pruned += await writeQueue.EnqueueScopedAsync(
+                        (sp, ct) => sp.GetRequiredService<ICatalogStore>().RemoveVarFilesAsync(vanishedIds, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -289,34 +285,34 @@ public sealed class StreamIndexer(
             logger.LogInformation(
                 "Healing {Count} packages missing Library rows for repository {RepositoryId}",
                 orphanPackageIds.Count, repositoryId);
-            await writeQueue.EnqueueAsync(
-                ct => dirty.MarkManyAsync(orphanPackageIds, "heal-missing-list", ct),
+            await writeQueue.EnqueueScopedAsync(
+                (sp, ct) => sp.GetRequiredService<IDurableDirtySet>().MarkManyAsync(orphanPackageIds, "heal-missing-list", ct),
                 WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
         }
 
-        await writeQueue.EnqueueAsync(ct => ledger.SetPhaseAsync(run.Id, ScanPhase.Refreshing, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+        await writeQueue.EnqueueScopedAsync((sp, ct) => sp.GetRequiredService<IScanLedger>().SetPhaseAsync(run.Id, ScanPhase.Refreshing, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
         progress.Report(new ProgressReport(discovered, discovered, "Refreshing catalog…"));
         var refreshSw = Stopwatch.StartNew();
         while (true)
         {
             // Peek → refresh → ack (never delete dirty before refresh commits). A crash between
             // drain-and-refresh used to leave Exact-visible Package/VarFile with no Library row.
-            var dirtyBatch = await writeQueue.EnqueueAsync(
-                ct => dirty.PeekBatchAsync(256, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+            var dirtyBatch = await writeQueue.EnqueueScopedAsync(
+                (sp, ct) => sp.GetRequiredService<IDurableDirtySet>().PeekBatchAsync(256, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
             if (dirtyBatch.Count == 0)
                 break;
-            await writeQueue.EnqueueAsync(
-                ct => store.RefreshReadModelAsync(dirtyBatch, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
-            await writeQueue.EnqueueAsync(
-                ct => dirty.AcknowledgeAsync(dirtyBatch, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+            await writeQueue.EnqueueScopedAsync(
+                (sp, ct) => sp.GetRequiredService<ICatalogStore>().RefreshReadModelAsync(dirtyBatch, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+            await writeQueue.EnqueueScopedAsync(
+                (sp, ct) => sp.GetRequiredService<IDurableDirtySet>().AcknowledgeAsync(dirtyBatch, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
         }
         refreshSw.Stop();
         Telemetry.IndexRefreshDurationMs.Record(refreshSw.Elapsed.TotalMilliseconds);
 
-        await writeQueue.EnqueueAsync(ct => ledger.CheckpointWalAsync(ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
-        await writeQueue.EnqueueAsync(ct => ledger.AnalyzeAsync(ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
-        await writeQueue.EnqueueAsync(
-            ct => ledger.CompleteAsync(run.Id, ScanPhase.Completed, null, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+        await writeQueue.EnqueueScopedAsync((sp, ct) => sp.GetRequiredService<IScanLedger>().CheckpointWalAsync(ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+        await writeQueue.EnqueueScopedAsync((sp, ct) => sp.GetRequiredService<IScanLedger>().AnalyzeAsync(ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
+        await writeQueue.EnqueueScopedAsync(
+            (sp, ct) => sp.GetRequiredService<IScanLedger>().CompleteAsync(run.Id, ScanPhase.Completed, null, ct), WritePriority.Bulk, cancellationToken).ConfigureAwait(false);
 
         var final = await ledger.GetRunAsync(run.Id, cancellationToken).ConfigureAwait(false);
         skipped = (int)(final?.Skipped ?? 0);
@@ -467,14 +463,13 @@ public sealed class StreamIndexer(
 
         if (thumbed.Count > 0)
         {
-            await writeQueue.EnqueueAsync(async ct =>
+            await writeQueue.EnqueueScopedAsync(async (sp, ct) =>
             {
-                using var s = scopeFactory.CreateScope();
-                var db = s.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+                var scopedDb = sp.GetRequiredService<VarVaultDbContext>();
                 foreach (var pid in thumbed)
                 {
                     var thumbRef = $"thumb:{pid}";
-                    await db.PackageListItems.Where(x => x.PackageId == pid)
+                    await scopedDb.PackageListItems.Where(x => x.PackageId == pid)
                         .ExecuteUpdateAsync(u => u.SetProperty(x => x.PreviewThumbRef, thumbRef), ct)
                         .ConfigureAwait(false);
                 }

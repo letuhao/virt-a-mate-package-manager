@@ -3,6 +3,7 @@ using VarVault.Domain.Entities;
 using VarVault.Infrastructure.Library;
 using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Library;
+using Microsoft.Extensions.DependencyInjection;
 using VarVault.TestKit;
 
 namespace VarVault.Infrastructure.Tests;
@@ -29,7 +30,7 @@ public sealed class ProfilePackageLinkTests
         }
 
         using var scope = fx.NewContext();
-        var svc = new EfProfilePackageLinkService(scope, new FakeClock(installed.AddDays(1)), new InlineWriteQueue(scope));
+        var svc = new EfProfilePackageLinkService(new FakeClock(installed.AddDays(1)), new InlineWriteQueue(scope));
         await svc.SyncFromActivationLinksAsync(1);
         await svc.RefreshActiveProfileReadModelAsync();
 
@@ -94,9 +95,16 @@ public sealed class ProfilePackageLinkTests
 
     private sealed class InlineWriteQueue(VarVaultDbContext db) : VarVault.Sdk.Threading.IWriteQueue
     {
+        private static IServiceProvider Provider(VarVaultDbContext context) =>
+            new ServiceCollection().AddSingleton(context).BuildServiceProvider();
+
         public Task<T> EnqueueAsync<T>(Func<CancellationToken, Task<T>> action, VarVault.Sdk.Threading.WritePriority priority = VarVault.Sdk.Threading.WritePriority.Normal, CancellationToken cancellationToken = default) =>
             action(cancellationToken);
         public Task EnqueueAsync(Func<CancellationToken, Task> action, VarVault.Sdk.Threading.WritePriority priority = VarVault.Sdk.Threading.WritePriority.Normal, CancellationToken cancellationToken = default) =>
             action(cancellationToken);
+        public Task<T> EnqueueScopedAsync<T>(Func<IServiceProvider, CancellationToken, Task<T>> action, VarVault.Sdk.Threading.WritePriority priority = VarVault.Sdk.Threading.WritePriority.Normal, CancellationToken cancellationToken = default) =>
+            action(Provider(db), cancellationToken);
+        public Task EnqueueScopedAsync(Func<IServiceProvider, CancellationToken, Task> action, VarVault.Sdk.Threading.WritePriority priority = VarVault.Sdk.Threading.WritePriority.Normal, CancellationToken cancellationToken = default) =>
+            action(Provider(db), cancellationToken);
     }
 }

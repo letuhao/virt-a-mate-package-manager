@@ -1,7 +1,10 @@
 using System.Collections.Concurrent;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using VarVault.Common;
+using VarVault.Domain.Entities;
 using VarVault.Host;
+using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Threading;
 using VarVault.TestKit;
 
@@ -79,6 +82,68 @@ public class ThreadingTests
         var result = await queue.EnqueueAsync(_ => Task.FromResult(42));
 
         Assert.Equal(42, result);
+    }
+
+    [Fact]
+    public async Task WriteQueue_scoped_jobs_use_isolated_dbcontext()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        var queue = host.Get<IWriteQueue>();
+
+        await using var callerScope = host.Host.Services.CreateAsyncScope();
+        var callerDb = callerScope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+
+        VarVaultDbContext? workerDb = null;
+        await queue.EnqueueScopedAsync((sp, _) =>
+        {
+            workerDb = sp.GetRequiredService<VarVaultDbContext>();
+            return Task.CompletedTask;
+        });
+
+        Assert.NotNull(workerDb);
+        Assert.False(ReferenceEquals(callerDb, workerDb));
+    }
+
+    [Fact]
+    public async Task Scoped_write_allows_concurrent_read_on_caller_context()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        var queue = host.Get<IWriteQueue>();
+
+        await using var callerScope = host.Host.Services.CreateAsyncScope();
+        var callerDb = callerScope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+
+        var repoId = Guid.NewGuid();
+        callerDb.Repositories.Add(new Repository
+        {
+            Id = repoId, Name = "t", MountPath = @"C:\t", IsOnline = true, IsEnabled = true,
+            CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow,
+        });
+        await callerDb.SaveChangesAsync();
+
+        var writeStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseWrite = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var writeTask = queue.EnqueueScopedAsync(async (sp, ct) =>
+        {
+            var workerDb = sp.GetRequiredService<VarVaultDbContext>();
+            workerDb.Repositories.Add(new Repository
+            {
+                Id = Guid.NewGuid(), Name = "w", MountPath = @"C:\w", IsOnline = true, IsEnabled = true,
+                CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow,
+            });
+            await workerDb.SaveChangesAsync(ct).ConfigureAwait(false);
+            writeStarted.SetResult();
+            await releaseWrite.Task.WaitAsync(ct).ConfigureAwait(false);
+        });
+
+        await writeStarted.Task;
+
+        for (var i = 0; i < 8; i++)
+            Assert.True(await callerDb.Repositories.AsNoTracking().CountAsync() >= 1);
+
+        releaseWrite.SetResult();
+        await writeTask;
     }
 
     [Fact]

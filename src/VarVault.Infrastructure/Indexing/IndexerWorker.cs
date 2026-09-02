@@ -174,13 +174,14 @@ public sealed class IndexerWorker(
             else
             {
                 await thumbnails.PutContentAsync(contentItemId, bytes, cancellationToken).ConfigureAwait(false);
-                await writeQueue.EnqueueAsync(
-                    ct => db.ContentItems.Where(c => c.Id == contentItemId)
+                await writeQueue.EnqueueScopedAsync(async (sp, ct) =>
+                {
+                    var scopedDb = sp.GetRequiredService<VarVaultDbContext>();
+                    await scopedDb.ContentItems.Where(c => c.Id == contentItemId)
                         .ExecuteUpdateAsync(
                             setters => setters.SetProperty(c => c.PreviewThumbRef, $"content-thumb:{contentItemId}"),
-                            ct),
-                    WritePriority.Interactive,
-                    cancellationToken).ConfigureAwait(false);
+                            ct).ConfigureAwait(false);
+                }, WritePriority.Interactive, cancellationToken).ConfigureAwait(false);
             }
             return Snapshot with { Error = null };
         }

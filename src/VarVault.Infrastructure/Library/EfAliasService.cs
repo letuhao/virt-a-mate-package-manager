@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using VarVault.Common;
 using VarVault.Domain.Entities;
@@ -32,8 +33,10 @@ public sealed class EfAliasService(
         if (string.IsNullOrWhiteSpace(missingRef))
             return Result.Failure("alias.ref", "Missing reference is required.");
 
-        var result = await writeQueue.EnqueueAsync(async ct =>
+        var result = await writeQueue.EnqueueScopedAsync(async (sp, ct) =>
         {
+            var db = sp.GetRequiredService<VarVaultDbContext>();
+            var resolver = sp.GetRequiredService<IDependencyResolver>();
             var owned = await db.Packages.FirstOrDefaultAsync(p => p.Id == ownedPackageId, ct).ConfigureAwait(false);
             if (owned is null)
                 return Result.Failure("alias.target", "Owned package not found.");
@@ -66,8 +69,10 @@ public sealed class EfAliasService(
 
     public async Task<Result> RemoveAsync(long aliasId, CancellationToken cancellationToken = default)
     {
-        var result = await writeQueue.EnqueueAsync(async ct =>
+        var result = await writeQueue.EnqueueScopedAsync(async (sp, ct) =>
         {
+            var db = sp.GetRequiredService<VarVaultDbContext>();
+            var resolver = sp.GetRequiredService<IDependencyResolver>();
             var alias = await db.VarAliases.FirstOrDefaultAsync(a => a.Id == aliasId, ct).ConfigureAwait(false);
             if (alias is null)
                 return Result.Failure("alias.missing", "Alias not found.");

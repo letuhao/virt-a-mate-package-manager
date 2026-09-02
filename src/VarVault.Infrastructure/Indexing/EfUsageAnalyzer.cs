@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using VarVault.Common;
 using VarVault.Domain.Analyzer;
 using VarVault.Domain.Entities;
@@ -34,7 +35,7 @@ public sealed class EfUsageAnalyzer(
         UsageSource source,
         DateTimeOffset? timestampUtc,
         CancellationToken cancellationToken = default) =>
-        WriteAsync(ct => RecordManyCoreAsync(packageIds, kind, source, timestampUtc, ct),
+        WriteAsync((ctx, ct) => RecordManyCoreAsync(ctx, packageIds, kind, source, timestampUtc, ct),
             WritePriority.Interactive, cancellationToken);
 
     public Task SetPlacementOverridesAsync(
@@ -42,43 +43,44 @@ public sealed class EfUsageAnalyzer(
         bool pinHot,
         bool forceCold,
         CancellationToken cancellationToken = default) =>
-        WriteAsync(ct => SetPlacementOverridesCoreAsync(packageId, pinHot, forceCold, ct),
+        WriteAsync((ctx, ct) => SetPlacementOverridesCoreAsync(ctx, packageId, pinHot, forceCold, ct),
             WritePriority.Interactive, cancellationToken);
 
     public Task<int> RecomputeAsync(CancellationToken cancellationToken = default) =>
-        WriteAsync(async ct =>
+        WriteAsync(async (ctx, ct) =>
         {
-            var packageIds = await db.UsageEvents
+            var packageIds = await ctx.UsageEvents
                 .Select(e => e.PackageId)
                 .Distinct()
                 .ToListAsync(ct).ConfigureAwait(false);
-            var overrideOnly = await db.UsageStats
+            var overrideOnly = await ctx.UsageStats
                 .Where(s => s.IsPinnedHot || s.IsForcedCold)
                 .Select(s => s.PackageId)
                 .ToListAsync(ct).ConfigureAwait(false);
-            return await RecomputePackagesCoreAsync(packageIds.Concat(overrideOnly).Distinct().ToList(), ct)
+            return await RecomputePackagesCoreAsync(ctx, packageIds.Concat(overrideOnly).Distinct().ToList(), ct)
                 .ConfigureAwait(false);
         }, WritePriority.Normal, cancellationToken);
 
     public Task<int> RecomputePackagesAsync(
         IReadOnlyList<long> packageIds,
         CancellationToken cancellationToken = default) =>
-        WriteAsync(ct => RecomputePackagesCoreAsync(packageIds, ct), WritePriority.Normal, cancellationToken);
+        WriteAsync((ctx, ct) => RecomputePackagesCoreAsync(ctx, packageIds, ct), WritePriority.Normal, cancellationToken);
 
     public Task<int> CompactAsync(int olderThanDays = 90, CancellationToken cancellationToken = default) =>
-        WriteAsync(ct => CompactCoreAsync(olderThanDays, ct), WritePriority.Bulk, cancellationToken);
+        WriteAsync((ctx, ct) => CompactCoreAsync(ctx, olderThanDays, ct), WritePriority.Bulk, cancellationToken);
 
-    private Task WriteAsync(Func<CancellationToken, Task> write, WritePriority priority, CancellationToken cancellationToken) =>
+    private Task WriteAsync(Func<VarVaultDbContext, CancellationToken, Task> write, WritePriority priority, CancellationToken cancellationToken) =>
         writeQueue is null
-            ? write(cancellationToken)
-            : writeQueue.EnqueueAsync(write, priority, cancellationToken);
+            ? write(db, cancellationToken)
+            : writeQueue.EnqueueScopedAsync((sp, ct) => write(sp.GetRequiredService<VarVaultDbContext>(), ct), priority, cancellationToken);
 
-    private Task<T> WriteAsync<T>(Func<CancellationToken, Task<T>> write, WritePriority priority, CancellationToken cancellationToken) =>
+    private Task<T> WriteAsync<T>(Func<VarVaultDbContext, CancellationToken, Task<T>> write, WritePriority priority, CancellationToken cancellationToken) =>
         writeQueue is null
-            ? write(cancellationToken)
-            : writeQueue.EnqueueAsync(write, priority, cancellationToken);
+            ? write(db, cancellationToken)
+            : writeQueue.EnqueueScopedAsync((sp, ct) => write(sp.GetRequiredService<VarVaultDbContext>(), ct), priority, cancellationToken);
 
     private async Task RecordManyCoreAsync(
+        VarVaultDbContext ctx,
         IReadOnlyList<long> packageIds,
         UsageKind kind,
         UsageSource source,
@@ -95,7 +97,7 @@ public sealed class EfUsageAnalyzer(
         {
             if (packageId <= 0 || !seen.Add(packageId))
                 continue;
-            db.UsageEvents.Add(new UsageEvent
+            ctx.UsageEvents.Add(new UsageEvent
             {
                 PackageId = packageId,
                 TimestampUnixMs = nowMs,
@@ -107,10 +109,11 @@ public sealed class EfUsageAnalyzer(
         if (seen.Count == 0)
             return;
 
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await ctx.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private async Task SetPlacementOverridesCoreAsync(
+        VarVaultDbContext ctx,
         long packageId,
         bool pinHot,
         bool forceCold,
@@ -121,21 +124,22 @@ public sealed class EfUsageAnalyzer(
         if (pinHot && forceCold)
             forceCold = false;
 
-        var stat = await db.UsageStats.FirstOrDefaultAsync(s => s.PackageId == packageId, cancellationToken)
+        var stat = await ctx.UsageStats.FirstOrDefaultAsync(s => s.PackageId == packageId, cancellationToken)
             .ConfigureAwait(false);
         if (stat is null)
         {
             stat = new UsageStat { PackageId = packageId, Class = ContentClass.Cold };
-            db.UsageStats.Add(stat);
+            ctx.UsageStats.Add(stat);
         }
 
         stat.IsPinnedHot = pinHot;
         stat.IsForcedCold = forceCold;
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        await RecomputePackagesCoreAsync([packageId], cancellationToken).ConfigureAwait(false);
+        await ctx.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await RecomputePackagesCoreAsync(ctx, [packageId], cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<int> RecomputePackagesCoreAsync(
+        VarVaultDbContext ctx,
         IReadOnlyList<long> packageIds,
         CancellationToken cancellationToken)
     {
@@ -150,23 +154,23 @@ public sealed class EfUsageAnalyzer(
         var distinct = packageIds.Where(id => id > 0).Distinct().ToList();
         foreach (var packageId in distinct)
         {
-            var events = await db.UsageEvents
+            var events = await ctx.UsageEvents
                 .Where(e => e.PackageId == packageId)
                 .Select(e => e.TimestampUnixMs)
                 .ToListAsync(cancellationToken).ConfigureAwait(false);
 
             var windows = WindowedUsage.Compute(events, now, primaryDays, secondaryDays);
 
-            var centrality = await db.Packages
+            var centrality = await ctx.Packages
                 .Where(p => p.Id == packageId)
                 .Select(p => p.ReverseDependentCount)
                 .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
 
-            var stat = await db.UsageStats.FirstOrDefaultAsync(s => s.PackageId == packageId, cancellationToken).ConfigureAwait(false);
+            var stat = await ctx.UsageStats.FirstOrDefaultAsync(s => s.PackageId == packageId, cancellationToken).ConfigureAwait(false);
             if (stat is null)
             {
                 stat = new UsageStat { PackageId = packageId, Class = ContentClass.Cold };
-                db.UsageStats.Add(stat);
+                ctx.UsageStats.Add(stat);
             }
 
             var inputs = new UsageInputs(windows.LastUsedAt, windows.Use30d, centrality, stat.IsPinnedHot, stat.IsForcedCold);
@@ -182,7 +186,7 @@ public sealed class EfUsageAnalyzer(
             stat.LastFlipAt = result.LastFlipAt;
             stat.ComputedAt = now.UtcDateTime;
 
-            var item = await db.PackageListItems.FirstOrDefaultAsync(x => x.PackageId == packageId, cancellationToken).ConfigureAwait(false);
+            var item = await ctx.PackageListItems.FirstOrDefaultAsync(x => x.PackageId == packageId, cancellationToken).ConfigureAwait(false);
             if (item is not null)
             {
                 item.Class = result.Class;
@@ -190,15 +194,15 @@ public sealed class EfUsageAnalyzer(
             }
         }
 
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await ctx.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return distinct.Count;
     }
 
-    private async Task<int> CompactCoreAsync(int olderThanDays, CancellationToken cancellationToken)
+    private async Task<int> CompactCoreAsync(VarVaultDbContext ctx, int olderThanDays, CancellationToken cancellationToken)
     {
         var cutoff = clock.UtcNow.AddDays(-olderThanDays).ToUnixTimeMilliseconds();
 
-        var oldCounts = await db.UsageEvents
+        var oldCounts = await ctx.UsageEvents
             .Where(e => e.TimestampUnixMs < cutoff)
             .GroupBy(e => e.PackageId)
             .Select(g => new { PackageId = g.Key, Count = g.LongCount() })
@@ -207,21 +211,21 @@ public sealed class EfUsageAnalyzer(
         if (oldCounts.Count == 0)
             return 0;
 
-        await using var tx = await db.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
+        await using var tx = await ctx.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
 
         foreach (var group in oldCounts)
         {
-            var stat = await db.UsageStats.FirstOrDefaultAsync(s => s.PackageId == group.PackageId, cancellationToken).ConfigureAwait(false);
+            var stat = await ctx.UsageStats.FirstOrDefaultAsync(s => s.PackageId == group.PackageId, cancellationToken).ConfigureAwait(false);
             if (stat is null)
             {
                 stat = new UsageStat { PackageId = group.PackageId, Class = ContentClass.Cold };
-                db.UsageStats.Add(stat);
+                ctx.UsageStats.Add(stat);
             }
             stat.RolledUpUseCount += group.Count;
         }
-        await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        await ctx.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-        var compacted = await db.UsageEvents
+        var compacted = await ctx.UsageEvents
             .Where(e => e.TimestampUnixMs < cutoff)
             .ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
 

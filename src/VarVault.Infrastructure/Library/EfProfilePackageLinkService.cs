@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using VarVault.Common;
 using VarVault.Domain.Entities;
 using VarVault.Infrastructure.Persistence;
@@ -12,13 +13,13 @@ namespace VarVault.Infrastructure.Library;
 /// the denormalized active-profile columns on <see cref="PackageListItem"/>.
 /// </summary>
 public sealed class EfProfilePackageLinkService(
-    VarVaultDbContext db,
     IClock clock,
     IWriteQueue writeQueue) : IProfilePackageLinkService
 {
     public Task SyncFromActivationLinksAsync(long profileId, CancellationToken cancellationToken = default) =>
-        writeQueue.EnqueueAsync(async ct =>
+        writeQueue.EnqueueScopedAsync(async (sp, ct) =>
         {
+            var db = sp.GetRequiredService<VarVaultDbContext>();
             var desired = await (
                     from l in db.ActivationLinks.AsNoTracking()
                     join v in db.VarFiles.AsNoTracking() on l.VarFileId equals v.Id
@@ -65,8 +66,9 @@ public sealed class EfProfilePackageLinkService(
         }, WritePriority.Interactive, cancellationToken);
 
     public Task RefreshActiveProfileReadModelAsync(CancellationToken cancellationToken = default) =>
-        writeQueue.EnqueueAsync(async ct =>
+        writeQueue.EnqueueScopedAsync(async (sp, ct) =>
         {
+            var db = sp.GetRequiredService<VarVaultDbContext>();
             var activeProfile = await db.Profiles.AsNoTracking()
                 .FirstOrDefaultAsync(p => p.IsActive, ct)
                 .ConfigureAwait(false);

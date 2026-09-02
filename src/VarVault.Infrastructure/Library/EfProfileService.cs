@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using VarVault.Common;
 using VarVault.Domain.Activation;
 using VarVault.Infrastructure.Persistence;
@@ -15,7 +16,6 @@ namespace VarVault.Infrastructure.Library;
 public sealed class EfProfileService(
     IVamProfileService profiles,
     ISettingsService settings,
-    VarVaultDbContext db,
     IProfilePackageLinkService profileLinks,
     IWriteQueue writeQueue) : IProfileService
 {
@@ -57,8 +57,9 @@ public sealed class EfProfileService(
         if (switched.IsFailure)
             return switched;
 
-        await writeQueue.EnqueueAsync(async ct =>
+        await writeQueue.EnqueueScopedAsync(async (sp, ct) =>
         {
+            var db = sp.GetRequiredService<VarVaultDbContext>();
             var all = await db.Profiles.ToListAsync(ct).ConfigureAwait(false);
             foreach (var p in all)
                 p.IsActive = string.Equals(p.Name, profileName, StringComparison.OrdinalIgnoreCase);
@@ -85,8 +86,9 @@ public sealed class EfProfileService(
             return renamed;
 
         var becameActive = false;
-        await writeQueue.EnqueueAsync(async ct =>
+        await writeQueue.EnqueueScopedAsync(async (sp, ct) =>
         {
+            var db = sp.GetRequiredService<VarVaultDbContext>();
             var profile = await db.Profiles.FirstOrDefaultAsync(p => p.Name == oldName, ct).ConfigureAwait(false);
             if (profile is null)
                 return;

@@ -353,6 +353,7 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
             await db.ContentItems.Where(c => c.VarFileId == varFileId)
                 .ExecuteDeleteAsync(cancellationToken)
                 .ConfigureAwait(false);
+            DetachTracked<ContentItem>(e => e.VarFileId == varFileId);
         }
 
         foreach (var i in items)
@@ -378,6 +379,7 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
         await db.Dependencies.Where(d => d.VarFileId == varFileId)
             .ExecuteDeleteAsync(cancellationToken)
             .ConfigureAwait(false);
+        DetachTracked<Dependency>(e => e.VarFileId == varFileId);
 
         // Meta refs first so a ref present in both keeps RefKind.Meta (the UNIQUE key dedups the rest).
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -418,5 +420,15 @@ public sealed class EfCatalogStore(VarVaultDbContext db, IClock clock) : ICatalo
                 continue;
             db.PackageContentCounts.Add(new PackageContentCount { PackageId = packageId, Type = type, Count = count });
         }
+    }
+
+    /// <summary>
+    /// ExecuteDeleteAsync bypasses the change tracker — detach stale rows so a subsequent Add+Save
+    /// cannot re-insert duplicates that violate UNIQUE constraints.
+    /// </summary>
+    private void DetachTracked<TEntity>(Func<TEntity, bool> predicate) where TEntity : class
+    {
+        foreach (var entry in db.ChangeTracker.Entries<TEntity>().Where(e => predicate(e.Entity)).ToList())
+            entry.State = EntityState.Detached;
     }
 }

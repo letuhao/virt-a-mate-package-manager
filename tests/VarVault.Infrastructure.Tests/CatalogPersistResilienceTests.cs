@@ -17,6 +17,112 @@ namespace VarVault.Infrastructure.Tests;
 public sealed class CatalogPersistResilienceTests
 {
     [Fact]
+    public async Task Reapply_with_tracked_dependencies_does_not_hit_unique_constraint()
+    {
+        using var fx = new SqliteTestDatabase();
+        var repoId = Guid.NewGuid();
+        using (var db = fx.NewContext())
+        {
+            db.Repositories.Add(new Repository
+            {
+                Id = repoId, Name = "r", MountPath = @"C:\r", IsOnline = true, IsEnabled = true,
+                CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var identity = PackageId.TryParse("Dense.Deps.1");
+        Assert.True(identity.IsSuccess);
+        var refs = Enumerable.Range(1, 40).Select(i => $"Creator.Pack{i}.1").ToList();
+        var upsert = new VarUpsert(
+            repoId, "Dense.Deps.1.var", 100, DateTime.UtcNow, QuarantineKind.None,
+            identity.Value, IntegrityStatus.Ok,
+            null, null, null, null, null,
+            "sig", null, null,
+            EncodingHealth.Ok, null, 0,
+            [], new Dictionary<ContentType, int>(),
+            refs, refs);
+
+        using (var db = fx.NewContext())
+        {
+            var store = new EfCatalogStore(db, new FakeClock());
+            Assert.NotNull(await store.ApplyAsync(upsert));
+        }
+
+        using (var db = fx.NewContext())
+        {
+            var vf = await db.VarFiles.SingleAsync();
+            // Leave stale Dependency rows tracked — ExecuteDeleteAsync alone used to leave them
+            // in the change tracker and the next SaveChanges hit UNIQUE(VarFileId, DependsOnRefKey).
+            _ = await db.Dependencies.Where(d => d.VarFileId == vf.Id).ToListAsync();
+            var store = new EfCatalogStore(db, new FakeClock());
+            Assert.NotNull(await store.ApplyAsync(upsert));
+        }
+
+        using (var check = fx.NewContext())
+        {
+            var vf = await check.VarFiles.SingleAsync();
+            var deps = await check.Dependencies.Where(d => d.VarFileId == vf.Id).ToListAsync();
+            Assert.Equal(40, deps.Count);
+            Assert.Equal(deps.Count, deps.Select(d => d.DependsOnRefKey).Distinct(StringComparer.Ordinal).Count());
+        }
+    }
+
+    [Fact]
+    public async Task Reapply_with_tracked_content_items_does_not_hit_unique_constraint()
+    {
+        using var fx = new SqliteTestDatabase();
+        var repoId = Guid.NewGuid();
+        using (var db = fx.NewContext())
+        {
+            db.Repositories.Add(new Repository
+            {
+                Id = repoId, Name = "r", MountPath = @"C:\r", IsOnline = true, IsEnabled = true,
+                CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var identity = PackageId.TryParse("Dense.Content.1");
+        Assert.True(identity.IsSuccess);
+        var items = Enumerable.Range(1, 20)
+            .Select(i => new UpsertContentItem(ContentType.Scene, $"Saves/scene{i}.json", false, null, null))
+            .ToList();
+        var upsert = new VarUpsert(
+            repoId, "Dense.Content.1.var", 100, DateTime.UtcNow, QuarantineKind.None,
+            identity.Value, IntegrityStatus.Ok,
+            null, null, null, null, null,
+            "sig", null, null,
+            EncodingHealth.Ok, null, 0,
+            items, new Dictionary<ContentType, int> { [ContentType.Scene] = 20 },
+            [], []);
+
+        using (var db = fx.NewContext())
+        {
+            var store = new EfCatalogStore(db, new FakeClock());
+            Assert.NotNull(await store.ApplyAsync(upsert));
+        }
+
+        using (var db = fx.NewContext())
+        {
+            var vf = await db.VarFiles.SingleAsync();
+            // Stale ContentItem rows in the tracker — ExecuteDeleteAsync alone used to leave them
+            // tracked and the next SaveChanges re-inserted duplicates.
+            _ = await db.ContentItems.Where(c => c.VarFileId == vf.Id).ToListAsync();
+            var store = new EfCatalogStore(db, new FakeClock());
+            Assert.NotNull(await store.ApplyAsync(upsert));
+        }
+
+        using (var check = fx.NewContext())
+        {
+            var vf = await check.VarFiles.SingleAsync();
+            var content = await check.ContentItems.Where(c => c.VarFileId == vf.Id).ToListAsync();
+            Assert.Equal(20, content.Count);
+            Assert.Equal(content.Count, content.Select(c => c.EntryPath).Distinct(StringComparer.Ordinal).Count());
+        }
+    }
+
+    [Fact]
     public async Task Reapply_with_overlapping_deps_does_not_hit_unique_constraint()
     {
         using var fx = new SqliteTestDatabase();

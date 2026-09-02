@@ -2,6 +2,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using VarVault.Common;
 using VarVault.Domain.Dependencies;
 using VarVault.Domain.Entities;
@@ -31,7 +32,7 @@ public sealed class EfVarMetaEditService(
         long? varFileId = null,
         CancellationToken cancellationToken = default)
     {
-        var resolved = await ResolveEditableCopyAsync(packageId, varFileId, cancellationToken).ConfigureAwait(false);
+        var resolved = await ResolveEditableCopyAsync(db, packageId, varFileId, cancellationToken).ConfigureAwait(false);
         if (resolved.IsFailure)
             return Result.Failure<VarMetaEditDraft>(resolved.Error);
 
@@ -84,10 +85,19 @@ public sealed class EfVarMetaEditService(
         CancellationToken cancellationToken = default)
     {
         Guard.NotNull(request);
-        return writeQueue.EnqueueAsync(ct => SaveCoreAsync(request, ct), cancellationToken: cancellationToken);
+        return writeQueue.EnqueueScopedAsync(async (sp, ct) =>
+        {
+            var scopedDb = sp.GetRequiredService<VarVaultDbContext>();
+            var scopedResolver = sp.GetRequiredService<IDependencyResolver>();
+            return await SaveCoreAsync(scopedDb, scopedResolver, request, ct).ConfigureAwait(false);
+        }, cancellationToken: cancellationToken);
     }
 
-    private async Task<Result<VarMetaEditResult>> SaveCoreAsync(VarMetaEditRequest request, CancellationToken cancellationToken)
+    private async Task<Result<VarMetaEditResult>> SaveCoreAsync(
+        VarVaultDbContext scopedDb,
+        IDependencyResolver scopedResolver,
+        VarMetaEditRequest request,
+        CancellationToken cancellationToken)
     {
         foreach (var raw in request.DependencyRefs)
         {
@@ -99,7 +109,7 @@ public sealed class EfVarMetaEditService(
                 return Result.Failure<VarMetaEditResult>(parsed.Error);
         }
 
-        var resolved = await ResolveEditableCopyAsync(request.PackageId, request.VarFileId, cancellationToken)
+        var resolved = await ResolveEditableCopyAsync(scopedDb, request.PackageId, request.VarFileId, cancellationToken)
             .ConfigureAwait(false);
         if (resolved.IsFailure)
             return Result.Failure<VarMetaEditResult>(resolved.Error);
@@ -171,7 +181,7 @@ public sealed class EfVarMetaEditService(
         var info = new FileInfo(absolutePath);
         var now = clock.UtcNow.UtcDateTime;
 
-        var tracked = await db.VarFiles.FirstAsync(v => v.Id == vf.Id, finishCt).ConfigureAwait(false);
+        var tracked = await scopedDb.VarFiles.FirstAsync(v => v.Id == vf.Id, finishCt).ConfigureAwait(false);
         tracked.SizeBytes = info.Exists ? info.Length : tracked.SizeBytes;
         tracked.FileMtime = info.Exists ? info.LastWriteTimeUtc : now;
         if (insp?.Signatures is { } sigs)
@@ -182,7 +192,7 @@ public sealed class EfVarMetaEditService(
         }
         tracked.IndexedAt = now;
 
-        var package = await db.Packages.FirstAsync(p => p.Id == request.PackageId, finishCt).ConfigureAwait(false);
+        var package = await scopedDb.Packages.FirstAsync(p => p.Id == request.PackageId, finishCt).ConfigureAwait(false);
         package.MetaCreator = insp?.Meta?.Creator ?? request.CreatorName;
         package.MetaPackage = insp?.Meta?.Package ?? request.PackageName;
         package.LicenseType = insp?.Meta?.LicenseType ?? request.LicenseType;
@@ -192,25 +202,25 @@ public sealed class EfVarMetaEditService(
         package.MetaDivergent = ComputeMetaDivergent(package, package.MetaCreator, package.MetaPackage);
 
         // Replace ALL deps (meta + embedded) like EfCatalogStore — Meta-only replace hits UNIQUE(VarFileId, DependsOnRefKey).
-        var existingDeps = await db.Dependencies
+        var existingDeps = await scopedDb.Dependencies
             .Where(d => d.VarFileId == vf.Id)
             .ToListAsync(finishCt)
             .ConfigureAwait(false);
         if (existingDeps.Count > 0)
-            db.Dependencies.RemoveRange(existingDeps);
+            scopedDb.Dependencies.RemoveRange(existingDeps);
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        AddDepRows(vf.Id, insp?.Meta?.DependencyRefs ?? request.DependencyRefs, RefKind.Meta, seen);
+        AddDepRows(scopedDb, vf.Id, insp?.Meta?.DependencyRefs ?? request.DependencyRefs, RefKind.Meta, seen);
         if (insp is not null)
-            AddDepRows(vf.Id, insp.EmbeddedRefs, RefKind.Embedded, seen);
+            AddDepRows(scopedDb, vf.Id, insp.EmbeddedRefs, RefKind.Embedded, seen);
 
-        var listItem = await db.PackageListItems.FirstOrDefaultAsync(i => i.PackageId == package.Id, finishCt)
+        var listItem = await scopedDb.PackageListItems.FirstOrDefaultAsync(i => i.PackageId == package.Id, finishCt)
             .ConfigureAwait(false);
         if (listItem is not null && package.CanonicalVarFileId == vf.Id)
             listItem.TotalSize = tracked.SizeBytes;
 
-        await db.SaveChangesAsync(finishCt).ConfigureAwait(false);
-        await resolver.ResolveAllAsync(finishCt).ConfigureAwait(false);
+        await scopedDb.SaveChangesAsync(finishCt).ConfigureAwait(false);
+        await scopedResolver.ResolveAllAsync(finishCt).ConfigureAwait(false);
 
         var metaDepCount = (insp?.Meta?.DependencyRefs ?? request.DependencyRefs)
             .Count(r => !string.IsNullOrWhiteSpace(r));
@@ -222,14 +232,14 @@ public sealed class EfVarMetaEditService(
             metaDepCount);
     }
 
-    private void AddDepRows(long varFileId, IReadOnlyList<string> refsRaw, RefKind kind, HashSet<string> seen)
+    private static void AddDepRows(VarVaultDbContext scopedDb, long varFileId, IReadOnlyList<string> refsRaw, RefKind kind, HashSet<string> seen)
     {
         foreach (var raw in refsRaw)
         {
             var key = IdentityFold.Compute(raw);
             if (key.Length == 0 || !seen.Add(key))
                 continue;
-            db.Dependencies.Add(new Dependency
+            scopedDb.Dependencies.Add(new Dependency
             {
                 VarFileId = varFileId,
                 DependsOnRefKey = key,
@@ -240,18 +250,19 @@ public sealed class EfVarMetaEditService(
         }
     }
 
-    private async Task<Result<(VarFile Vf, Repository Repo, string AbsolutePath, IReadOnlyList<string> Warnings)>> ResolveEditableCopyAsync(
+    private static async Task<Result<(VarFile Vf, Repository Repo, string AbsolutePath, IReadOnlyList<string> Warnings)>> ResolveEditableCopyAsync(
+        VarVaultDbContext scopedDb,
         long packageId,
         long? varFileId,
         CancellationToken cancellationToken)
     {
-        var package = await db.Packages.AsNoTracking()
+        var package = await scopedDb.Packages.AsNoTracking()
             .FirstOrDefaultAsync(p => p.Id == packageId, cancellationToken)
             .ConfigureAwait(false);
         if (package is null)
             return Result.Failure<(VarFile, Repository, string, IReadOnlyList<string>)>("meta.package", "Package not found.");
 
-        var copies = await db.VarFiles.AsNoTracking()
+        var copies = await scopedDb.VarFiles.AsNoTracking()
             .Include(v => v.Repository)
             .Where(v => v.PackageId == packageId && v.SupersededByVarFileId == null)
             .ToListAsync(cancellationToken)
