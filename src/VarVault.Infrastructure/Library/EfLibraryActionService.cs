@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using VarVault.Domain.Dedup;
 using VarVault.Domain.Safety;
 using VarVault.Infrastructure.Persistence;
@@ -86,8 +87,9 @@ public sealed class EfLibraryActionService(
         if (string.IsNullOrWhiteSpace(subfolder))
             return Task.FromResult(new BulkActionResult(0, varFileIds.Count));
 
-        return writeQueue.EnqueueAsync(async ct =>
+        return writeQueue.EnqueueScopedAsync(async (sp, ct) =>
         {
+            var db = sp.GetRequiredService<VarVaultDbContext>();
             var rows = await db.VarFiles
                 .Where(v => varFileIds.Contains(v.Id))
                 .Select(v => new { Entity = v, Mount = v.Repository!.MountPath })
@@ -143,8 +145,9 @@ public sealed class EfLibraryActionService(
     }
 
     public Task<bool> SetFavoriteAsync(long packageId, bool isFavorite, CancellationToken cancellationToken = default) =>
-        writeQueue.EnqueueAsync(async ct =>
+        writeQueue.EnqueueScopedAsync(async (sp, ct) =>
         {
+            var db = sp.GetRequiredService<VarVaultDbContext>();
             var pkg = await db.Packages.FirstOrDefaultAsync(p => p.Id == packageId, ct).ConfigureAwait(false);
             if (pkg is null)
                 return false;
@@ -157,8 +160,9 @@ public sealed class EfLibraryActionService(
         }, WritePriority.Interactive, cancellationToken);
 
     public Task<BulkActionResult> SetFavoritesAsync(IReadOnlyList<long> packageIds, bool isFavorite, CancellationToken cancellationToken = default) =>
-        writeQueue.EnqueueAsync(async ct =>
+        writeQueue.EnqueueScopedAsync(async (sp, ct) =>
         {
+            var db = sp.GetRequiredService<VarVaultDbContext>();
             if (packageIds.Count == 0)
                 return new BulkActionResult(0, 0);
             var ids = packageIds.Distinct().ToList();

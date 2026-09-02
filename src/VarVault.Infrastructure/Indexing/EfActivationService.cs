@@ -1,5 +1,6 @@
 using System.IO;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using VarVault.Common;
 using VarVault.Common.Threading;
@@ -34,7 +35,8 @@ public sealed class EfActivationService(
     IWriteQueue writeQueue,
     IProfilePackageLinkService profileLinks,
     IPresetService presets,
-    IUsageAnalyzer usage,
+    IServiceScopeFactory scopeFactory,
+    IJobQueue jobQueue,
     ILogger<EfActivationService> logger) : IActivationService
 {
     // Serializes filesystem link operations so two concurrent activations can't race on a profile dir. (T7.3)
@@ -58,17 +60,26 @@ public sealed class EfActivationService(
 
     public async Task<int> RescueAsync(long profileId, CancellationToken cancellationToken = default)
     {
-        // Remove every app-created link (a preset owns it); user-made links (null attribution) survive.
-        var owned = await db.ActivationLinks
+        var owned = await db.ActivationLinks.AsNoTracking()
             .Where(l => l.ProfileId == profileId && l.RequestedByPresetId != null)
+            .Select(l => new { l.Id, l.LinkPath })
             .ToListAsync(cancellationToken).ConfigureAwait(false);
 
         using (await FsLock.AcquireAsync(cancellationToken).ConfigureAwait(false))
         {
             foreach (var link in owned)
                 DeleteLinkFile(link.LinkPath);
-            db.ActivationLinks.RemoveRange(owned);
-            await SaveAsync(cancellationToken).ConfigureAwait(false);
+            if (owned.Count > 0)
+            {
+                var ids = owned.Select(l => l.Id).ToList();
+                await writeQueue.EnqueueScopedAsync(async (sp, ct) =>
+                {
+                    var scopedDb = sp.GetRequiredService<VarVaultDbContext>();
+                    var rows = await scopedDb.ActivationLinks.Where(l => ids.Contains(l.Id)).ToListAsync(ct).ConfigureAwait(false);
+                    scopedDb.ActivationLinks.RemoveRange(rows);
+                    await scopedDb.SaveChangesAsync(ct).ConfigureAwait(false);
+                }, WritePriority.Interactive, cancellationToken).ConfigureAwait(false);
+            }
         }
         await profileLinks.SyncFromActivationLinksAsync(profileId, cancellationToken).ConfigureAwait(false);
         await profileLinks.RefreshActiveProfileReadModelAsync(cancellationToken).ConfigureAwait(false);
@@ -101,7 +112,6 @@ public sealed class EfActivationService(
             .ConfigureAwait(false);
         if (profile is null)
         {
-            // Case-insensitive fallback (VaM folder names vs catalog).
             var all = await db.Profiles.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
             profile = all.FirstOrDefault(p => string.Equals(p.Name, activeName, StringComparison.OrdinalIgnoreCase));
         }
@@ -117,16 +127,26 @@ public sealed class EfActivationService(
 
     public async Task<int> CleanTempLinksAsync(long profileId, CancellationToken cancellationToken = default)
     {
-        var temps = await db.ActivationLinks
+        var temps = await db.ActivationLinks.AsNoTracking()
             .Where(l => l.ProfileId == profileId && l.LinkKind == LinkKind.Temp)
+            .Select(l => new { l.Id, l.LinkPath })
             .ToListAsync(cancellationToken).ConfigureAwait(false);
 
         using (await FsLock.AcquireAsync(cancellationToken).ConfigureAwait(false))
         {
             foreach (var link in temps)
                 DeleteLinkFile(link.LinkPath);
-            db.ActivationLinks.RemoveRange(temps);
-            await SaveAsync(cancellationToken).ConfigureAwait(false);
+            if (temps.Count > 0)
+            {
+                var ids = temps.Select(l => l.Id).ToList();
+                await writeQueue.EnqueueScopedAsync(async (sp, ct) =>
+                {
+                    var scopedDb = sp.GetRequiredService<VarVaultDbContext>();
+                    var rows = await scopedDb.ActivationLinks.Where(l => ids.Contains(l.Id)).ToListAsync(ct).ConfigureAwait(false);
+                    scopedDb.ActivationLinks.RemoveRange(rows);
+                    await scopedDb.SaveChangesAsync(ct).ConfigureAwait(false);
+                }, WritePriority.Interactive, cancellationToken).ConfigureAwait(false);
+            }
         }
         return temps.Count;
     }
@@ -139,22 +159,46 @@ public sealed class EfActivationService(
         var vamRoot = root.Value;
         var activeName = profiles.ActiveProfile(vamRoot);
 
-        var all = await db.Profiles.ToListAsync(cancellationToken).ConfigureAwait(false);
+        var all = await db.Profiles.AsNoTracking()
+            .Select(p => new { p.Id, p.Name })
+            .ToListAsync(cancellationToken).ConfigureAwait(false);
+
         var pruned = 0;
+        var updates = new List<(long Id, bool IsActive)>();
+        var removedProfileIds = new List<long>();
         foreach (var p in all)
         {
             var dirExists = Directory.Exists(ActivationPaths.ProfileDir(vamRoot, p.Name));
             if (!dirExists)
             {
-                var links = await db.ActivationLinks.Where(l => l.ProfileId == p.Id).ToListAsync(cancellationToken).ConfigureAwait(false);
-                db.ActivationLinks.RemoveRange(links);
-                db.Profiles.Remove(p);
+                removedProfileIds.Add(p.Id);
                 pruned++;
                 continue;
             }
-            p.IsActive = string.Equals(p.Name, activeName, StringComparison.OrdinalIgnoreCase);
+            updates.Add((p.Id, string.Equals(p.Name, activeName, StringComparison.OrdinalIgnoreCase)));
         }
-        await SaveAsync(cancellationToken).ConfigureAwait(false);
+
+        if (removedProfileIds.Count > 0 || updates.Count > 0)
+        {
+            await writeQueue.EnqueueScopedAsync(async (sp, ct) =>
+            {
+                var scopedDb = sp.GetRequiredService<VarVaultDbContext>();
+                foreach (var profileId in removedProfileIds)
+                {
+                    var links = await scopedDb.ActivationLinks.Where(l => l.ProfileId == profileId).ToListAsync(ct).ConfigureAwait(false);
+                    scopedDb.ActivationLinks.RemoveRange(links);
+                    var profile = await scopedDb.Profiles.FirstAsync(p => p.Id == profileId, ct).ConfigureAwait(false);
+                    scopedDb.Profiles.Remove(profile);
+                }
+                foreach (var (id, isActive) in updates)
+                {
+                    var profile = await scopedDb.Profiles.FirstOrDefaultAsync(p => p.Id == id, ct).ConfigureAwait(false);
+                    if (profile is not null)
+                        profile.IsActive = isActive;
+                }
+                await scopedDb.SaveChangesAsync(ct).ConfigureAwait(false);
+            }, WritePriority.Interactive, cancellationToken).ConfigureAwait(false);
+        }
         return pruned;
     }
 
@@ -169,11 +213,12 @@ public sealed class EfActivationService(
     }
 
     private sealed record AliasMapping(string MissingRefKey, string MissingRefRaw, long TargetPackageId);
+    private sealed record ProfileInfo(long Id, string Name);
+    private sealed record LinkPersistRow(string LinkPath, long VarFileId, LinkKind Kind, ActivationReason Reason, string? AliasKey);
 
     private async Task<(HashSet<long> Members, List<AliasMapping> Aliases, IReadOnlyList<string> UnresolvedMembers)> ResolvedMembersAsync(
         long presetId, CancellationToken cancellationToken)
     {
-        // Fresh .latest / formerly-missing snapshots before materializing links.
         await presets.RefreshMemberResolutionsAsync(presetId, cancellationToken).ConfigureAwait(false);
 
         var members = await db.PresetMembers.AsNoTracking()
@@ -191,8 +236,6 @@ public sealed class EfActivationService(
                 unresolved.Add((m.PackageRefKey, m.PackageRefRaw));
         }
 
-        // All in-scope aliases → ___MissingVarLink___ (legacy Createlink): not only unresolved members.
-        // Dependency aliases must land on disk under the missing name so VaM can resolve them.
         var aliasRows = await db.VarAliases.AsNoTracking()
             .Where(a => a.ResolvedPackageId != null
                         && (a.Scope == AliasScope.Global || a.PresetId == presetId))
@@ -221,7 +264,10 @@ public sealed class EfActivationService(
         long presetId, HashSet<long> memberSet, IReadOnlyList<AliasMapping> aliases,
         IReadOnlyList<string> unresolvedMembers, bool recordUsage, CancellationToken cancellationToken)
     {
-        var preset = await db.LoadingPresets.FirstOrDefaultAsync(p => p.Id == presetId, cancellationToken).ConfigureAwait(false);
+        var preset = await db.LoadingPresets.AsNoTracking()
+            .Where(p => p.Id == presetId)
+            .Select(p => new { p.Id, p.Name })
+            .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
         if (preset is null)
             return new ActivationBuildResult(0, 0, 0);
 
@@ -235,19 +281,16 @@ public sealed class EfActivationService(
         var vamRoot = rootResult.Value;
         if (!Directory.Exists(vamRoot))
         {
-            // Defensive: never create a bogus profile tree under a mistyped/offline path. (T6.3a)
             logger.LogWarning("Activation skipped for preset {PresetId}: VaM path does not exist: {VamRoot}", presetId, vamRoot);
             return new ActivationBuildResult(0, 0, 0, PathUnavailable: 1,
                 UnresolvedDependencies: unresolvedMembers.Count);
         }
         var now = clock.UtcNow.UtcDateTime;
-        var profile = await EnsureProfileAsync(preset, vamRoot, now, cancellationToken).ConfigureAwait(false);
+        var profile = await EnsureProfileAsync(presetId, preset.Name, vamRoot, now, cancellationToken).ConfigureAwait(false);
 
         var varsLinkDir = ActivationPaths.VarsLinkDir(vamRoot, profile.Name);
         var missingLinkDir = ActivationPaths.MissingVarLinkDir(vamRoot, profile.Name);
 
-        // Forward closure: members + their deps, plus alias-target deps (the alias link itself stands in
-        // for the target under the missing name, but the target's dependencies still need installing).
         var full = new HashSet<long>(memberSet);
         var unresolvedRefs = new HashSet<string>(unresolvedMembers, StringComparer.OrdinalIgnoreCase);
         foreach (var id in memberSet)
@@ -258,8 +301,6 @@ public sealed class EfActivationService(
             foreach (var edge in closure.UnresolvedEdges)
                 unresolvedRefs.Add(edge.DependsOnRefRaw);
         }
-        // Alias targets are NOT added to `full` — the alias link stands in for that package. Their
-        // dependency closure still is, and offline targets are counted once via offlinePackages below.
         foreach (var alias in aliases)
         {
             var closure = await graph.ForwardClosureDetailedAsync(alias.TargetPackageId, cancellationToken).ConfigureAwait(false);
@@ -269,7 +310,6 @@ public sealed class EfActivationService(
                 unresolvedRefs.Add(edge.DependsOnRefRaw);
         }
 
-        // Desired install links, keyed by absolute link path.
         var desired = new Dictionary<string, DesiredLink>(StringComparer.OrdinalIgnoreCase);
         var offlinePackages = new HashSet<long>();
         foreach (var packageId in full)
@@ -290,8 +330,6 @@ public sealed class EfActivationService(
                 copy.VarFileId, packageId, LinkKind.Install, reason, AliasKey: null);
         }
 
-        // Desired alias links (named after the still-missing ref) → the owned target's file.
-        // Count offline targets once here — they are not in `full`, so they won't double-count.
         foreach (var alias in aliases)
         {
             var copy = await PickHottestOnlineCopyAsync(alias.TargetPackageId, cancellationToken).ConfigureAwait(false);
@@ -314,30 +352,27 @@ public sealed class EfActivationService(
 
         var missing = offlinePackages.Count;
 
-        // Existing app-owned links for this preset (install + alias); never touch user (null) or temp links.
-        var existing = await db.ActivationLinks
+        var existingPaths = await db.ActivationLinks.AsNoTracking()
             .Where(l => l.ProfileId == profile.Id && l.RequestedByPresetId == presetId
                         && (l.LinkKind == LinkKind.Install || l.LinkKind == LinkKind.Alias))
+            .Select(l => l.LinkPath)
             .ToListAsync(cancellationToken).ConfigureAwait(false);
-        var existingByPath = new Dictionary<string, ActivationLink>(StringComparer.OrdinalIgnoreCase);
-        foreach (var row in existing)
-            existingByPath[row.LinkPath] = row;
+        var existingPathSet = existingPaths.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         using (await FsLock.AcquireAsync(cancellationToken).ConfigureAwait(false))
         {
             var newlyCreated = new List<string>();
             var present = 0;
             var installedPackageIds = new HashSet<long>();
+            var upserts = new List<LinkPersistRow>();
 
-            // Phase A — materialize desired links (creates first, so a privilege denial aborts atomically).
             foreach (var d in desired.Values)
             {
                 var outcome = EnsureFileLink(d.LinkPath, d.SourcePath);
                 switch (outcome)
                 {
                     case LinkOutcome.Privilege:
-                        foreach (var path in newlyCreated) DeleteLinkFile(path); // roll back this call
-                        db.ChangeTracker.Clear();
+                        foreach (var path in newlyCreated) DeleteLinkFile(path);
                         logger.LogWarning("Activation aborted for preset {PresetId}: symlink privilege (Developer Mode).", presetId);
                         return new ActivationBuildResult(0, 0, 0, PrivilegeFailures: 1,
                             UnresolvedDependencies: unresolvedRefs.Count);
@@ -352,75 +387,126 @@ public sealed class EfActivationService(
                         logger.LogWarning("Failed to create link {LinkPath}; skipping.", d.LinkPath);
                         continue;
                 }
-                present++; // Created, Recreated, or Unchanged — the link is on disk
+                present++;
                 if (d.Kind == LinkKind.Install)
                     installedPackageIds.Add(d.PackageId);
-
-                // Upsert the row for this present link.
-                if (existingByPath.TryGetValue(d.LinkPath, out var row))
-                {
-                    row.VarFileId = d.VarFileId;
-                    row.LinkKind = d.Kind;
-                    row.Reason = d.Reason;
-                    row.AliasedMissingRefKey = d.AliasKey;
-                }
-                else
-                {
-                    db.ActivationLinks.Add(new ActivationLink
-                    {
-                        ProfileId = profile.Id,
-                        VarFileId = d.VarFileId,
-                        LinkPath = d.LinkPath,
-                        LinkKind = d.Kind,
-                        LinkType = LinkType.Symlink,
-                        Reason = d.Reason,
-                        AliasedMissingRefKey = d.AliasKey,
-                        RequestedByPresetId = presetId,
-                    });
-                }
+                upserts.Add(new LinkPersistRow(d.LinkPath, d.VarFileId, d.Kind, d.Reason, d.AliasKey));
             }
 
-            // Phase B — orphan sweep: owned links no longer desired → delete file + row.
+            var removePaths = new List<string>();
             var removed = 0;
-            foreach (var row in existing)
+            foreach (var path in existingPathSet)
             {
-                if (desired.ContainsKey(row.LinkPath))
+                if (desired.ContainsKey(path))
                     continue;
-                DeleteLinkFile(row.LinkPath);
-                db.ActivationLinks.Remove(row);
+                DeleteLinkFile(path);
+                removePaths.Add(path);
                 removed++;
             }
 
-            profile.IsActive = string.Equals(profile.Name, profiles.ActiveProfile(vamRoot), StringComparison.OrdinalIgnoreCase);
-            await SaveAsync(cancellationToken).ConfigureAwait(false);
+            var profileIsActive = string.Equals(profile.Name, profiles.ActiveProfile(vamRoot), StringComparison.OrdinalIgnoreCase);
+            await PersistActivationLinksAsync(profile.Id, presetId, profileIsActive, upserts, removePaths, cancellationToken)
+                .ConfigureAwait(false);
 
             await profileLinks.SyncFromActivationLinksAsync(profile.Id, cancellationToken).ConfigureAwait(false);
-            if (profile.IsActive)
+            if (profileIsActive)
                 await profileLinks.RefreshActiveProfileReadModelAsync(cancellationToken).ConfigureAwait(false);
 
-            // G1 · only BuildProfileLinksAsync (Activate) records usage — not Deactivate rebuilds.
             if (recordUsage && installedPackageIds.Count > 0)
-                await RecordActivateUsageBestEffortAsync(installedPackageIds.ToList(), cancellationToken).ConfigureAwait(false);
+                RecordActivateUsageBestEffort(installedPackageIds.ToList());
 
             return new ActivationBuildResult(present, removed, missing, UnresolvedDependencies: unresolvedRefs.Count);
         }
     }
 
+    private async Task PersistActivationLinksAsync(
+        long profileId,
+        long presetId,
+        bool profileIsActive,
+        IReadOnlyList<LinkPersistRow> upserts,
+        IReadOnlyList<string> removePaths,
+        CancellationToken cancellationToken)
+    {
+        await writeQueue.EnqueueScopedAsync(async (sp, ct) =>
+        {
+            var scopedDb = sp.GetRequiredService<VarVaultDbContext>();
+            await using var tx = await scopedDb.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
+
+            var profile = await scopedDb.Profiles.FirstAsync(p => p.Id == profileId, ct).ConfigureAwait(false);
+            profile.IsActive = profileIsActive;
+
+            var existingByPath = await scopedDb.ActivationLinks
+                .Where(l => l.ProfileId == profileId && l.RequestedByPresetId == presetId
+                            && (l.LinkKind == LinkKind.Install || l.LinkKind == LinkKind.Alias))
+                .ToDictionaryAsync(l => l.LinkPath, StringComparer.OrdinalIgnoreCase, ct)
+                .ConfigureAwait(false);
+
+            foreach (var row in upserts)
+            {
+                if (existingByPath.TryGetValue(row.LinkPath, out var existing))
+                {
+                    existing.VarFileId = row.VarFileId;
+                    existing.LinkKind = row.Kind;
+                    existing.Reason = row.Reason;
+                    existing.AliasedMissingRefKey = row.AliasKey;
+                }
+                else
+                {
+                    scopedDb.ActivationLinks.Add(new ActivationLink
+                    {
+                        ProfileId = profileId,
+                        VarFileId = row.VarFileId,
+                        LinkPath = row.LinkPath,
+                        LinkKind = row.Kind,
+                        LinkType = LinkType.Symlink,
+                        Reason = row.Reason,
+                        AliasedMissingRefKey = row.AliasKey,
+                        RequestedByPresetId = presetId,
+                    });
+                }
+            }
+
+            foreach (var path in removePaths)
+            {
+                if (existingByPath.TryGetValue(path, out var orphan))
+                    scopedDb.ActivationLinks.Remove(orphan);
+            }
+
+            await scopedDb.SaveChangesAsync(ct).ConfigureAwait(false);
+            await tx.CommitAsync(ct).ConfigureAwait(false);
+        }, WritePriority.Interactive, cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>Best-effort: never fail activation because usage scoring failed. (G1.)</summary>
-    private async Task RecordActivateUsageBestEffortAsync(IReadOnlyList<long> packageIds, CancellationToken cancellationToken)
+    private void RecordActivateUsageBestEffort(IReadOnlyList<long> packageIds)
     {
         if (packageIds.Count == 0)
             return;
-        try
+        var ids = packageIds.ToList();
+        _ = writeQueue.EnqueueScopedAsync(async (sp, ct) =>
         {
-            await usage.RecordManyAsync(packageIds, UsageKind.Activate, cancellationToken).ConfigureAwait(false);
-            // Recompute only the packages we just touched — full recompute would scan every historical user.
-            await usage.RecomputePackagesAsync(packageIds, cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception ex)
+            var analyzer = sp.GetRequiredService<IUsageAnalyzer>();
+            await analyzer.RecordManyAsync(ids, UsageKind.Activate, ct).ConfigureAwait(false);
+        }, WritePriority.Interactive, CancellationToken.None).ContinueWith(t =>
         {
-            logger.LogWarning(ex, "Usage feed failed after activation ({Count} packages); install links are intact.", packageIds.Count);
-        }
+            if (t.IsFaulted)
+                logger.LogWarning(t.Exception!.GetBaseException(),
+                    "Usage feed failed after activation ({Count} packages); install links are intact.", ids.Count);
+        }, TaskScheduler.Default);
+
+        jobQueue.Enqueue("Activation usage recompute", async ctx =>
+        {
+            using var scope = scopeFactory.CreateScope();
+            var analyzer = scope.ServiceProvider.GetRequiredService<IUsageAnalyzer>();
+            try
+            {
+                await analyzer.RecomputePackagesAsync(ids, ctx.Cancellation).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Usage recompute failed after activation ({Count} packages).", ids.Count);
+            }
+        });
     }
 
     private enum LinkOutcome { Created, Unchanged, Recreated, RefusedCollision, Privilege, Failed }
@@ -431,7 +517,7 @@ public sealed class EfActivationService(
         {
             var current = symlinks.ResolveTarget(linkPath);
             if (string.Equals(current, targetPath, StringComparison.OrdinalIgnoreCase))
-                return LinkOutcome.Unchanged; // already correct
+                return LinkOutcome.Unchanged;
             var del = symlinks.DeleteLink(linkPath);
             if (del.IsFailure)
                 return del.Error.Code == "symlink.privilege" ? LinkOutcome.Privilege : LinkOutcome.Failed;
@@ -440,7 +526,7 @@ public sealed class EfActivationService(
         }
 
         if (File.Exists(linkPath) || Directory.Exists(linkPath))
-            return LinkOutcome.RefusedCollision; // a real file/dir occupies the name — never clobber
+            return LinkOutcome.RefusedCollision;
 
         var create = symlinks.CreateFile(linkPath, targetPath);
         return Classify(create, LinkOutcome.Created);
@@ -463,49 +549,66 @@ public sealed class EfActivationService(
 
     private sealed record HotCopy(long VarFileId, string VarName, string MountPath, string RelativePath);
 
-    // The hottest online copy = the VarFile in the lowest-tier online repository. (3.4)
     private async Task<HotCopy?> PickHottestOnlineCopyAsync(long packageId, CancellationToken cancellationToken)
     {
         return await (
-            from v in db.VarFiles
-            join r in db.Repositories on v.RepositoryId equals r.Id
-            join p in db.Packages on v.PackageId equals p.Id
+            from v in db.VarFiles.AsNoTracking()
+            join r in db.Repositories.AsNoTracking() on v.RepositoryId equals r.Id
+            join p in db.Packages.AsNoTracking() on v.PackageId equals p.Id
             where v.PackageId == packageId && r.IsOnline && r.IsEnabled
             orderby r.Tier, r.PriorityInTier, v.Id
             select new HotCopy(v.Id, p.VarName, r.MountPath, v.RelativePath))
             .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<Profile> EnsureProfileAsync(LoadingPreset preset, string vamRoot, DateTime now, CancellationToken cancellationToken)
+    private async Task<ProfileInfo> EnsureProfileAsync(
+        long presetId, string presetName, string vamRoot, DateTime now, CancellationToken cancellationToken)
     {
-        Profile? profile = null;
-        if (preset.ProfileId is { } pid)
-            profile = await db.Profiles.FirstOrDefaultAsync(p => p.Id == pid, cancellationToken).ConfigureAwait(false);
+        var presetProfileId = await db.LoadingPresets.AsNoTracking()
+            .Where(p => p.Id == presetId)
+            .Select(p => p.ProfileId)
+            .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
 
-        if (profile is null)
+        if (presetProfileId is long pid)
         {
-            profile = new Profile
+            var profile = await db.Profiles.AsNoTracking()
+                .Where(p => p.Id == pid)
+                .Select(p => new ProfileInfo(p.Id, p.Name))
+                .FirstOrDefaultAsync(cancellationToken).ConfigureAwait(false);
+            if (profile is not null)
             {
-                Name = preset.Name,
-                DirPath = $"{ActivationPaths.SwitchDirName}/{preset.Name}", // relative — resolved against vamRoot on use
+                EnsureProfileDirs(vamRoot, profile.Name);
+                return profile;
+            }
+        }
+
+        var created = await writeQueue.EnqueueScopedAsync(async (sp, ct) =>
+        {
+            var scopedDb = sp.GetRequiredService<VarVaultDbContext>();
+            var loadingPreset = await scopedDb.LoadingPresets.FirstAsync(p => p.Id == presetId, ct).ConfigureAwait(false);
+            var profile = new Profile
+            {
+                Name = presetName,
+                DirPath = $"{ActivationPaths.SwitchDirName}/{presetName}",
                 CreatedAt = now,
                 UpdatedAt = now,
             };
-            db.Profiles.Add(profile);
-            await SaveAsync(cancellationToken).ConfigureAwait(false);
+            scopedDb.Profiles.Add(profile);
+            await scopedDb.SaveChangesAsync(ct).ConfigureAwait(false);
+            loadingPreset.ProfileId = profile.Id;
+            loadingPreset.UpdatedAt = now;
+            await scopedDb.SaveChangesAsync(ct).ConfigureAwait(false);
+            return new ProfileInfo(profile.Id, profile.Name);
+        }, WritePriority.Interactive, cancellationToken).ConfigureAwait(false);
 
-            preset.ProfileId = profile.Id;
-            preset.UpdatedAt = now;
-            await SaveAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        // Ensure the on-disk profile + link folders exist (idempotent).
-        Directory.CreateDirectory(ActivationPaths.ProfileDir(vamRoot, profile.Name));
-        Directory.CreateDirectory(ActivationPaths.VarsLinkDir(vamRoot, profile.Name));
-        Directory.CreateDirectory(ActivationPaths.MissingVarLinkDir(vamRoot, profile.Name));
-        return profile;
+        EnsureProfileDirs(vamRoot, created.Name);
+        return created;
     }
 
-    private Task SaveAsync(CancellationToken cancellationToken) =>
-        writeQueue.EnqueueAsync(ct => db.SaveChangesAsync(ct), WritePriority.Interactive, cancellationToken);
+    private static void EnsureProfileDirs(string vamRoot, string profileName)
+    {
+        Directory.CreateDirectory(ActivationPaths.ProfileDir(vamRoot, profileName));
+        Directory.CreateDirectory(ActivationPaths.VarsLinkDir(vamRoot, profileName));
+        Directory.CreateDirectory(ActivationPaths.MissingVarLinkDir(vamRoot, profileName));
+    }
 }

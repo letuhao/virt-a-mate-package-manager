@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using VarVault.Domain.Entities;
 using VarVault.Infrastructure.Persistence;
 using VarVault.Sdk.Import;
@@ -17,8 +18,10 @@ public sealed class EfImportHistoryStore(VarVaultDbContext db, IWriteQueue write
     private const int DefaultKeep = 200;
 
     public Task<Guid> RecordAsync(ImportRun run, CancellationToken cancellationToken = default) =>
-        writeQueue.EnqueueAsync(async ct =>
+        writeQueue.EnqueueScopedAsync(async (sp, ct) =>
         {
+            var scopedDb = sp.GetRequiredService<VarVaultDbContext>();
+            var scopedSettings = sp.GetRequiredService<ISettingsService>();
             var entity = new ImportRunEntity
             {
                 Id = run.Id == default ? Guid.NewGuid() : run.Id,
@@ -36,16 +39,15 @@ public sealed class EfImportHistoryStore(VarVaultDbContext db, IWriteQueue write
                     FileName = o.FileName, IdentityKey = o.IdentityKey, Lane = o.Lane.ToString(),
                     Decision = o.Decision.ToString(), Result = o.Ok ? "ok" : "failed", Reason = o.Reason,
                 });
-            db.ImportRuns.Add(entity);
-            await db.SaveChangesAsync(ct).ConfigureAwait(false);
+            scopedDb.ImportRuns.Add(entity);
+            await scopedDb.SaveChangesAsync(ct).ConfigureAwait(false);
 
-            // Prune oldest beyond the keep limit. (5.10)
-            var keep = await ResolveKeepAsync(ct).ConfigureAwait(false);
-            var stale = await db.ImportRuns.OrderByDescending(r => r.StartedUtc).Skip(keep).ToListAsync(ct).ConfigureAwait(false);
+            var keep = await ResolveKeepAsync(scopedSettings, ct).ConfigureAwait(false);
+            var stale = await scopedDb.ImportRuns.OrderByDescending(r => r.StartedUtc).Skip(keep).ToListAsync(ct).ConfigureAwait(false);
             if (stale.Count > 0)
             {
-                db.ImportRuns.RemoveRange(stale);
-                await db.SaveChangesAsync(ct).ConfigureAwait(false);
+                scopedDb.ImportRuns.RemoveRange(stale);
+                await scopedDb.SaveChangesAsync(ct).ConfigureAwait(false);
             }
             return entity.Id;
         }, WritePriority.Normal, cancellationToken);
@@ -103,9 +105,9 @@ public sealed class EfImportHistoryStore(VarVaultDbContext db, IWriteQueue write
             page.SafePageSize);
     }
 
-    private async Task<int> ResolveKeepAsync(CancellationToken ct)
+    private static async Task<int> ResolveKeepAsync(ISettingsService scopedSettings, CancellationToken ct)
     {
-        var raw = await settings.GetAsync(KeepKey, ct).ConfigureAwait(false);
+        var raw = await scopedSettings.GetAsync(KeepKey, ct).ConfigureAwait(false);
         return int.TryParse(raw, out var k) && k > 0 ? k : DefaultKeep;
     }
 

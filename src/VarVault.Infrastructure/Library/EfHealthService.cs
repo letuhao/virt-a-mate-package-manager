@@ -1,6 +1,7 @@
 using System.IO;
 using System.IO.Compression;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using VarVault.Common;
 using VarVault.Domain.Content;
 using VarVault.Domain.Entities;
@@ -132,10 +133,11 @@ public sealed class EfHealthService(
 
         if (statusUpdates.Count > 0)
         {
-            await writeQueue.EnqueueAsync(async ct =>
+            await writeQueue.EnqueueScopedAsync(async (sp, ct) =>
             {
+                var scopedDb = sp.GetRequiredService<VarVaultDbContext>();
                 var ids = statusUpdates.Keys.ToList();
-                var rows = await db.VarFiles.Where(v => ids.Contains(v.Id)).ToListAsync(ct).ConfigureAwait(false);
+                var rows = await scopedDb.VarFiles.Where(v => ids.Contains(v.Id)).ToListAsync(ct).ConfigureAwait(false);
                 foreach (var row in rows)
                 {
                     if (!statusUpdates.TryGetValue(row.Id, out var next))
@@ -148,7 +150,7 @@ public sealed class EfHealthService(
                     row.IntegrityStatus = next;
                 }
 
-                await db.SaveChangesAsync(ct).ConfigureAwait(false);
+                await scopedDb.SaveChangesAsync(ct).ConfigureAwait(false);
             }, cancellationToken: cancellationToken).ConfigureAwait(false);
         }
 

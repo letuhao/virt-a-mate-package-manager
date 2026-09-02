@@ -1,3 +1,5 @@
+using Microsoft.Extensions.DependencyInjection;
+
 namespace VarVault.Sdk.Threading;
 
 /// <summary>
@@ -13,6 +15,15 @@ public interface IWriteQueue
 
     /// <summary>Enqueue a write and await its completion.</summary>
     Task EnqueueAsync(Func<CancellationToken, Task> write, WritePriority priority = WritePriority.Normal, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Enqueue a catalog write that runs inside a fresh DI scope so the worker thread never
+    /// shares the caller's scoped <c>DbContext</c>. Prefer this for all EF mutations.
+    /// </summary>
+    Task<T> EnqueueScopedAsync<T>(Func<IServiceProvider, CancellationToken, Task<T>> write, WritePriority priority = WritePriority.Normal, CancellationToken cancellationToken = default);
+
+    /// <summary>Scoped variant of <see cref="EnqueueAsync(Func{CancellationToken, Task}, WritePriority, CancellationToken)"/>.</summary>
+    Task EnqueueScopedAsync(Func<IServiceProvider, CancellationToken, Task> write, WritePriority priority = WritePriority.Normal, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Interactive writes jump ahead of bulk writes.</summary>

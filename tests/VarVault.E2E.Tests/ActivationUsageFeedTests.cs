@@ -77,6 +77,47 @@ public sealed class ActivationUsageFeedTests
         Assert.Equal(beforeDeact, await db.UsageEvents.CountAsync());
     }
 
+    [Fact]
+    public async Task Activate_does_not_share_dbcontext_with_usage_recompute()
+    {
+        await using var host = TestHost.Create(withPersistence: true);
+        using var repoDir = new TempDirectory();
+        using var vamDir = new TempDirectory();
+        var repoId = await Register(host, repoDir.Path);
+
+        WriteVar(repoDir, "A.Look.1.var", "A", "Look", "A.Base.1");
+        WriteVar(repoDir, "A.Base.1.var", "A", "Base");
+        await host.Get<IIndexingService>().IndexRepositoryAsync(repoId, repoDir.Path);
+
+        using var scope = host.Host.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<ISettingsService>().SetAsync(SettingKeys.VamPath, vamDir.Path);
+        await scope.ServiceProvider.GetRequiredService<VarVault.Domain.Dependencies.IDependencyResolver>().ResolveAllAsync();
+
+        var preset = (await scope.ServiceProvider.GetRequiredService<IPresetService>()
+            .CreateAsync("P", ["A.Look.1"])).Value;
+        var activation = scope.ServiceProvider.GetRequiredService<IActivationService>();
+        var db = scope.ServiceProvider.GetRequiredService<VarVaultDbContext>();
+
+        var first = await activation.BuildProfileLinksAsync(preset.Id);
+        if (first.PrivilegeFailures > 0)
+            return;
+
+        // Second activation enqueues scoped usage writes + background recompute.
+        // Sequential reads on the caller context must stay healthy (no shared-context crash).
+        await activation.BuildProfileLinksAsync(preset.Id);
+
+        for (var i = 0; i < 40; i++)
+        {
+            _ = await db.Packages.AsNoTracking().CountAsync();
+            if (await db.UsageEvents.AsNoTracking().CountAsync() >= 4)
+                break;
+            await Task.Delay(50);
+        }
+
+        Assert.True(await db.UsageEvents.AsNoTracking().CountAsync() >= 4);
+        _ = await db.UsageStats.AsNoTracking().CountAsync();
+    }
+
     private static async Task<Guid> Register(TestHost host, string path)
     {
         using var scope = host.Host.Services.CreateScope();

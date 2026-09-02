@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using Microsoft.Extensions.DependencyInjection;
 using VarVault.Common.Diagnostics;
 using VarVault.Sdk.Threading;
 
@@ -24,9 +25,11 @@ internal sealed class WriteQueue : IWriteQueue, IAsyncDisposable
     private readonly Task _consumer;
     private readonly ObservableGauge<int> _depthGauge;
     private readonly IGlobalWriteLock _globalLock;
+    private readonly IServiceScopeFactory _scopeFactory;
 
-    public WriteQueue(IGlobalWriteLock? globalLock = null)
+    public WriteQueue(IServiceScopeFactory scopeFactory, IGlobalWriteLock? globalLock = null)
     {
+        _scopeFactory = scopeFactory;
         _globalLock = globalLock ?? new NullWriteLock();
         _depthGauge = Telemetry.Meter.CreateObservableGauge("varvault.writequeue.depth", () => Depth);
         _consumer = Task.Run(ConsumeAsync);
@@ -69,6 +72,16 @@ internal sealed class WriteQueue : IWriteQueue, IAsyncDisposable
         _signal.Release();
         return tcs.Task;
     }
+
+    public Task EnqueueScopedAsync(Func<IServiceProvider, CancellationToken, Task> write, WritePriority priority = WritePriority.Normal, CancellationToken cancellationToken = default) =>
+        EnqueueScopedAsync(async (sp, ct) => { await write(sp, ct).ConfigureAwait(false); return true; }, priority, cancellationToken);
+
+    public Task<T> EnqueueScopedAsync<T>(Func<IServiceProvider, CancellationToken, Task<T>> write, WritePriority priority = WritePriority.Normal, CancellationToken cancellationToken = default) =>
+        EnqueueAsync(async ct =>
+        {
+            using var scope = _scopeFactory.CreateScope();
+            return await write(scope.ServiceProvider, ct).ConfigureAwait(false);
+        }, priority, cancellationToken);
 
     private async Task ConsumeAsync()
     {
