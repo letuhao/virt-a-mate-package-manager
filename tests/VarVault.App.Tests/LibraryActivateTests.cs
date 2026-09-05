@@ -5,29 +5,27 @@ using Avalonia.Headless.XUnit;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using VarVault.App.ViewModels;
+using VarVault.Domain.Activation;
 using VarVault.Domain.Dependencies;
 using VarVault.Domain.Entities;
 using VarVault.Infrastructure.Persistence;
-using VarVault.Sdk.Activation;
 using VarVault.Sdk.Indexing;
 using VarVault.Sdk.Library;
-using VarVault.Sdk.Presets;
 using VarVault.Sdk.Settings;
 using VarVault.TestKit;
 
 namespace VarVault.App.Tests;
 
 /// <summary>
-/// doc 26 · G-5 — the Library ops-bar "Install"/"Uninstall" (the mockup's two primary actions, absent per
-/// audit 25 §5.2). Install activates the selection via a dedicated "Library installs" preset; Uninstall
-/// removes them. Link materialization needs symlink privilege (Developer Mode); the test skips the on-disk
-/// assertion when it's unavailable, but still exercises the whole VM→SDK path.
+/// doc 26 · G-5 — Library ops-bar Install/Uninstall must target the currently active AddonPackages
+/// profile (not a dedicated "Library installs" profile). Link materialization needs symlink privilege;
+/// the test skips the on-disk assertion when it's unavailable, but still asserts catalog rows.
 /// </summary>
 [Trait("Category", TestCategories.E2E)]
 public class LibraryActivateTests
 {
     [AvaloniaFact]
-    public async Task Install_selected_activates_then_uninstall_removes_links()
+    public async Task Install_selected_targets_active_profile_then_uninstall_removes_links()
     {
         await using var host = TestHost.Create(withPersistence: true);
         using var repoDir = new TempDirectory();
@@ -42,10 +40,13 @@ public class LibraryActivateTests
         await sp.GetRequiredService<ISettingsService>().SetAsync(SettingKeys.VamPath, vamDir.Path);
         await sp.GetRequiredService<IDependencyResolver>().ResolveAllAsync();
 
+        var profiles = sp.GetRequiredService<IProfileService>();
+        Assert.True((await profiles.CreateAsync("Live")).IsSuccess);
+        Assert.True((await profiles.SwitchToAsync("Live")).IsSuccess);
+
         var lib = new LibraryViewModel(
             sp.GetRequiredService<ILibraryQueryService>(),
-            presets: sp.GetService<IPresetService>(),
-            activation: sp.GetService<IActivationService>());
+            actions: sp.GetRequiredService<ILibraryActionService>());
         await lib.RefreshAsync();
         UiE2E.Pump();
         Assert.Equal(2, lib.Items.Count);
@@ -57,13 +58,24 @@ public class LibraryActivateTests
 
         var db = sp.GetRequiredService<VarVaultDbContext>();
         if (lib.LastActionMessage?.Contains("Developer Mode") == true)
-            return; // no symlink privilege in this environment — install aborts atomically (0 links)
+            return; // no symlink privilege — install aborts atomically (0 links)
 
-        Assert.Equal(2, await db.ActivationLinks.CountAsync()); // both selected packages linked
+        var liveId = await db.Profiles.Where(p => p.Name == "Live").Select(p => p.Id).SingleAsync();
+        Assert.Equal(2, await db.ActivationLinks.CountAsync(l => l.ProfileId == liveId));
+        Assert.False(await db.Profiles.AnyAsync(p => p.Name == "Library installs"));
+        Assert.Equal(0, await db.ActivationLinks.CountAsync(l =>
+            db.Profiles.Any(p => p.Id == l.ProfileId && p.Name == "Library installs")));
+
+        var varsLink = ActivationPaths.VarsLinkDir(vamDir.Path, "Live");
+        if (Directory.Exists(varsLink))
+        {
+            var links = Directory.GetFiles(varsLink);
+            Assert.Equal(2, links.Length);
+        }
 
         await lib.UninstallSelectedCommand.ExecuteAsync(null);
         UiE2E.Pump();
-        Assert.Equal(0, await db.ActivationLinks.CountAsync()); // links removed
+        Assert.Equal(0, await db.ActivationLinks.CountAsync(l => l.ProfileId == liveId));
     }
 
     private static async Task<System.Guid> RegisterAsync(TestHost host, string path)

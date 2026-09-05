@@ -34,4 +34,14 @@ public interface ILibraryActionService
     /// <summary>Bulk favorite/unfavorite in one write-queue transaction.</summary>
     Task<BulkActionResult> SetFavoritesAsync(IReadOnlyList<long> packageIds, bool isFavorite, CancellationToken cancellationToken = default)
         => Task.FromResult(new BulkActionResult(0, packageIds.Count));
+
+    /// <summary>Add var names to the active loading preset and rebuild its profile links (Library Install).</summary>
+    Task<MissingLogActivation> InstallIntoActiveProfileAsync(
+        IReadOnlyList<string> varNames, CancellationToken cancellationToken = default)
+        => Task.FromResult(new MissingLogActivation(0, 0, 0, 0));
+
+    /// <summary>Remove var names from the active loading preset and rebuild its profile links (Library Uninstall).</summary>
+    Task<MissingLogActivation> UninstallFromActiveProfileAsync(
+        IReadOnlyList<string> varNames, CancellationToken cancellationToken = default)
+        => Task.FromResult(new MissingLogActivation(0, 0, 0, 0));
 }

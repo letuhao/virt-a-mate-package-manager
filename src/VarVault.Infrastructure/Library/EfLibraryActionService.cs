@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using VarVault.Domain.Dedup;
 using VarVault.Domain.Safety;
 using VarVault.Infrastructure.Persistence;
+using VarVault.Sdk.Activation;
 using VarVault.Sdk.Library;
 using VarVault.Sdk.Presets;
 using VarVault.Sdk.Threading;
@@ -21,8 +22,11 @@ public sealed class EfLibraryActionService(
     IPresetService presets,
     IHealthService health,
     ITrashService trash,
-    VarVault.Sdk.Threading.IWriteQueue writeQueue) : ILibraryActionService
+    VarVault.Sdk.Threading.IWriteQueue writeQueue,
+    IActivationService activation,
+    IProfileService profiles) : ILibraryActionService
 {
+    private readonly ActivePresetActivationHelper _active = new(db, presets, activation, profiles);
     public async Task<BulkActionResult> AddToPresetAsync(long presetId, IReadOnlyList<long> packageIds, CancellationToken cancellationToken = default)
     {
         var names = await db.Packages.Where(p => packageIds.Contains(p.Id)).Select(p => p.VarName)
@@ -194,4 +198,12 @@ public sealed class EfLibraryActionService(
         var unmatched = wanted.Where(w => !matchedNames.Contains(w)).ToList();
         return new TxtResolveResult(owned.Select(o => o.Id).ToList(), unmatched);
     }
+
+    public Task<MissingLogActivation> InstallIntoActiveProfileAsync(
+        IReadOnlyList<string> varNames, CancellationToken cancellationToken = default) =>
+        _active.ActivateAsync(varNames, cancellationToken);
+
+    public Task<MissingLogActivation> UninstallFromActiveProfileAsync(
+        IReadOnlyList<string> varNames, CancellationToken cancellationToken = default) =>
+        _active.UninstallAsync(varNames, cancellationToken);
 }

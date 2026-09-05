@@ -70,54 +70,42 @@ public sealed partial class LibraryViewModel(
         LastActionMessage = $"Matched {res.MatchedPackageIds.Count}, {res.Unmatched.Count} not owned";
     }
 
-    // ── Bulk Install / Uninstall via a dedicated "Library installs" preset (doc 26 · G-5) ────────────────
-    // Reuses the proven activation path: Install = add members + build links; Uninstall = remove members + rebuild.
-    private const string LibraryPresetName = "Library installs";
-
-    private async Task<long?> EnsureLibraryPresetAsync(CancellationToken cancellationToken)
-    {
-        if (presets is null)
-            return null;
-        var existing = (await presets.ListAsync(cancellationToken).ConfigureAwait(true)).FirstOrDefault(p => p.Name == LibraryPresetName);
-        if (existing is not null)
-            return existing.Id;
-        var created = await presets.CreateAsync(LibraryPresetName, [], cancellationToken).ConfigureAwait(true);
-        return created.IsSuccess ? created.Value.Id : (long?)null;
-    }
-
-    /// <summary>Ops-bar "Install": activate the selected packages (materialize per-var symlinks). (doc 26 · G-5)</summary>
+    /// <summary>Ops-bar "Install": add selected packages to the active loading preset and materialize links. (doc 26 · G-5)</summary>
     [RelayCommand]
     public async Task InstallSelectedAsync(CancellationToken cancellationToken = default)
     {
-        if (activation is null || presets is null || SelectedCount == 0)
+        if (actions is null || SelectedCount == 0)
             return;
-        var presetId = await EnsureLibraryPresetAsync(cancellationToken).ConfigureAwait(true);
-        if (presetId is null) { LastActionMessage = "Could not prepare the library preset."; return; }
-        var count = SelectedCount;
-        foreach (var entry in await ResolveSelectedEntriesAsync(cancellationToken).ConfigureAwait(true))
-            await presets.AddMemberAsync(presetId.Value, entry.VarName, cancellationToken).ConfigureAwait(true);
-        var r = await activation.BuildProfileLinksAsync(presetId.Value, cancellationToken).ConfigureAwait(true);
+        var names = (await ResolveSelectedEntriesAsync(cancellationToken).ConfigureAwait(true))
+            .Select(e => e.VarName)
+            .ToList();
+        var count = names.Count;
+        var r = await actions.InstallIntoActiveProfileAsync(names, cancellationToken).ConfigureAwait(true);
         LastActionMessage = r.PrivilegeFailures > 0
             ? "Enable Windows Developer Mode (or run elevated) to create symlinks."
-            : $"Installed {count} selected → {r.LinksCreated} linked, {r.MissingPackages} missing";
+            : r.PathUnavailable > 0
+                ? "VaM install path is not set or does not exist — set it in Settings before installing."
+                : $"Installed {count} selected → {r.LinksCreated} linked, {r.StillMissing} missing";
         ShowToast?.Invoke(LastActionMessage, null);
         await RefreshLoadedRowsAsync(cancellationToken).ConfigureAwait(true);
     }
 
-    /// <summary>Ops-bar "Uninstall": deactivate the selected packages (remove their symlinks). (doc 26 · G-5)</summary>
+    /// <summary>Ops-bar "Uninstall": remove selected packages from the active loading preset and rebuild links. (doc 26 · G-5)</summary>
     [RelayCommand]
     public async Task UninstallSelectedAsync(CancellationToken cancellationToken = default)
     {
-        if (activation is null || presets is null || SelectedCount == 0)
+        if (actions is null || SelectedCount == 0)
             return;
-        var presetId = await EnsureLibraryPresetAsync(cancellationToken).ConfigureAwait(true);
-        if (presetId is null)
-            return;
-        var count = SelectedCount;
-        foreach (var entry in await ResolveSelectedEntriesAsync(cancellationToken).ConfigureAwait(true))
-            await presets.RemoveMemberAsync(presetId.Value, entry.VarName, cancellationToken).ConfigureAwait(true);
-        var r = await activation.BuildProfileLinksAsync(presetId.Value, cancellationToken).ConfigureAwait(true);
-        LastActionMessage = $"Uninstalled {count} selected → {r.LinksRemoved} links removed";
+        var names = (await ResolveSelectedEntriesAsync(cancellationToken).ConfigureAwait(true))
+            .Select(e => e.VarName)
+            .ToList();
+        var count = names.Count;
+        var r = await actions.UninstallFromActiveProfileAsync(names, cancellationToken).ConfigureAwait(true);
+        LastActionMessage = r.PrivilegeFailures > 0
+            ? "Enable Windows Developer Mode (or run elevated) to create symlinks."
+            : r.PathUnavailable > 0
+                ? "VaM install path is not set or does not exist — set it in Settings before uninstalling."
+                : $"Uninstalled {count} selected → {r.LinksRemoved} links removed";
         ShowToast?.Invoke(LastActionMessage, null);
         await RefreshLoadedRowsAsync(cancellationToken).ConfigureAwait(true);
     }

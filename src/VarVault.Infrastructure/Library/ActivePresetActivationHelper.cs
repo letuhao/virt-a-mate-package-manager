@@ -8,8 +8,8 @@ using VarVault.Sdk.Presets;
 namespace VarVault.Infrastructure.Library;
 
 /// <summary>
-/// Shared “add these var names to the active loading preset + rebuild links” path used by VaM-log repair
-/// and installed-deps repair. Never invents a disposable repair preset.
+/// Shared “add/remove these var names on the active loading preset + rebuild links” path used by
+/// Library Install, VaM-log repair, and installed-deps repair. Never invents a disposable repair preset.
 /// </summary>
 internal sealed class ActivePresetActivationHelper(
     VarVaultDbContext db,
@@ -63,6 +63,39 @@ internal sealed class ActivePresetActivationHelper(
             PrivilegeFailures: build.PrivilegeFailures,
             UnresolvedDependencies: build.UnresolvedDependencies,
             PathUnavailable: build.PathUnavailable);
+    }
+
+    /// <summary>Remove members from the active loading preset and rebuild its profile links.</summary>
+    public async Task<MissingLogActivation> UninstallAsync(
+        IReadOnlyList<string> varNames,
+        CancellationToken cancellationToken = default)
+    {
+        var members = varNames.Where(n => !string.IsNullOrWhiteSpace(n)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (members.Count == 0)
+            return new MissingLogActivation(0, 0, 0, 0);
+
+        var target = await ResolveActivePresetAsync(cancellationToken).ConfigureAwait(false);
+        if (target is null)
+            return new MissingLogActivation(0, 0, 0, 0);
+
+        var removed = 0;
+        foreach (var name in members)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await presets.RemoveMemberAsync(target.Value, name, cancellationToken).ConfigureAwait(false);
+            if (result.IsSuccess)
+                removed++;
+        }
+
+        var build = await activation.BuildProfileLinksAsync(target.Value, cancellationToken).ConfigureAwait(false);
+        return new MissingLogActivation(
+            MembersActivated: removed,
+            LinksCreated: build.LinksCreated,
+            StillMissing: build.MissingPackages,
+            PrivilegeFailures: build.PrivilegeFailures,
+            UnresolvedDependencies: build.UnresolvedDependencies,
+            PathUnavailable: build.PathUnavailable,
+            LinksRemoved: build.LinksRemoved);
     }
 
     private async Task<long?> ResolveActivePresetAsync(CancellationToken cancellationToken)

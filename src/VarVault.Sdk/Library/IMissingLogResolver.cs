@@ -26,7 +26,8 @@ public sealed record MissingLogActivation(
     int StillMissing,         // closure packages with no online copy to link (need import)
     int PrivilegeFailures,    // >0 → symlink privilege denied (needs Developer Mode / admin)
     int UnresolvedDependencies = 0, // unresolved members + transitive refs that stopped a branch
-    int PathUnavailable = 0); // 1 when VaM path unset/missing
+    int PathUnavailable = 0,        // 1 when VaM path unset/missing
+    int LinksRemoved = 0);          // orphaned links deleted on rebuild (Library uninstall)
 
 /// <summary>
 /// Turns a pasted VaM error log into an actionable repair: parse the missing <c>Creator.Package.version</c> refs
